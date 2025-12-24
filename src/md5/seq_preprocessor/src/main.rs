@@ -101,7 +101,7 @@ struct Cli {
     /// 一个开关，用于禁止在每个样本子目录中创建独立的 MD5 文件。
     #[arg(long)]
     no_per_sample_md5: bool,
-    
+
     /// 生成一个 JSON 格式的重命名报告文件。
     #[arg(long)]
     json_report: Option<PathBuf>,
@@ -128,6 +128,8 @@ fn main() -> Result<()> {
     // --- (PE) 两个独立的、更简单的正则表达式 ---
     let re_illumina = Regex::new(r"^(.*?)_S\d+_L\d+_([Rr][12])_\d+\.f(ast)?q\.gz$").unwrap();
     let re_generic = Regex::new(r"^(.*)[\._]([Rr][12]|[12])\.f(ast)?q\.gz$").unwrap();
+    // --- 新增：(PE) 用于匹配带 .raw 的文件格式，如 L1MKK1806607-a1.R1.raw.fastq.gz ---
+    let re_with_raw = Regex::new(r"^(.+)\.([Rr][12])\.raw\.f(ast)?q\.gz$").unwrap();
     // --- 新增：(SE) 用于匹配 Long-read 的正则表达式 ---
     let re_long_read = Regex::new(r"^(.*?)(\.f(ast)?q\.gz)$").unwrap();
     // --- 新增：(SRA) 用于匹配 SRA 数据的正则表达式 ---
@@ -137,7 +139,7 @@ fn main() -> Result<()> {
 
     // --- 遍历所有传入的 input 路径 ---
     for input_path in &cli.input {
-        
+
         // 检查路径是否存在 (移到循环内部)
         if !input_path.exists() {
             anyhow::bail!("输入路径不存在: {}", input_path.display());
@@ -193,7 +195,23 @@ fn main() -> Result<()> {
                     }
                 }
 
-                // 3. 尝试匹配 PE (Generic) - Check this last to avoid conflicts with more specific patterns
+                // 3. 尝试匹配 PE (with .raw) - Check this before generic to handle .raw files
+                if !matched && (cli.library_type == LibraryType::Auto || cli.library_type == LibraryType::ShortRead) {
+                    if let Some(caps) = re_with_raw.captures(file_name) {
+                        if let (Some(sample), Some(pair_cap)) = (caps.get(1), caps.get(2)) {
+                            let read_pair = if pair_cap.as_str().to_lowercase() == "r1" { "R1" } else { "R2" }.to_string();
+                            pe_fastq_files.push(SampleFileInfo {
+                                sample_name: sample.as_str().to_string(),
+                                read_pair,
+                                original_path: path.to_path_buf(),
+                                is_sra: false, // Not SRA data
+                            });
+                            matched = true;
+                        }
+                    }
+                }
+
+                // 4. 尝试匹配 PE (Generic) - Check this last to avoid conflicts with more specific patterns
                 if !matched && (cli.library_type == LibraryType::Auto || cli.library_type == LibraryType::ShortRead) {
                      if let Some(caps) = re_generic.captures(file_name) {
                         if let (Some(sample), Some(pair_cap)) = (caps.get(1), caps.get(2)) {
@@ -245,7 +263,7 @@ fn main() -> Result<()> {
                          }
                     }
                 }
-                
+
                 // 4. 处理未匹配或 MD5
                 if !matched {
                     if file_name.ends_with(".fq.gz") || file_name.ends_with(".fastq.gz") {
@@ -269,24 +287,25 @@ fn main() -> Result<()> {
         error_message.push_str("\n根据您选择的 --library-type 模式，预期的模式为: \n");
         if cli.library_type == LibraryType::Auto || cli.library_type == LibraryType::ShortRead {
             error_message.push_str("  1. PE 模式 (Illumina): <样本名>_S..._L..._R[12]_...fq.gz\n");
-            error_message.push_str("  2. PE 模式 (Generic): <样本名>[._][R12|12].fq.gz\n");
-            error_message.push_str("  3. PE 模式 (SRA): [SED]RR#######[._][12].fq.gz (e.g., SRR######_1.fq.gz)\n");
+            error_message.push_str("  2. PE 模式 (with .raw): <样本名>.<R1/R2>.raw.fq.gz (如: L1MKK1806607-a1.R1.raw.fastq.gz)\n");
+            error_message.push_str("  3. PE 模式 (Generic): <样本名>[._][R12|12].fq.gz\n");
+            error_message.push_str("  4. PE 模式 (SRA): [SED]RR#######[._][12].fq.gz (e.g., SRR######_1.fq.gz)\n");
         }
         if cli.library_type == LibraryType::Auto || cli.library_type == LibraryType::LongRead {
-            error_message.push_str("  4. SE 模式: <样本名>.fq.gz (且不符合上述 PE 模式)\n");
-            error_message.push_str("  5. SE 模式 (SRA): [SED]RR#######.fq.gz (e.g., SRR#######.fq.gz)\n");
+            error_message.push_str("  5. SE 模式: <样本名>.fq.gz (且不符合上述 PE 模式)\n");
+            error_message.push_str("  6. SE 模式 (SRA): [SED]RR#######.fq.gz (e.g., SRR#######.fq.gz)\n");
         }
         anyhow::bail!(error_message);
     }
 
     // --- 修改：更新扫描完成的日志 ---
     println!(
-        "- 扫描完成: 找到 {} 个 PE 文件, {} 个 SE 文件, {} 个 MD5 文件。", 
-        pe_fastq_files.len(), 
-        se_fastq_files.len(), 
+        "- 扫描完成: 找到 {} 个 PE 文件, {} 个 SE 文件, {} 个 MD5 文件。",
+        pe_fastq_files.len(),
+        se_fastq_files.len(),
         md5_files.len()
     );
-    
+
     // 2. 解析所有 MD5 文件
     let mut checksum_map: HashMap<String, String> = HashMap::new();
     println!("- 开始解析 MD5 文件...");
@@ -328,24 +347,24 @@ fn main() -> Result<()> {
     // --- 修改：更新日志 ---
     println!("- 已将 PE 文件整理为 {} 个独立样本。", pe_samples.len());
     println!("- 已找到 {} 个 SE 样本。", se_fastq_files.len());
-    
+
     // 准备报告和总 MD5
     let mut summary_md5_lines: Vec<String> = Vec::new();
     let mut json_report_entries: Vec<RenamingReportEntry> = Vec::new();
 
     // --- 4. 准备文件处理辅助函数 ---
     // --- 新增：将文件处理逻辑提取为辅助函数，以便 PE 和 SE 都能调用 ---
-    
+
     #[cfg(unix)]
     /// (Unix) 辅助函数：处理单个文件（R1, R2, 或 SE），创建或验证软链接
     fn process_file_link(
-        new_path: &PathBuf, 
-        original_path: &PathBuf, 
+        new_path: &PathBuf,
+        original_path: &PathBuf,
         read_name: &str, // "R1", "R2", "SE"
         sample_name: &str,
     ) -> Result<()> {
         if new_path.exists() {
-            match read_link(new_path) { 
+            match read_link(new_path) {
                 Ok(target) => {
                     if target == *original_path {
                         println!("    - 文件 {} ({}) 已存在且指向正确，跳过。", new_path.file_name().unwrap_or_default().to_string_lossy(), read_name);
@@ -362,7 +381,7 @@ fn main() -> Result<()> {
                 },
                 Err(_) => {
                     // 不是软链接，或者读取失败（例如是普通文件），先删除
-                    println!("    - 文件 {} ({}) 存在但不是有效软链接，正在删除并重建...", 
+                    println!("    - 文件 {} ({}) 存在但不是有效软链接，正在删除并重建...",
                         new_path.file_name().unwrap_or_default().to_string_lossy(),
                         read_name,
                     );
@@ -370,7 +389,7 @@ fn main() -> Result<()> {
                 }
             }
         }
-        
+
         // 创建新的软链接
         symlink(original_path, new_path)
             .context(format!("无法为样本 {} 创建软链接 {}: {}", sample_name, read_name, new_path.display()))?;
@@ -381,8 +400,8 @@ fn main() -> Result<()> {
     #[cfg(not(unix))]
     /// (Non-Unix) 辅助函数：处理单个文件（R1, R2, 或 SE），复制文件
     fn process_file_copy(
-        new_path: &PathBuf, 
-        original_path: &PathBuf, 
+        new_path: &PathBuf,
+        original_path: &PathBuf,
         read_name: &str, // "R1", "R2", "SE"
         _sample_name: &str, // _sample_name 变为未使用，但保持签名一致
     ) -> Result<()> {
@@ -461,12 +480,12 @@ fn main() -> Result<()> {
                 println!("    - 已生成样本 MD5 文件: {}", cli.md5_name);
             }
         }
-        
+
         let relative_r1_path = PathBuf::from(&sample_name).join(&new_r1_name);
         let relative_r2_path = PathBuf::from(&sample_name).join(&new_r2_name);
         if let Some(c) = &checksum_r1 { summary_md5_lines.push(format!("{}  {}", c, relative_r1_path.display())); }
         if let Some(c) = &checksum_r2 { summary_md5_lines.push(format!("{}  {}", c, relative_r2_path.display())); }
-        
+
         // --- 修改：填充 JSON 报告条目 (PE) ---
         if cli.json_report.is_some() {
             json_report_entries.push(RenamingReportEntry {
@@ -486,7 +505,7 @@ fn main() -> Result<()> {
             });
         }
     } // --- PE 循环结束 ---
-    
+
 
     // --- 6. 新增：处理 SE (Long-Read) 样本 ---
     for se_file_info in &se_fastq_files {
@@ -525,8 +544,8 @@ fn main() -> Result<()> {
 
         if !cli.no_per_sample_md5 {
             let mut per_sample_md5_content = String::new();
-            if let Some(c) = &checksum_se { 
-                per_sample_md5_content.push_str(&format!("{}  {}\n", c, new_se_name)); 
+            if let Some(c) = &checksum_se {
+                per_sample_md5_content.push_str(&format!("{}  {}\n", c, new_se_name));
             }
 
             if !per_sample_md5_content.is_empty() {
@@ -536,18 +555,18 @@ fn main() -> Result<()> {
                 println!("    - 已生成样本 MD5 文件: {}", cli.md5_name);
             }
         }
-        
+
         let relative_se_path = PathBuf::from(sample_name).join(&new_se_name);
-        if let Some(c) = &checksum_se { 
-            summary_md5_lines.push(format!("{}  {}", c, relative_se_path.display())); 
+        if let Some(c) = &checksum_se {
+            summary_md5_lines.push(format!("{}  {}", c, relative_se_path.display()));
         }
-        
+
         // --- 填充 JSON 报告条目 (SE) ---
         if cli.json_report.is_some() {
             json_report_entries.push(RenamingReportEntry {
                 sample_name: sample_name.clone(),
                 library_type: "SE".to_string(),
-                
+
                 new_r1_path_relative: None,
                 original_r1_path_absolute: None,
                 new_r2_path_relative: None,
@@ -576,7 +595,7 @@ fn main() -> Result<()> {
             println!("\n- 未找到任何 MD5 信息，因此未生成总纲 MD5 文件。");
         }
     }
-    
+
     // --- 在所有样本处理完后，写入 JSON 报告文件 ---
     if let Some(report_path) = &cli.json_report {
         if !json_report_entries.is_empty() {
