@@ -40,10 +40,10 @@
 
 ```bash
 # 编译 seq_preprocessor 并放置到指定目录
-cargo build --target-dir ../release/seq_preprocessor_x86_64 --release
+cargo build --target-dir ../Compile_release/seq_preprocessor_x86_64 --release
 ```
 
-编译后的可执行文件将位于 `../release/seq_preprocessor_x86_64/release/` 目录下。
+编译后的可执行文件将位于 `../Compile_release/seq_preprocessor_x86_64/release/` 目录下。
 
 ### 使用示例
 
@@ -83,10 +83,10 @@ cargo build --target-dir ../release/seq_preprocessor_x86_64 --release
 
 ```bash
 # 编译 json_md5_verifier 并放置到指定目录
-cargo build --target-dir ../release/json_md5_verifier_x86_64 --release
+cargo build --target-dir ../Compile_release/json_md5_verifier_x86_64 --release
 ```
 
-编译后的可执行文件将位于 `../release/json_md5_verifier_x86_64/release/` 目录下。
+编译后的可执行文件将位于 `../Compile_release/json_md5_verifier_x86_64/release/` 目录下。
 
 ### 使用示例
 
