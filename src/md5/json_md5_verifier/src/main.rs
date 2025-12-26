@@ -10,6 +10,7 @@ use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
 use std::sync::Arc;
+use tui_banner::{Banner, Style};
 
 // --- 数据结构 ---
 
@@ -224,6 +225,9 @@ fn generate_report(results: &[VerificationResult], output_file: &Path) -> Result
 // --- 主函数 ---
 
 fn main() -> Result<()> {
+    let banner = Banner::new("MD5 Verifier")?.style(Style::NeonCyber).render();
+    println!("{}", banner);
+
     let cli = Cli::parse();
     setup_logger(&cli.log_file)?;
 
