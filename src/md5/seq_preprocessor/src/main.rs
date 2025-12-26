@@ -14,6 +14,7 @@ use walkdir::WalkDir;
 // --- 引入 Unix 平台的 symlink ---
 #[cfg(unix)]
 use std::os::unix::fs::symlink;
+use tui_banner::{Banner, Style};
 
 
 /// (PE) 用于解析双端文件名的结构体
@@ -113,6 +114,9 @@ struct Cli {
 }
 
 fn main() -> Result<()> {
+    let banner = Banner::new("seq prep")?.style(Style::NeonCyber).render();
+    println!("{}", banner);
+
     let cli = Cli::parse();
 
     // 准备输出目录
