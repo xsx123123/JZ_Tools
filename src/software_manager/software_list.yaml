@@ -1,0 +1,56 @@
+# RNA-seq Analysis Software Configuration
+# 格式：分类 -> { name: 展示名称, package: Conda包名 }
+
+# 1. 数据质控与预处理
+Raw Data QC & Trimming:
+  - name: "fastp"
+    package: "fastp"
+  - name: "FastQC"
+    package: "fastqc"
+  - name: "MultiQC"
+    package: "multiqc"
+  - name: "Cutadapt"
+    package: "cutadapt"  # 备用，如果没用fastp的话
+
+# 2. 序列比对 (Mapping)
+Alignment:
+  - name: "STAR"
+    package: "star"
+  - name: "HISAT2"
+    package: "hisat2"    # 备用比对软件
+  - name: "Samtools"
+    package: "samtools"  # 必不可少的BAM处理工具
+
+# 3. 表达量定量 (Quantification)
+Quantification:
+  - name: "featureCounts"
+    package: "subread"   # 注意：Conda里包名叫 subread
+  - name: "Salmon"
+    package: "salmon"    # 如果做基于转录本的定量
+  - name: "HTSeq"
+    package: "htseq"
+
+# 4. 差异表达分析 (Differential Expression)
+Differential Analysis:
+  - name: "DESeq2"
+    package: "bioconductor-deseq2" # 注意：Bioconductor包通常有前缀
+  - name: "edgeR"
+    package: "bioconductor-edger"
+  - name: "limma"
+    package: "bioconductor-limma"
+
+# 5. 功能富集分析 (Functional Enrichment)
+Enrichment Analysis:
+  - name: "clusterProfiler"
+    package: "bioconductor-clusterprofiler"
+  - name: "GOseq"
+    package: "bioconductor-goseq"
+
+# 6. 基础环境与语言 (Infrastructure)
+Environment & Language:
+  - name: "Snakemake"
+    package: "snakemake"
+  - name: "Python"
+    package: "python"
+  - name: "R"
+    package: "r-base"
