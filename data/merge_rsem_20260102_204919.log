@@ -1,0 +1,7 @@
+2026-01-02 20:49:19 | INFO     | __main__:41 - 📝 详细日志已保存至: /home/zj/code/jz_tools/data/merge_rsem_20260102_204919.log
+2026-01-02 20:49:19 | DEBUG    | __main__:189 -    🔄 Renaming: SRR25660662 -> WT_sIM_rep4
+2026-01-02 20:49:19 | DEBUG    | __main__:189 -    🔄 Renaming: SRR25660668 -> WT_sFM_rep3
+2026-01-02 20:49:19 | INFO     | __main__:222 - 📦 正在拼接矩阵...
+2026-01-02 20:49:19 | SUCCESS  | __main__:229 - ✅ TPM 矩阵: /home/zj/code/jz_tools/data/merge_rsem_tpm.csv
+2026-01-02 20:49:20 | SUCCESS  | __main__:232 - ✅ Counts 矩阵: /home/zj/code/jz_tools/data/merge_rsem_count.csv
+2026-01-02 20:49:20 | SUCCESS  | __main__:236 - ✅ FPKM 矩阵: /home/zj/code/jz_tools/data/merge_rsem_fpkm.csv
