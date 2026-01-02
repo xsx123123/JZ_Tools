@@ -2,6 +2,7 @@
 name = "data_deliver"
 version = "0.6.0"
 edition = "2021"
+license = "Non-Commercial"
 
 [dependencies]
 anyhow = "1.0"
@@ -21,3 +22,9 @@ async-trait = "0.1"
 futures = "0.3"
 reqwest = { version = "0.11", features = ["json"] }
 ve-tos-rust-sdk = { version = "2.9.9", features = ["tokio-runtime"] }
+serde = { version = "1.0.228", features = ["derive"] }
+aes-gcm = "0.10.3"
+base64 = "0.22.1"
+dirs = "6.0.0"
+rand = "0.8"
+serde_yaml = "0.9.34"

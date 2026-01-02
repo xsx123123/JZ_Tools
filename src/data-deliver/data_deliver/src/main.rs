@@ -1,4 +1,5 @@
 mod cloud;
+mod config_manager;
 
 use anyhow::Result;
 use clap::builder::styling::{AnsiColor, Effects, Styles};
@@ -40,8 +41,12 @@ struct Cli {
 
 #[derive(Subcommand, Debug)]
 enum Commands {
+    /// 本地文件处理（复制、硬链接、软链接）
     Local(LocalArgs),
+    /// 将文件上传到云端对象存储 (TOS)
     Cloud(CloudArgs),
+    /// 设置或更新工具的配置（如 AK/SK、Endpoint）
+    Config(ConfigArgs),
 }
 
 #[derive(Args, Debug)]
@@ -50,6 +55,7 @@ struct LocalArgs {
     #[arg(short, long)] output: PathBuf,
     #[arg(long)] project_id: String,
     #[arg(short, long, value_enum, default_value_t = Mode::Copy)] mode: Mode,
+    /// 仅处理文件名匹配该正则表达式的文件
     #[arg(long)] regex: Option<String>,
     #[arg(short, long)] threads: Option<usize>,
     #[arg(long, default_value_t = 2097152)] buffer_size: usize,
@@ -61,13 +67,15 @@ struct CloudArgs {
     #[arg(short, long)] input: PathBuf,
     #[arg(long)] bucket: String,
     #[arg(long, default_value = "")] prefix: String,
-    #[arg(long, default_value = "https://tos-cn-beijing.volces.com")] endpoint: String,
-    #[arg(long, default_value = "cn-beijing")] region: String,
+    // 移除默认值，改为 Option，以便后续逻辑判断是否从 config 读取
+    #[arg(long)] endpoint: Option<String>,
+    #[arg(long)] region: Option<String>,
     #[arg(long, env = "TOS_ACCESS_KEY")] ak: Option<String>,
     #[arg(long, env = "TOS_SECRET_KEY")] sk: Option<String>,
     #[arg(long)] project_id: String,
     
     #[arg(long)] meta: Option<String>,
+    /// 仅处理文件名匹配该正则表达式的文件
     #[arg(long)] regex: Option<String>,
     #[arg(long, default_value = ".")] log_dir: PathBuf,
     #[arg(long)] debug: bool,
@@ -76,6 +84,18 @@ struct CloudArgs {
     #[arg(long, default_value_t = 20)] part_size: u64,
     /// 并发上传线程数，默认 3
     #[arg(long, default_value_t = 3)] task_num: usize,
+}
+
+#[derive(Args, Debug)]
+struct ConfigArgs {
+    /// 对象存储服务端点 (如 https://tos-cn-beijing.volces.com)
+    #[arg(long)] endpoint: String,
+    /// 存储桶所在的区域 (如 cn-beijing)
+    #[arg(long)] region: String,
+    /// Access Key ID (将被加密存储)
+    #[arg(long)] ak: Option<String>,
+    /// Secret Access Key (将被加密存储)
+    #[arg(long)] sk: Option<String>,
 }
 
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, ValueEnum, Debug)]
@@ -97,7 +117,14 @@ async fn main() -> Result<()> {
     match cli.command {
         Commands::Local(args) => run_local(args, cmd_str, start_time).await,
         Commands::Cloud(args) => run_cloud(args, cmd_str, start_time).await,
+        Commands::Config(args) => run_config(args).await,
     }
+}
+
+async fn run_config(args: ConfigArgs) -> Result<()> {
+    let manager = config_manager::ConfigManager::new()?;
+    manager.update(Some(args.endpoint), Some(args.region), args.ak, args.sk)?;
+    Ok(())
 }
 
 // --- Local 逻辑 ---
@@ -138,6 +165,27 @@ async fn run_local(args: LocalArgs, cmd_str: String, start_time: Instant) -> Res
 
 // --- Cloud 逻辑 ---
 async fn run_cloud(mut args: CloudArgs, cmd_str: String, start_time: Instant) -> Result<()> {
+    // 1. 尝试加载配置文件
+    let config_manager = config_manager::ConfigManager::new()?;
+    let config = config_manager.load().unwrap_or_default();
+
+    // 2. 参数补全优先级: CLI Args > Env Vars (clap handled) > Config File
+    if args.endpoint.is_none() {
+        args.endpoint = config.endpoint.clone();
+    }
+    if args.region.is_none() {
+        args.region = config.region.clone();
+    }
+    if args.ak.is_none() {
+        args.ak = config.decrypt_ak()?;
+    }
+    if args.sk.is_none() {
+        args.sk = config.decrypt_sk()?;
+    }
+
+    let endpoint = args.endpoint.as_ref().ok_or_else(|| anyhow::anyhow!("❌ 缺少 Endpoint 配置！请在命令行指定 --endpoint 或运行 'data_deliver config' 进行配置"))?;
+    let region = args.region.as_ref().ok_or_else(|| anyhow::anyhow!("❌ 缺少 Region 配置！请在命令行指定 --region 或运行 'data_deliver config' 进行配置"))?;
+
     if args.bucket.starts_with("tos://") {
         args.bucket = args.bucket.strip_prefix("tos://").unwrap().to_string();
     }
@@ -149,11 +197,11 @@ async fn run_cloud(mut args: CloudArgs, cmd_str: String, start_time: Instant) ->
     info!("COMMAND: {}", cmd_str);
     info!("🚀 [CLOUD] 任务启动: Project={}, Bucket={}", args.project_id, args.bucket);
 
-    cloud::check_prerequisites(&args.endpoint, &args.ak, &args.sk).await?;
+    cloud::check_prerequisites(endpoint, &args.ak, &args.sk).await?;
 
     let client = cloud::create_client(
-        &args.endpoint, 
-        &args.region, 
+        endpoint, 
+        region, 
         args.ak.as_ref().unwrap(), 
         args.sk.as_ref().unwrap()
     )?;
