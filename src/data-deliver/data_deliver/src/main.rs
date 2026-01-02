@@ -7,7 +7,7 @@ use comfy_table::modifiers::UTF8_ROUND_CORNERS;
 use comfy_table::presets::UTF8_FULL;
 use comfy_table::Table;
 use console::style;
-use indicatif::{ProgressBar, ProgressStyle};
+use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
 use log::{error, info, warn};
 use md5::{Context as Md5Context, Digest};
 use rayon::prelude::*;
@@ -122,7 +122,11 @@ async fn run_local(args: LocalArgs, cmd_str: String, start_time: Instant) -> Res
         let md5 = format!("{}.md5", dest.display());
         if !args.debug { pb.set_message(format!("{:?}", src.file_name().unwrap())); }
         match process_local_file(src, &dest, &md5, args.mode, args.buffer_size) {
-            Ok(s) => { stats.success.fetch_add(1, Ordering::Relaxed); stats.total_bytes.fetch_add(s as usize, Ordering::Relaxed); }
+            Ok((s, m)) => { 
+                stats.success.fetch_add(1, Ordering::Relaxed); 
+                stats.total_bytes.fetch_add(s as usize, Ordering::Relaxed);
+                info!("✅ Local: {} -> {} (MD5: {})", src.display(), dest.display(), m);
+            }
             Err(e) => { stats.failed.fetch_add(1, Ordering::Relaxed); pb.println(format!("{} Fail: {:?}", style("❌").red(), src)); error!("{}", e); }
         }
         pb.inc(1);
@@ -133,7 +137,11 @@ async fn run_local(args: LocalArgs, cmd_str: String, start_time: Instant) -> Res
 }
 
 // --- Cloud 逻辑 ---
-async fn run_cloud(args: CloudArgs, cmd_str: String, start_time: Instant) -> Result<()> {
+async fn run_cloud(mut args: CloudArgs, cmd_str: String, start_time: Instant) -> Result<()> {
+    if args.bucket.starts_with("tos://") {
+        args.bucket = args.bucket.strip_prefix("tos://").unwrap().to_string();
+    }
+
     if !args.log_dir.exists() { fs::create_dir_all(&args.log_dir)?; }
     let log_path = args.log_dir.join(format!("{}_{}_cloud.log", args.project_id, chrono::Local::now().format("%Y%m%d-%H%M%S")));
     setup_logger(args.debug, &log_path)?;
@@ -154,27 +162,31 @@ async fn run_cloud(args: CloudArgs, cmd_str: String, start_time: Instant) -> Res
     let entries = scan_files(&args.input, &re)?;
 
     if entries.is_empty() { warn!("未找到文件"); return Ok(()); }
-    let pb = create_pb(entries.len() as u64);
+    
+    let mp = MultiProgress::new();
     let stats = Stats { success: AtomicUsize::new(0), failed: AtomicUsize::new(0), total_bytes: AtomicUsize::new(0) };
 
     info!("开始传输 {} 个文件到云端...", entries.len());
 
+    let total_files = entries.len();
+
     // 串行遍历文件，但 upload_file 内部是多线程并发上传分片的
-    for src_path in entries {
+    for (idx, src_path) in entries.iter().enumerate() {
         let file_name = src_path.file_name().unwrap().to_string_lossy().to_string();
         let object_key = format!("{}{}", args.prefix, file_name);
-
-        if !args.debug { pb.set_message(format!("☁️ Uploading: {}", file_name)); }
 
         let res = cloud::upload_and_set_meta(
             &client, 
             &args.bucket, 
             &object_key, 
-            &src_path, 
+            src_path, 
             &args.project_id, 
             &args.meta,
-            args.part_size, // 传入参数
-            args.task_num   // 传入参数
+            args.part_size, 
+            args.task_num,
+            Some(&mp),
+            idx + 1,
+            total_files
         ).await;
 
         match res {
@@ -186,14 +198,40 @@ async fn run_cloud(args: CloudArgs, cmd_str: String, start_time: Instant) -> Res
             Err(e) => {
                 stats.failed.fetch_add(1, Ordering::Relaxed);
                 error!("❌ Cloud Fail: {} - {}", file_name, e);
-                pb.println(format!("{} Fail: {} ({})", style("❌").red(), file_name, e));
+                // 使用 mp.println 避免打断其他可能存在的进度条（虽然这里只有一个），或者直接 error!
+                let _ = mp.println(format!("{} Fail: {} ({})", style("❌").red(), file_name, e));
             }
         }
-        pb.inc(1);
     }
 
-    pb.finish_and_clear();
+    // 清除可能残留的进度条（虽然后面就是 finish）
+    // pb.finish_and_clear(); // 已移除 pb
     print_summary("Cloud Delivery", &stats, &log_path, start_time.elapsed());
+
+    // --- Upload Log File ---
+    let log_file_name = log_path.file_name().unwrap().to_string_lossy().to_string();
+    let log_object_key = format!("{}{}", args.prefix, log_file_name);
+    info!("📤 Uploading log file: {} -> s3://{}/{}", log_file_name, args.bucket, log_object_key);
+
+    let log_res = cloud::upload_and_set_meta(
+        &client,
+        &args.bucket,
+        &log_object_key,
+        &log_path,
+        &args.project_id,
+        &None, // No extra meta for log
+        args.part_size,
+        1, // Serial upload for log is fine, or use args.task_num
+        Some(&mp),
+        1,
+        1
+    ).await;
+
+    match log_res {
+        Ok(_) => info!("✅ Log file uploaded successfully."),
+        Err(e) => error!("❌ Failed to upload log file: {}", e),
+    }
+
     Ok(())
 }
 
@@ -259,7 +297,7 @@ fn print_summary(title: &str, stats: &Stats, log: &Path, dur: Duration) {
     println!("\n{}", table);
 }
 
-fn process_local_file(src: &Path, dest: &Path, md5_dest: &str, mode: Mode, buf_size: usize) -> Result<u64> {
+fn process_local_file(src: &Path, dest: &Path, md5_dest: &str, mode: Mode, buf_size: usize) -> Result<(u64, String)> {
     if let Some(parent) = dest.parent() { fs::create_dir_all(parent)?; }
     let (hash_digest, file_len) = match mode {
         Mode::Copy => copy_and_hash(src, dest, buf_size)?,
@@ -280,7 +318,7 @@ fn process_local_file(src: &Path, dest: &Path, md5_dest: &str, mode: Mode, buf_s
     let hash_str = format!("{:x}", hash_digest);
     let file_name = dest.file_name().unwrap().to_string_lossy();
     fs::write(md5_dest, format!("{}  {}\n", hash_str, file_name))?;
-    Ok(file_len)
+    Ok((file_len, hash_str))
 }
 
 fn just_hash(path: &Path, buffer_size: usize) -> Result<(Digest, u64)> {
