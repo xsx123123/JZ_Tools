@@ -1,0 +1,2 @@
+"ID","Description","GeneRatio","BgRatio","RichFactor","FoldEnrichment","zScore","pvalue","p.adjust","qvalue","geneID","Count"
+"GO:0003824","catalytic activity","1/1","229/5719",0.00436681222707424,24.9737991266376,4.89630463989298,0.0400419653785629,0.0400419653785629,NA,"Solyc04g080480.1",1
