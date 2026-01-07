@@ -16,30 +16,3 @@ data_delivery:
   include_qc_summary: true
   output_dir: ./variant_delivery
   threads: 4
-metrics:
-  calculate_variant_counts: true
-  calculate_pass_rates: true
-  calculate_filter_stats: true
-variant_files:
-  raw_variants:
-  - 04.variant/gatk/*/*.raw_variants.vcf
-  - 04.variant/gatk/*/*.raw_variants.vcf.idx
-  filtered_variants:
-  - 04.variant/gatk/*/*.final.pass.vcf
-  - 04.variant/gatk/*/*.final.pass.vcf.idx
-  qc_metrics:
-  - 04.variant/gatk_MarkDuplicates/*.rg.dedup.metrics.txt
-  - 04.variant/gatk_bcftools_stats_pass/*/
-  - 04.variant/gatk_bcftools_stats_raw/*/
-  general:
-  - 04.variant/multiqc_gatk_bcftools_stats_pass/
-  - 04.variant/multiqc_gatk_bcftools_stats_raw/
-variant_summary_columns:
-- sample_name
-- total_raw_variants
-- passing_variants
-- filtered_variants
-- snps_count
-- indels_count
-- ts_tv_ratio
-- quality_score

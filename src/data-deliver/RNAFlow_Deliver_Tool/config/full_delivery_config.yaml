@@ -26,29 +26,3 @@ data_delivery:
   include_qc_summary: true
   output_dir: ./full_delivery
   threads: 8
-metrics:
-  calculate_all_stats: true
-all_modules_files:
-  qc:
-  - 01.qc/
-  mapping:
-  - 02.mapping/
-  count:
-  - 03.count/
-  variant:
-  - 04.variant/
-  deg:
-  - 06.DEG/
-  as:
-  - 07.AS/
-  fusion:
-  - 06.fusion/
-all_summary_columns:
-- sample_name
-- qc_passing
-- mapping_rate
-- gene_counts
-- variant_count
-- deg_genes
-- splice_events
-- fusion_count

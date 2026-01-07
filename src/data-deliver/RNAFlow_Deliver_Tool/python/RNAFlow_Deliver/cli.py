@@ -5,7 +5,7 @@ from rich.panel import Panel
 from rich.table import Table
 from rich.text import Text
 from rich.align import Align
-from RNAFlow_Deliver.modules import qc, deliver, config, merge
+from RNAFlow_Deliver.modules import deliver, config, merge
 
 __version__ = "0.2.0"
 console = Console()
@@ -74,13 +74,6 @@ def main():
     
     subparsers = parser.add_subparsers(dest="command", required=True, title="Available commands")
 
-    # --- Command: qc ---
-    qc_parser = subparsers.add_parser("qc", help="Parse and summarize QC metrics (FastQC, Fastp, Screen)")
-    qc_parser.add_argument("-d", "--data-dir", type=str, default=".", help="Input directory containing QC results")
-    qc_parser.add_argument("-o", "--output-dir", type=str, default="qc_delivery", help="Output directory for reports")
-    qc_parser.add_argument("-c", "--config", type=str, default="config/qc_summary_config.yaml", help="Config file path")
-    qc_parser.add_argument("-p", "--prefix", type=str, default="qc_summary", help="Output filename prefix")
-
     # --- Command: deliver ---
     dl_parser = subparsers.add_parser("deliver", help="High-performance file delivery using Rust engine")
     dl_parser.add_argument("-d", "--data-dir", type=str, default=".", help="Base directory to search for files")
@@ -115,9 +108,7 @@ def main():
 
     args = parser.parse_args()
 
-    if args.command == "qc":
-        qc.run(args)
-    elif args.command == "deliver":
+    if args.command == "deliver":
         deliver.run(args)
     elif args.command == "config":
         config.run(args)
