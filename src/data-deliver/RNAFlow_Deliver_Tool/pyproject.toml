@@ -19,4 +19,4 @@ rnaflow-qc = "RNAFlow_Deliver.qc_summary:main"
 
 [tool.maturin]
 python-source = "python"
-module-name = "data_deliver_rs"
+module-name = "RNAFlow_Deliver.data_deliver_rs"

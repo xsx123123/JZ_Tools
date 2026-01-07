@@ -22,6 +22,11 @@ from rich.table import Table
 from rich.progress import Progress, SpinnerColumn, BarColumn, TextColumn
 from rich.panel import Panel
 from rich.logging import RichHandler
+from rich.tree import Tree
+from rich.text import Text
+from rich import box
+from rich.layout import Layout
+from rich.align import Align
 
 # --- Rust Extension Import ---
 try:
@@ -35,7 +40,7 @@ console = Console()
 # Configure Loguru
 logger.remove()
 logger.add(
-    RichHandler(console=console, rich_tracebacks=True, markup=True),
+    RichHandler(console=console, rich_tracebacks=True, markup=True, show_path=False),
     format="[bold green]{time:HH:mm:ss}[/bold green] | {level} | {message}",
     level="INFO"
 )
@@ -43,6 +48,34 @@ logger.add(
 # -----------------------------------------------------------------------------
 # 1. Configuration & Utils
 # -----------------------------------------------------------------------------
+
+def display_config_tree(args, config: Dict):
+    """Display configuration and run parameters in a tree structure."""
+    tree = Tree(f"[bold cyan]🚀 RNAFlow QC & Delivery[/bold cyan]")
+    
+    # Paths Branch
+    paths = tree.add("[bold yellow]📂 Paths[/bold yellow]")
+    paths.add(f"Input:  [blue]{args.data_dir}[/blue]")
+    paths.add(f"Output: [blue]{args.output_dir}[/blue]")
+    paths.add(f"Config: [dim]{args.config}[/dim]")
+    
+    # Settings Branch
+    delivery_conf = config.get('data_delivery', {})
+    settings = tree.add("[bold magenta]⚙️  Settings[/bold magenta]")
+    
+    mode = delivery_conf.get('delivery_mode', 'symlink')
+    mode_color = "green" if mode == "symlink" else "yellow"
+    settings.add(f"Delivery Mode: [{mode_color}]{mode}[/{mode_color}]")
+    
+    threads = delivery_conf.get('threads', 4)
+    settings.add(f"Threads: [cyan]{threads}[/cyan]")
+    
+    qc_enabled = delivery_conf.get('include_qc_summary', False)
+    qc_status = "[green]Enabled[/green]" if qc_enabled else "[red]Disabled[/red]"
+    settings.add(f"Data Delivery: {qc_status}")
+
+    console.print(tree)
+    console.print("")
 
 def load_config(config_path: str) -> Dict[str, Any]:
     """Load configuration YAML."""
@@ -58,6 +91,10 @@ def load_config(config_path: str) -> Dict[str, Any]:
                 "fastp": [
                     "01.qc/short_read_trim/*.trimed.json",
                 ],
+                "contamination": [
+                    "01.qc/fastq_screen_r1/*_screen.txt",
+                    "01.qc/fastq_screen_r2/*_screen.txt"
+                ]
             },
             "data_delivery": {
                 "include_qc_summary": True,
@@ -91,17 +128,24 @@ def extract_sample_name_from_path(file_path: str) -> str:
         ('_R1_fastqc.zip', ''),
         ('_R2_fastqc.zip', ''),
         ('.R1.trimed.fq.gz', ''),
-        ('.R2.trimed.fq.gz', '')
+        ('.R2.trimed.fq.gz', ''),
+        ('_screen.txt', ''),
+        ('_R1_screen.txt', ''),
+        ('_R2_screen.txt', '')
     ]
     
     for suffix, replacement in patterns:
         if filename.endswith(suffix):
-            return filename.replace(suffix, replacement)
+            # Special handling for _R1/_R2 inside the name if necessary
+            name = filename.replace(suffix, replacement)
+            if name.endswith('_R1'): name = name[:-3]
+            if name.endswith('_R2'): name = name[:-3]
+            return name
     
     return "unknown"
 
 # -----------------------------------------------------------------------------
-# 2. Parsing Logic (FastQC & Fastp)
+# 2. Parsing Logic (FastQC, Fastp, FastQ Screen)
 # -----------------------------------------------------------------------------
 
 def parse_fastqc_data(fastqc_zip_path: str) -> Dict[str, Any]:
@@ -131,6 +175,8 @@ def parse_fastqc_data(fastqc_zip_path: str) -> Dict[str, Any]:
                         metrics['avg_sequence_length'] = (l_min + l_max) // 2
                     else:
                         metrics['avg_sequence_length'] = int(value)
+                elif key == '%GC':
+                    metrics['gc_content'] = float(value)
                 elif key == 'Q30 bases':
                     try: metrics['q30_bases'] = int(value.replace(',', ''))
                     except ValueError: pass
@@ -140,7 +186,7 @@ def parse_fastqc_data(fastqc_zip_path: str) -> Dict[str, Any]:
             metrics['q30_percentage'] = round((metrics['q30_bases'] / total_bases) * 100, 2) if total_bases > 0 else 0.0
 
     except Exception as e:
-        logger.warning(f"Skipping problematic file {Path(fastqc_zip_path).name}: {e}")
+        logger.warning(f"Skipping problematic FastQC file {Path(fastqc_zip_path).name}: {e}")
     return metrics
 
 def parse_fastp_json(json_path: str) -> Dict[str, Any]:
@@ -151,6 +197,8 @@ def parse_fastp_json(json_path: str) -> Dict[str, Any]:
         
         summary = data.get('summary', {})
         before = summary.get('before_filtering', {})
+        
+        # Basic Stats
         metrics.update({
             'input_reads': before.get('total_reads', 0),
             'input_bases': before.get('total_bases', 0),
@@ -158,6 +206,14 @@ def parse_fastp_json(json_path: str) -> Dict[str, Any]:
             'input_avg_length': before.get('mean_length', 0),
             'input_data_size_mb': round(before.get('total_bases', 0) / (1024**2), 2)
         })
+
+        # Duplication
+        dup = data.get('duplication', {})
+        metrics['duplication_rate'] = round(dup.get('rate', 0.0) * 100, 2)
+
+        # Insert Size (only for PE)
+        ins = data.get('insert_size', {})
+        metrics['insert_size_peak'] = ins.get('peak', 0)
 
         after = summary.get('after_filtering', {})
         metrics.update({
@@ -172,23 +228,80 @@ def parse_fastp_json(json_path: str) -> Dict[str, Any]:
         logger.error(f"Error parsing fastp JSON {json_path}: {e}")
     return metrics
 
+def parse_fastq_screen(txt_path: str) -> Dict[str, Any]:
+    """Parses FastQ Screen text output for contamination metrics."""
+    metrics = {}
+    try:
+        with open(txt_path, 'r') as f:
+            lines = f.readlines()
+        
+        # Find header line index (Genome or Library)
+        header_idx = -1
+        for i, line in enumerate(lines):
+            if line.startswith('Genome') or line.startswith('Library'):
+                header_idx = i
+                break
+        
+        if header_idx == -1: return metrics
+
+        screen_data = {}
+        for line in lines[header_idx+1:]:
+            line = line.strip()
+            if not line or line.startswith('%'): continue
+            parts = line.split()
+            if len(parts) < 3: continue
+            
+            species = parts[0]
+            # Standard Format: Genome | #Reads | %Unmapped | %One_hit ...
+            try:
+                # %Unmapped is usually col 2 (index 2)
+                pct_unmapped = float(parts[2])
+                pct_hit = 100.0 - pct_unmapped
+                screen_data[species] = pct_hit
+            except ValueError:
+                continue
+
+        metrics['screen_no_hit'] = 100.0 # Default fallback
+        for sp, hit_pct in screen_data.items():
+            key = f"screen_{sp.lower()}_pct"
+            metrics[key] = round(hit_pct, 2)
+            
+    except Exception as e:
+        logger.warning(f"Error parsing FastQ Screen {Path(txt_path).name}: {e}")
+    return metrics
+
 def process_qc_files(data_dir: Path, config: Dict) -> pd.DataFrame:
-    # Strict Filtering Logic
+    # 1. FastQC
     fastqc_files = []
     for pattern in config['qc_files'].get('fastqc', []):
         found = list(data_dir.glob(pattern))
         fastqc_files.extend([p for p in found if str(p).endswith('.zip')])
     
+    # 2. Fastp
     fastp_files = []
     for pattern in config['qc_files'].get('fastp', []):
         target_pattern = pattern if pattern.endswith('.json') else pattern.rsplit('.', 1)[0] + '.json'
         fastp_files.extend(list(data_dir.glob(target_pattern)))
     fastp_files = list(set(str(p) for p in fastp_files if str(p).endswith('.json')))
 
-    logger.info(f"Processing {len(fastqc_files)} FastQC zips and {len(fastp_files)} Fastp JSONs.")
+    # 3. Contamination (FastQ Screen)
+    screen_files = []
+    for pattern in config['qc_files'].get('contamination', []):
+        found = list(data_dir.glob(pattern))
+        screen_files.extend([p for p in found if str(p).endswith('.txt')])
+
+    logger.info(f"Scanning directory: {data_dir.absolute()}")
+    logger.info(f"Found [cyan]{len(fastqc_files)}[/cyan] FastQC, [cyan]{len(fastp_files)}[/cyan] Fastp, [cyan]{len(screen_files)}[/cyan] Screen files.")
 
     sample_data = {}
-    with Progress(SpinnerColumn(), TextColumn("[progress.description]{task.description}"), BarColumn(), TextColumn("[progress.percentage]{task.percentage:>3.0f}%"), console=console) as progress:
+    with Progress(
+        SpinnerColumn(), 
+        TextColumn("[bold blue]{task.description}"), 
+        BarColumn(bar_width=40, style="blue"), 
+        TextColumn("[progress.percentage]{task.percentage:>3.0f}%"), 
+        TextColumn("{task.completed}/{task.total}"),
+        console=console
+    ) as progress:
         
         task1 = progress.add_task("[cyan]Parsing FastQC...", total=len(fastqc_files))
         for f in fastqc_files:
@@ -205,21 +318,41 @@ def process_qc_files(data_dir: Path, config: Dict) -> pd.DataFrame:
                 if s_name not in sample_data: sample_data[s_name] = {}
                 sample_data[s_name].update(parse_fastp_json(str(f)))
             progress.advance(task2)
+            
+        task3 = progress.add_task("[yellow]Parsing Contamination...", total=len(screen_files))
+        for f in screen_files:
+            s_name = extract_sample_name_from_path(str(f))
+            if s_name not in ["unknown", "ignore_me"]:
+                if s_name not in sample_data: sample_data[s_name] = {}
+                sample_data[s_name].update(parse_fastq_screen(str(f)))
+            progress.advance(task3)
 
     df_rows = []
     for s_name, data in sample_data.items():
         row = {
             'sample_name': s_name,
             'reads_raw': data.get('total_sequences', data.get('input_reads', 0)),
-            'q30_raw': data.get('q30_percentage', data.get('input_q30_rate', 0.0)),
             'len_raw': data.get('avg_sequence_length', data.get('input_avg_length', 0)),
             'data_mb_raw': data.get('input_data_size_mb', 0.0),
-            'data_mb_clean': data.get('output_data_size_mb', 0.0),
+            'gc_content': data.get('gc_content', 0.0),
+            
             'reads_clean': data.get('output_reads', 0),
-            'q30_clean': data.get('output_q30_rate', 0.0)
+            'data_mb_clean': data.get('output_data_size_mb', 0.0),
+            'q30_clean': data.get('output_q30_rate', 0.0),
+            'avg_len_clean': data.get('output_avg_length', 0),
+            
+            'duplication_rate': data.get('duplication_rate', 0.0),
+            'insert_size': data.get('insert_size_peak', 0),
         }
+        
         if row['data_mb_raw'] == 0 and row['reads_raw'] > 0 and row['len_raw'] > 0:
             row['data_mb_raw'] = round((row['reads_raw'] * row['len_raw']) / (1024**2), 2)
+            
+        # Add dynamic screen columns
+        for k, v in data.items():
+            if k.startswith('screen_'):
+                row[k] = v
+
         df_rows.append(row)
 
     return pd.DataFrame(df_rows)
@@ -227,33 +360,96 @@ def process_qc_files(data_dir: Path, config: Dict) -> pd.DataFrame:
 def save_outputs(df: pd.DataFrame, output_dir: Path, prefix: str):
     output_dir.mkdir(parents=True, exist_ok=True)
     csv_path = output_dir / f"{prefix}_table.csv"
-    df.to_csv(csv_path, index=False)
+    
+    # Reorder columns for better readability
+    cols = ['sample_name', 'reads_raw', 'data_mb_raw', 'gc_content', 'duplication_rate', 
+            'reads_clean', 'data_mb_clean', 'q30_clean', 'avg_len_clean', 'insert_size']
+    # Add any extra screen columns found
+    existing_cols = df.columns.tolist()
+    screen_cols = [c for c in existing_cols if c.startswith('screen_')] # Pick only screen columns
+    final_cols = [c for c in cols if c in existing_cols] + sorted(screen_cols)
+    
+    df[final_cols].to_csv(csv_path, index=False)
     
     stats = {
         "total_samples": len(df),
         "total_raw_data_gb": round(df['data_mb_raw'].sum() / 1024, 2),
         "total_clean_data_gb": round(df['data_mb_clean'].sum() / 1024, 2),
-        "avg_q30_clean": round(df['q30_clean'].mean(), 2)
+        "avg_q30_clean": round(df['q30_clean'].mean(), 2),
+        "avg_gc": round(df['gc_content'].mean(), 2) if 'gc_content' in df else 0
     }
     json_path = output_dir / f"{prefix}_stats.json"
     with open(json_path, 'w') as f:
         json.dump(stats, f, indent=2)
     
-    logger.success(f"Saved Summary CSV: {csv_path}")
-    logger.success(f"Saved Summary JSON: {json_path}")
+    logger.info(f"Saved Summary CSV: [underline]{csv_path}[/underline]")
+    logger.info(f"Saved Summary JSON: [underline]{json_path}[/underline]")
 
 def display_summary_table(df: pd.DataFrame):
     if df.empty: return
-    table = Table(title="QC Summary Preview (Top 10)")
-    table.add_column("Sample", style="cyan", no_wrap=True)
-    table.add_column("Raw Reads", justify="right")
-    table.add_column("Raw Q30(%)", justify="right")
-    table.add_column("Clean Data(MB)", justify="right", style="green")
     
-    for _, row in df.sort_values(by="sample_name").head(10).iterrows():
-        table.add_row(str(row['sample_name']), f"{int(row['reads_raw']):,}", f"{row['q30_raw']}", f"{row['data_mb_clean']}")
+    # Create a nice looking table
+    table = Table(
+        title="📊 Detailed QC Summary Preview (Top 10)", 
+        box=box.ROUNDED,
+        header_style="bold white on blue",
+        border_style="blue",
+        title_style="bold cyan"
+    )
+    
+    table.add_column("Sample", style="bold cyan", no_wrap=True)
+    table.add_column("Clean Data\n(MB)", justify="right")
+    table.add_column("Q30\n(%)", justify="right")
+    table.add_column("GC\n(%)", justify="right")
+    table.add_column("Dup\n(%)", justify="right")
+    
+    # Add dynamic screen columns to display (e.g. Human)
+    screen_keys = [c for c in df.columns if c.startswith('screen_') and 'no_hit' not in c]
+    # Pick top 1-2 contaminants to show in table
+    display_screen = screen_keys[:2] 
+    for sk in display_screen:
+        header = sk.replace('screen_', '').replace('_pct', '').title()
+        table.add_column(f"{header}\n(%)", justify="right", style="magenta")
+
+    # Sort and take top 10
+    top_df = df.sort_values(by="sample_name").head(10)
+    
+    for _, row in top_df.iterrows():
+        # Conditional Formatting for Q30
+        q30 = row.get('q30_clean', 0)
+        q30_style = "green" if q30 >= 85 else ("yellow" if q30 >= 80 else "red")
+        q30_text = f"[{q30_style}]{q30}[/{q30_style}]"
+        
+        # Dup Color
+        dup = row.get('duplication_rate', 0)
+        dup_style = "green" if dup < 50 else "yellow"
+        dup_text = f"[{dup_style}]{dup}[/{dup_style}]"
+
+        # GC Color
+        gc = row.get('gc_content', 0)
+        gc_style = "white"
+        if gc < 30 or gc > 70: gc_style = "yellow"
+        gc_text = f"[{gc_style}]{gc}[/{gc_style}]"
+
+        row_data = [
+            str(row['sample_name']), 
+            f"{row.get('data_mb_clean',0):.1f}", 
+            q30_text,
+            gc_text,
+            dup_text
+        ]
+        
+        for sk in display_screen:
+            val = row.get(sk, 0)
+            style = "red" if val > 10 else "dim white" 
+            row_data.append(f"[{style}]{val}[/{style}]")
+
+        table.add_row(*row_data)
+        
     console.print(table)
-    if len(df) > 10: console.print(f"[dim]... and {len(df)-10} more samples.[/dim]")
+    if len(df) > 10: 
+        console.print(Align.center(f"[dim]... and {len(df)-10} more samples hidden ...[/dim]"))
+    console.print("")
 
 # -----------------------------------------------------------------------------
 # 3. Data Delivery (Rust Integration)
@@ -264,16 +460,13 @@ def run_delivery_task(config: Dict, data_dir: Path, output_dir: Path):
     Invokes the compiled Rust extension 'data_deliver_rs' for high-speed file handling.
     """
     if data_deliver_rs is None:
-        logger.warning("[yellow]Rust extension 'data_deliver_rs' not found. Skipping delivery task.[/yellow]")
-        logger.warning("Tip: Run 'maturin develop --release' to build the extension.")
+        console.print(Panel("[bold red]❌ Rust extension 'data_deliver_rs' not found![/bold red]\n\nSkipping delivery task.\nTip: Run 'maturin develop --release' to build.", border_style="red"))
         return
 
     delivery_conf = config.get('data_delivery', {})
     if not delivery_conf.get('include_qc_summary', False):
         logger.info("Skipping data delivery (disabled in config).")
         return
-
-    logger.info("Collecting files for delivery...")
 
     files_to_deliver = set()
     patterns = delivery_conf.get('include_patterns', [])
@@ -282,11 +475,9 @@ def run_delivery_task(config: Dict, data_dir: Path, output_dir: Path):
     # Resolve Include Patterns
     for pattern in patterns:
         if "qc_summary" in pattern:
-            # Look in output_dir
             matches = list(output_dir.glob(pattern))
             if not matches: matches = list(Path('.').glob(pattern))
         else:
-            # Look in data_dir
             matches = list(data_dir.glob(pattern))
         
         for p in matches:
@@ -308,20 +499,35 @@ def run_delivery_task(config: Dict, data_dir: Path, output_dir: Path):
     mode = delivery_conf.get('delivery_mode', 'symlink')
     threads = int(delivery_conf.get('threads', 4))
     
-    logger.info(f"Invoking Rust engine to process {len(file_list)} files (Mode: {mode})...")
+    console.rule(f"[bold magenta]📦 Starting Data Delivery (Mode: {mode})[/bold magenta]")
+    logger.info(f"Invoking Rust engine for {len(file_list)} files...")
     
     try:
         # Calls: run_local_delivery(files, output_dir, mode, threads) -> (success, failed, size_gb)
-        success, failed, size_gb = data_deliver_rs.run_local_delivery(
-            file_list, 
-            str(output_dir.absolute()), 
-            mode, 
-            threads
+        with console.status("[bold green]Rust Engine Running...[/bold green]", spinner="dots"):
+            success, failed, size_gb = data_deliver_rs.run_local_delivery(
+                file_list, 
+                str(output_dir.absolute()), 
+                mode, 
+                threads
+            )
+        
+        # Result Panel
+        stats_table = Table(show_header=False, box=None)
+        stats_table.add_row("✅ Success:", f"[green]{success}[/green]")
+        stats_table.add_row("❌ Failed:", f"[red]{failed}[/red]")
+        stats_table.add_row("💾 Total Size:", f"[blue]{size_gb:.2f} GB[/blue]")
+        
+        panel = Panel(
+            stats_table, 
+            title="[bold green]Delivery Complete[/bold green]", 
+            border_style="green",
+            expand=False
         )
-        logger.success(f"Data delivery completed via Rust! Success: {success}, Failed: {failed}, Total: {size_gb:.2f} GB")
+        console.print(panel)
         
     except Exception as e:
-        logger.error(f"Rust engine execution failed: {e}")
+        console.print(Panel(f"[bold red]Rust execution failed[/bold red]\n{e}", border_style="red"))
 
 # -----------------------------------------------------------------------------
 # Main Entry Point
@@ -336,9 +542,18 @@ def main():
     
     args = parser.parse_args()
     
-    console.print(Panel.fit(f"[bold blue]RNAFlow QC Summary[/bold blue]\nTarget: {args.data_dir}", border_style="blue"))
+    # Title Panel
+    console.print("")
+    console.print(Panel.fit(
+        "[bold white]RNAFlow QC Summary Tool[/bold white]\n[dim]High-Performance Rust Accelerated[/dim]", 
+        style="bold blue", 
+        border_style="blue"
+    ))
+    console.print("")
 
     config = load_config(args.config)
+    display_config_tree(args, config)
+
     data_path = Path(args.data_dir)
     output_path = Path(args.output_dir)
 
@@ -346,18 +561,23 @@ def main():
         # Step 1: Analyze & Parse
         df = process_qc_files(data_path, config)
         if df.empty:
-            logger.error("No QC data extracted!")
+            console.print(Panel("[bold red]No QC data found![/bold red]\nPlease check your input directory.", border_style="red"))
             sys.exit(1)
             
         # Step 2: Save Summary Reports
+        console.rule("[bold cyan]💾 Saving Reports[/bold cyan]")
         save_outputs(df, output_path, args.prefix)
         display_summary_table(df)
         
         # Step 3: Deliver Data (Rust)
         run_delivery_task(config, data_path, output_path)
         
+        console.print("")
+        console.print("[bold green]✨ All tasks completed successfully! ✨[/bold green]")
+        console.print("")
+        
     except KeyboardInterrupt:
-        console.print("\n[red]Process interrupted.[/red]")
+        console.print("\n[bold red]⚠️ Process interrupted by user.[/bold red]")
         sys.exit(1)
     except Exception:
         console.print_exception()
