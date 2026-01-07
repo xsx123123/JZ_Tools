@@ -1,0 +1,22 @@
+[build-system]
+requires = ["maturin>=1.0,<2.0"]
+build-backend = "maturin"
+
+[project]
+name = "RNAFlow_Deliver_Tool"
+version = "0.1.0"
+description = "RNAFlow QC Summary tool with Rust acceleration"
+requires-python = ">=3.8"
+dependencies = [
+    "pandas>=1.3",
+    "rich>=10.0",
+    "loguru>=0.5",
+    "pyyaml>=5.0"
+]
+
+[project.scripts]
+rnaflow-qc = "RNAFlow_Deliver.qc_summary:main"
+
+[tool.maturin]
+python-source = "python"
+module-name = "data_deliver_rs"

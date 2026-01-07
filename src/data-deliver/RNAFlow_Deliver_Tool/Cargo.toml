@@ -8,6 +8,10 @@ license = "Non-Commercial"
 name = "data_deliver_rs"
 crate-type = ["cdylib", "rlib"]
 
+[[bin]]
+name = "data_deliver"
+path = "src/main.rs"
+
 [dependencies]
 anyhow = "1.0"
 regex = "1.10"
