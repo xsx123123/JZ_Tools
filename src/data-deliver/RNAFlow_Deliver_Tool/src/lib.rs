@@ -28,43 +28,162 @@ impl From<&str> for ProcessMode {
 fn process_file_internal(src: &Path, output_dir: &Path, md5_file: bool, mode: ProcessMode, buf_size: usize) -> anyhow::Result<(u64, String)> {
     let file_name = src.file_name().ok_or_else(|| anyhow::anyhow!("Invalid filename"))?;
     let dest = output_dir.join(file_name);
-    
+
     if let Some(parent) = dest.parent() {
         if !parent.exists() { fs::create_dir_all(parent)?; }
     }
 
-    let (hash_digest, file_len) = match mode {
-        ProcessMode::Copy => copy_and_hash(src, &dest, buf_size)?,
-        ProcessMode::Hardlink => {
-            let (h, len) = just_hash(src, buf_size)?;
-            if dest.exists() { fs::remove_file(&dest)?; }
-            fs::hard_link(src, &dest)?;
-            (h, len)
-        },
-        ProcessMode::Symlink => {
-            let (h, len) = just_hash(src, buf_size)?;
-            if dest.exists() { fs::remove_file(&dest)?; }
-            #[cfg(unix)]
-            std::os::unix::fs::symlink(src, &dest)?;
-            #[cfg(windows)]
-            std::os::windows::fs::symlink_file(src, &dest)?;
-            (h, len)
+    // Check if source is a directory
+    if src.is_dir() {
+        // Handle directory delivery
+        match mode {
+            ProcessMode::Copy => copy_directory_recursive(src, &dest, buf_size)?,
+            ProcessMode::Hardlink => {
+                // For directories, create a directory and process contents
+                if dest.exists() { fs::remove_dir_all(&dest).ok(); }
+                fs::create_dir_all(&dest)?;
+                copy_directory_contents_hardlink(src, &dest, buf_size)?;
+            },
+            ProcessMode::Symlink => {
+                // For directories, create a symbolic link to the entire directory
+                if dest.exists() {
+                    if dest.is_symlink() { fs::remove_file(&dest)?; }
+                    else { fs::remove_dir_all(&dest)?; }
+                }
+                #[cfg(unix)]
+                std::os::unix::fs::symlink(src, &dest)?;
+                #[cfg(windows)]
+                std::os::windows::fs::symlink_dir(src, &dest)?;
+            }
         }
-    };
 
-    let hash_str = format!("{:x}", hash_digest);
-    if md5_file {
-        let md5_path = format!("{}.md5", dest.display());
-        fs::write(md5_path, format!("{}  {}\n", hash_str, file_name.to_string_lossy()))?;
+        // Calculate total size of directory
+        let total_size = get_directory_size(&dest)?;
+        let hash_str = format!("{:x}", calculate_directory_hash(&dest)?);
+        if md5_file {
+            let md5_path = format!("{}.md5", dest.display());
+            fs::write(md5_path, format!("{}  {}\n", hash_str, file_name.to_string_lossy()))?;
+        }
+        Ok((total_size, hash_str))
+    } else {
+        // Handle file delivery (original logic)
+        let (hash_digest, file_len) = match mode {
+            ProcessMode::Copy => copy_and_hash(src, &dest, buf_size)?,
+            ProcessMode::Hardlink => {
+                let (h, len) = just_hash(src, buf_size)?;
+                if dest.exists() { fs::remove_file(&dest)?; }
+                fs::hard_link(src, &dest)?;
+                (h, len)
+            },
+            ProcessMode::Symlink => {
+                let (h, len) = just_hash(src, buf_size)?;
+                if dest.exists() { fs::remove_file(&dest)?; }
+                #[cfg(unix)]
+                std::os::unix::fs::symlink(src, &dest)?;
+                #[cfg(windows)]
+                std::os::windows::fs::symlink_file(src, &dest)?;
+                (h, len)
+            }
+        };
+
+        let hash_str = format!("{:x}", hash_digest);
+        if md5_file {
+            let md5_path = format!("{}.md5", dest.display());
+            fs::write(md5_path, format!("{}  {}\n", hash_str, file_name.to_string_lossy()))?;
+        }
+        Ok((file_len, hash_str))
     }
-    Ok((file_len, hash_str))
+}
+
+// Helper function to recursively copy a directory
+fn copy_directory_recursive(src: &Path, dest: &Path, buf_size: usize) -> anyhow::Result<()> {
+    if dest.exists() {
+        fs::remove_dir_all(dest)?;
+    }
+    fs::create_dir_all(dest)?;
+
+    for entry in fs::read_dir(src)? {
+        let entry = entry?;
+        let src_path = entry.path();
+        let dest_path = dest.join(entry.file_name());
+
+        if src_path.is_dir() {
+            copy_directory_recursive(&src_path, &dest_path, buf_size)?;
+        } else {
+            // Copy file
+            fs::copy(&src_path, &dest_path)?;
+        }
+    }
+    Ok(())
+}
+
+// Helper function to hardlink directory contents
+fn copy_directory_contents_hardlink(src: &Path, dest: &Path, buf_size: usize) -> anyhow::Result<()> {
+    for entry in fs::read_dir(src)? {
+        let entry = entry?;
+        let src_path = entry.path();
+        let dest_path = dest.join(entry.file_name());
+
+        if src_path.is_dir() {
+            fs::create_dir_all(&dest_path)?;
+            copy_directory_contents_hardlink(&src_path, &dest_path, buf_size)?;
+        } else {
+            // Create hard link for file
+            fs::hard_link(&src_path, &dest_path)?;
+        }
+    }
+    Ok(())
+}
+
+// Helper function to calculate directory size
+fn get_directory_size(dir: &Path) -> anyhow::Result<u64> {
+    let mut total = 0;
+    for entry in walkdir::WalkDir::new(dir).into_iter().filter_map(|e| e.ok()) {
+        if entry.file_type().is_file() {
+            total += entry.metadata()?.len();
+        }
+    }
+    Ok(total)
+}
+
+// Helper function to calculate directory hash
+fn calculate_directory_hash(dir: &Path) -> anyhow::Result<Digest> {
+    use std::collections::HashMap;
+    let mut context = Md5Context::new();
+
+    // Collect all files with their relative paths and contents
+    let mut files: HashMap<String, Vec<u8>> = HashMap::new();
+
+    for entry in walkdir::WalkDir::new(dir).into_iter().filter_map(|e| e.ok()) {
+        if entry.file_type().is_file() {
+            let relative_path = entry.path().strip_prefix(dir)
+                .unwrap_or(entry.path())
+                .to_string_lossy()
+                .replace('\\', "/");
+            if let Ok(content) = fs::read(entry.path()) {
+                files.insert(relative_path, content);
+            }
+        }
+    }
+
+    // Sort by path to ensure consistent hashing
+    let mut sorted_files: Vec<_> = files.into_iter().collect();
+    sorted_files.sort_by(|a, b| a.0.cmp(&b.0));
+
+    // Hash each file's path and content
+    for (path, content) in sorted_files {
+        context.consume(path.as_bytes());
+        context.consume(&content);
+    }
+
+    Ok(context.compute())
 }
 
 fn just_hash(path: &Path, buffer_size: usize) -> anyhow::Result<(Digest, u64)> {
     let mut file = File::open(path)?;
     let len = file.metadata()?.len();
     let mut context = Md5Context::new();
-    let mut buffer = vec![0; buffer_size]; 
+    let mut buffer = vec![0; buffer_size];
     loop {
         let count = file.read(&mut buffer)?;
         if count == 0 { break; }
@@ -140,10 +259,10 @@ fn run_cloud_delivery(
     task_num: usize,
     part_size: u64
 ) -> PyResult<(usize, usize, f64)> {
-    
+
     // 创建 Tokio Runtime
     let rt = tokio::runtime::Runtime::new().unwrap();
-    
+
     rt.block_on(async {
         // 初始化 Client
         let client = match cloud::create_client(&endpoint, &region, &ak, &sk) {
@@ -158,12 +277,12 @@ fn run_cloud_delivery(
         // 这里为了简单，我们在 Rust 侧串行调度文件（每个文件的上传内部是并发的），
         // 或者也可以并发调度文件。鉴于 cloud::upload_and_set_meta 内部设计，我们串行调用它。
         let total_files = files.len();
-        
+
         for (idx, f) in files.iter().enumerate() {
             let src_path = Path::new(f);
             let file_name = src_path.file_name().unwrap().to_string_lossy();
             let object_key = format!("{}{}", prefix, file_name);
-            
+
             // 调用现有的 cloud 模块
             // 注意：cloud::upload_and_set_meta 需要 MultiProgress 等 indicatif 对象，
             // 如果是在 Python 环境下运行，我们可能不需要终端进度条，或者需要传入 None。
@@ -193,7 +312,7 @@ fn run_cloud_delivery(
                 }
             }
         }
-        
+
         Ok((success, failed, total_bytes / 1_000_000_000.0))
     })
 }
@@ -214,11 +333,11 @@ fn config_update(
 fn config_get() -> PyResult<(Option<String>, Option<String>, Option<String>, Option<String>)> {
     let manager = ConfigManager::new().map_err(|e| pyo3::exceptions::PyIOError::new_err(e.to_string()))?;
     let config = manager.load().map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(e.to_string()))?;
-    
+
     // Decrypt
     let ak = config.decrypt_ak().unwrap_or(None);
     let sk = config.decrypt_sk().unwrap_or(None);
-    
+
     Ok((config.endpoint, config.region, ak, sk))
 }
 

@@ -13,4 +13,4 @@
 ./examples
 ./deps
 ./incremental
-./Compile_release
+*/Compile_release

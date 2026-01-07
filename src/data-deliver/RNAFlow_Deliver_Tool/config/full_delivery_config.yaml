@@ -1,0 +1,54 @@
+data_delivery:
+  delivery_mode: copy
+  exclude_patterns: []
+  include_patterns:
+  - qc_summary_table.csv
+  - qc_summary_paths.json
+  - mapping_summary_table.csv
+  - mapping_summary_paths.json
+  - count_summary_table.csv
+  - count_summary_paths.json
+  - variant_summary_table.csv
+  - variant_summary_paths.json
+  - deg_summary_table.csv
+  - deg_summary_paths.json
+  - as_summary_table.csv
+  - as_summary_paths.json
+  - fusion_summary_table.csv
+  - fusion_summary_paths.json
+  - 01.qc/
+  - 02.mapping/
+  - 03.count/
+  - 04.variant/
+  - 06.DEG/
+  - 07.AS/
+  - 06.fusion/
+  include_qc_summary: true
+  output_dir: ./full_delivery
+  threads: 8
+metrics:
+  calculate_all_stats: true
+all_modules_files:
+  qc:
+  - 01.qc/
+  mapping:
+  - 02.mapping/
+  count:
+  - 03.count/
+  variant:
+  - 04.variant/
+  deg:
+  - 06.DEG/
+  as:
+  - 07.AS/
+  fusion:
+  - 06.fusion/
+all_summary_columns:
+- sample_name
+- qc_passing
+- mapping_rate
+- gene_counts
+- variant_count
+- deg_genes
+- splice_events
+- fusion_count

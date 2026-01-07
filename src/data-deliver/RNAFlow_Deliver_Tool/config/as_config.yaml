@@ -1,0 +1,38 @@
+data_delivery:
+  delivery_mode: copy
+  exclude_patterns: []
+  include_patterns:
+  - as_summary_table.csv
+  - as_summary_paths.json
+  - 07.AS/qc/strandness/*.summary.txt
+  - 07.AS/qc/all_samples_strandness.txt
+  - 07.AS/rmats_pair/*/
+  - 07.AS/rmats_single/*/
+  include_qc_summary: true
+  output_dir: ./as_delivery
+  threads: 4
+metrics:
+  calculate_splicing_events: true
+  calculate_as_stats: true
+  calculate_strandness: true
+as_files:
+  strandness_qc:
+  - 07.AS/qc/strandness/*.summary.txt
+  - 07.AS/qc/all_samples_strandness.txt
+  rmats_results:
+  - 07.AS/rmats_pair/*/SE.MATS.JC.txt
+  - 07.AS/rmats_pair/*/summary.txt
+  - 07.AS/rmats_pair/*/
+  - 07.AS/rmats_single/*/
+  general:
+  - 07.AS/
+as_summary_columns:
+- sample_name
+- total_junctions
+- strandness_rate
+- se_events
+- mxe_events
+- a5ss_events
+- a3ss_events
+- ri_events
+- total_as_events

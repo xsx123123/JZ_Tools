@@ -1,0 +1,39 @@
+data_delivery:
+  delivery_mode: copy
+  exclude_patterns: []
+  include_patterns:
+  - deg_summary_table.csv
+  - deg_summary_paths.json
+  - 06.DEG/Gene_Expression/
+  - 06.DEG/Heatmap_tpm/
+  - 06.DEG/Heatmap_fpkm/
+  - 06.DEG/DESEQ2/
+  include_qc_summary: true
+  output_dir: ./deg_delivery
+  threads: 4
+metrics:
+  calculate_deg_stats: true
+  calculate_pca: true
+  calculate_clustering: true
+deg_files:
+  expression_analysis:
+  - 06.DEG/Gene_Expression/Gene_Expression_Distribution.pdf
+  - 06.DEG/Gene_Expression/Gene_Expression_Distribution.png
+  heatmap:
+  - 06.DEG/Heatmap_tpm/Heatmap_TopVar.pdf
+  - 06.DEG/Heatmap_tpm/Heatmap_TopVar.png
+  - 06.DEG/Heatmap_fpkm/Heatmap_TopVar.pdf
+  - 06.DEG/Heatmap_fpkm/Heatmap_TopVar.png
+  deg_results:
+  - 06.DEG/DESEQ2/
+  general:
+  - 06.DEG/
+deg_summary_columns:
+- sample_name
+- total_genes
+- expressed_genes
+- deg_genes
+- upregulated_genes
+- downregulated_genes
+- padj_significant
+- max_log_fold_change

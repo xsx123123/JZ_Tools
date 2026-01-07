@@ -231,56 +231,87 @@ def parse_fastq_screen(txt_path: str) -> Dict[str, Any]:
     try:
         with open(txt_path, 'r') as f:
             lines = f.readlines()
-        
+
         header_idx = -1
         for i, line in enumerate(lines):
             if line.startswith('Genome') or line.startswith('Library'):
                 header_idx = i
                 break
-        
+
         if header_idx == -1: return metrics
+
+        # Parse header to identify column positions
+        header_line = lines[header_idx].strip()
+        header_parts = header_line.split()
+
+        # Look for common column names in fastq_screen output
+        # Typical format: Genome/Taxonomy, #Reads, %Unmapped, %Mapped, %One_hit, %Multiple_hits
+        pct_mapped_idx = -1
+        pct_unmapped_idx = -1
+
+        for i, col in enumerate(header_parts):
+            if col == '%Mapped':
+                pct_mapped_idx = i
+            elif col == '%Unmapped':
+                pct_unmapped_idx = i
+            # Also check for other common mapped percentage columns
+            elif col in ['%One_hit', '%Unique']:
+                pct_mapped_idx = i  # Use these as alternatives to %Mapped
 
         screen_data = {}
         for line in lines[header_idx+1:]:
             line = line.strip()
             if not line or line.startswith('%'): continue
-            
-            parts = line.split()
-            
-            # --- 修复逻辑开始 ---
-            # 智能寻找第一个数字列，以解决物种名包含空格导致的偏移问题 (解决负数BUG)
-            first_num_idx = -1
-            for i, p in enumerate(parts):
-                try:
-                    # 尝试寻找数字 (Reads数通常是整数，但这里只要是数字就行)
-                    float(p)
-                    first_num_idx = i
-                    break
-                except ValueError:
-                    continue
-            
-            # 如果找到了数字，并且后面还有列
-            if first_num_idx != -1 and len(parts) > first_num_idx + 1:
-                # 物种名是数字前的所有部分拼接
-                species = " ".join(parts[:first_num_idx])
-                
-                # first_num_idx 是 #Reads
-                # first_num_idx + 1 是 %Unmapped
-                try:
-                    pct_unmapped = float(parts[first_num_idx + 1])
-                    pct_hit = 100.0 - pct_unmapped
-                    # 防止浮点误差导致的微小负数
-                    if pct_hit < 0: pct_hit = 0.0
-                    screen_data[species] = pct_hit
-                except ValueError:
-                    continue
-            # --- 修复逻辑结束 ---
 
-        metrics['screen_no_hit'] = 100.0 
+            parts = line.split()
+
+            # Determine which percentage column to use
+            pct_value = None
+            species = None
+
+            if pct_mapped_idx != -1 and len(parts) > pct_mapped_idx:
+                # Use the %Mapped column directly (this is the percentage that mapped to this genome)
+                try:
+                    species = parts[0]  # First column is usually the species/genome name
+                    pct_value = float(parts[pct_mapped_idx])
+                except (ValueError, IndexError):
+                    continue
+            elif pct_unmapped_idx != -1 and len(parts) > pct_unmapped_idx:
+                # If we only have %Unmapped, we should NOT calculate 100-%Unmapped
+                # because that would be wrong for contamination detection
+                # The %Unmapped column represents reads that did NOT map to this genome
+                # So we should look for other columns or skip
+                continue
+            else:
+                # Fallback: try to identify the species and percentage from the line structure
+                # Usually it's [Species, Reads, Percentage, ...] where Percentage is %Mapped
+                if len(parts) >= 3:
+                    try:
+                        species = parts[0]
+                        # Try to parse the third column as percentage (after #Reads)
+                        pct_value = float(parts[2])
+                    except (ValueError, IndexError):
+                        continue
+
+            # Only add if it's a reasonable percentage value
+            if pct_value is not None and species:
+                # Only include values that are reasonable percentages
+                # In some cases, very high values might indicate data format issues
+                # but we'll be more permissive to handle various formats
+                if 0 <= pct_value <= 100:
+                    screen_data[species] = pct_value
+                elif pct_value > 100:
+                    # For values > 100, this might be due to specific data formats
+                    # We'll include them since they might be valid in some contexts
+                    # but log a warning
+                    logger.warning(f"High percentage value ({pct_value}) for {species} in {Path(txt_path).name}")
+                    screen_data[species] = pct_value
+
+        metrics['screen_no_hit'] = 100.0
         for sp, hit_pct in screen_data.items():
             key = f"screen_{sp.lower().replace(' ', '_')}_pct"
             metrics[key] = round(hit_pct, 2)
-            
+
     except Exception as e:
         logger.warning(f"Error parsing FastQ Screen {Path(txt_path).name}: {e}")
     return metrics
@@ -301,9 +332,11 @@ def process_qc_files(data_dir: Path, config: Dict) -> pd.DataFrame:
 
     # 3. Contamination (FastQ Screen)
     screen_files = []
-    for pattern in config['qc_files'].get('contamination', []):
-        found = list(data_dir.glob(pattern))
-        screen_files.extend([p for p in found if str(p).endswith('.txt')])
+    contamination_patterns = config['qc_files'].get('contamination', [])
+    if contamination_patterns:  # Only process if contamination patterns are defined
+        for pattern in contamination_patterns:
+            found = list(data_dir.glob(pattern))
+            screen_files.extend([p for p in found if str(p).endswith('.txt')])
 
     logger.info(f"Scanning directory: {data_dir.absolute()}")
     logger.info(f"Found [cyan]{len(fastqc_files)}[/cyan] FastQC, [cyan]{len(fastp_files)}[/cyan] Fastp, [cyan]{len(screen_files)}[/cyan] Screen files.")

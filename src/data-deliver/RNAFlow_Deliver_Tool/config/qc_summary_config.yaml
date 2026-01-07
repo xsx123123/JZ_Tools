@@ -1,5 +1,5 @@
 data_delivery:
-  delivery_mode: symlink
+  delivery_mode: copy
   exclude_patterns: []
   include_patterns:
   - qc_summary_table.csv
@@ -24,11 +24,7 @@ metrics:
   calculate_q30: true
   calculate_retention_rates: true
 qc_files:
-  contamination:
-  - 01.qc/fastq_screen_r1/*_R1_screen.txt
-  - 01.qc/fastq_screen_r2/*_R2_screen.txt
-  - 01.qc/fastq_screen_multiqc_r1/multiqc_*_report.html
-  - 01.qc/fastq_screen_multiqc_r2/multiqc_*_report.html
+  contamination: []
   fastp:
   - 01.qc/short_read_trim/*.R1.trimed.fq.gz
   - 01.qc/short_read_trim/*.R2.trimed.fq.gz

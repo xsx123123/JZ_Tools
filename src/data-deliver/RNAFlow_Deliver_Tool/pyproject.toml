@@ -15,7 +15,6 @@ dependencies = [
 ]
 
 [project.scripts]
-rnaflow-qc = "RNAFlow_Deliver.qc_summary:main"
 rnaflow-cli = "RNAFlow_Deliver.cli:main"
 
 [tool.maturin]

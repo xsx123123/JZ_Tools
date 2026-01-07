@@ -5,7 +5,7 @@ from rich.panel import Panel
 from rich.table import Table
 from rich.text import Text
 from rich.align import Align
-from RNAFlow_Deliver.modules import qc, deliver, config
+from RNAFlow_Deliver.modules import qc, deliver, config, merge
 
 __version__ = "0.2.0"
 console = Console()
@@ -101,6 +101,13 @@ def main():
     cfg_parser.add_argument("--ak", type=str, help="Access Key ID")
     cfg_parser.add_argument("--sk", type=str, help="Secret Access Key")
 
+    # --- Command: merge ---
+    merge_parser = subparsers.add_parser("merge", help="Merge multiple config files into JSON/TSV format")
+    merge_parser.add_argument("-p", "--config-pattern", type=str, default="config/*_config.yaml", help="Glob pattern for config files to merge")
+    merge_parser.add_argument("-o", "--output-dir", type=str, default="merged_output", help="Output directory for merged results")
+    merge_parser.add_argument("-f", "--format", type=str, choices=["json", "tsv"], default="tsv", help="Output format (json or tsv)")
+    merge_parser.add_argument("--prefix", type=str, default="merged_config", help="Output filename prefix")
+
     # Parse
     if len(sys.argv) == 1:
         parser.print_help()
@@ -114,6 +121,8 @@ def main():
         deliver.run(args)
     elif args.command == "config":
         config.run(args)
+    elif args.command == "merge":
+        merge.run(args)
 
 if __name__ == "__main__":
     main()
