@@ -3,8 +3,8 @@
 # ==============================================================================
 # Expression Distribution Pipeline (TPM & FPKM)
 # Author: Jian Zhang (Integrated by Hajimi)
-# Date: 2026-01-03
-# Version: 1.1 (Added width & height arguments)
+# Date: 2026-01-07
+# Version: 1.2 (Fixed: Continuous value to discrete scale error)
 # ==============================================================================
 
 # 0. 加载必要的包 ---------------------------------------------------------
@@ -43,7 +43,9 @@ log4r_init <- function(level = "INFO", log_file = NULL){
 }
 
 # 2. 定义绘图函数 ---------------------------------------------------------
-colors_discrete_friendly_long <- c("#CC79A7","#0072B2","#56B4E9","#009E73","#F5C710","#E69F00","#D55E00")
+# 定义更丰富的色板，防止分组过多时颜色不够
+colors_discrete_friendly_long <- c("#CC79A7","#0072B2","#56B4E9","#009E73","#F5C710","#E69F00","#D55E00", 
+                                   "#999999", "#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E00", "#CC79A7")
 
 plot_expression_distribution <- function(data_matrix, meta_df, type_name = "TPM"){
   keep_genes <- rowMeans(data_matrix) > 1
@@ -78,7 +80,7 @@ plot_expression_distribution <- function(data_matrix, meta_df, type_name = "TPM"
          y = paste0("Log2(", type_name, "+1)")) +
     theme_pubclean() +
     theme(axis.text.x = element_text(angle = 90, hjust = 1),
-          legend.position = 'none')
+          legend.position = 'right') # 改为 right 以便查看图例
   
   return(p)
 }
@@ -90,7 +92,6 @@ option_list <- list(
   make_option(c("-m", "--metadata"), type = "character", default = NULL, help = "Path to sample metadata"),
   make_option(c("-o", "--outdir"), type = "character", default = "./results_dist", help = "Output Directory"),
   make_option(c("-l", "--log_file"), type = "character", default = "dist_plot.log", help = "Log Filename"),
-  # 【新增参数】
   make_option(c("--width"), type = "numeric", default = 8.5, help = "Plot Width (inches) [Default: 8.5]"),
   make_option(c("--height"), type = "numeric", default = 7.5, help = "Plot Height (inches) [Default: 7.5]")
 )
@@ -116,7 +117,6 @@ logger <- log4r_init(level = "INFO", log_file = log_path)
 
 cat(paste0("Log file location: ", log_path, "\n"))
 log4r::info(logger, "Pipeline Started: Expression Distribution Analysis")
-# 记录尺寸设置
 log4r::info(logger, paste0("Output Size -> Width: ", opt$width, " in | Height: ", opt$height, " in"))
 
 # 4. 数据读取函数 ---------------------------------------------------------
@@ -132,7 +132,11 @@ read_matrix <- function(file_path){
 tryCatch({
   # --- Step 1: 读取 Metadata ---
   log4r::info(logger, "Loading Metadata...")
-  if(grepl(".csv$", opt$metadata)) meta_df <- read.csv(opt$metadata, stringsAsFactors = F) else meta_df <- read.table(opt$metadata, header = T, sep = "\t", stringsAsFactors = F)
+  if(grepl(".csv$", opt$metadata)) {
+    meta_df <- read.csv(opt$metadata, stringsAsFactors = F) 
+  } else {
+    meta_df <- read.table(opt$metadata, header = T, sep = "\t", stringsAsFactors = F)
+  }
   
   if("sample_name" %in% colnames(meta_df)) colnames(meta_df)[colnames(meta_df) == "sample_name"] <- "Sample"
   if("group" %in% colnames(meta_df)) colnames(meta_df)[colnames(meta_df) == "group"] <- "Group"
@@ -141,6 +145,10 @@ tryCatch({
     log4r::fatal(logger, "Metadata format error: Need 'sample_name' and 'group' columns.")
     stop("Metadata Error")
   }
+  
+  # 【FIX】强制转换为 Factor，解决 "Continuous value to discrete scale" 报错
+  meta_df$Group <- as.factor(meta_df$Group)
+  log4r::info(logger, paste0("Group Levels: ", paste(levels(meta_df$Group), collapse = ", ")))
   
   # --- Step 2: 处理 TPM ---
   log4r::info(logger, "Processing TPM Data...")
@@ -172,7 +180,6 @@ tryCatch({
   out_png <- file.path(opt$outdir, 'Gene_Expression_Distribution.png')
   out_pdf <- file.path(opt$outdir, 'Gene_Expression_Distribution.pdf')
   
-  # 【使用参数】
   ggsave(out_png, width = opt$width, height = opt$height, dpi = 300, plot = final_plot)
   ggsave(out_pdf, width = opt$width, height = opt$height, plot = final_plot)
   
