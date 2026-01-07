@@ -3,6 +3,7 @@
 """
 QC Summary Script for RNAFlow Pipeline (Hybrid Version)
 Integrates Python parsing logic with Rust high-performance I/O engine.
+Fixed: FastQ Screen parsing logic to prevent negative percentages.
 """
 
 import os
@@ -23,9 +24,7 @@ from rich.progress import Progress, SpinnerColumn, BarColumn, TextColumn
 from rich.panel import Panel
 from rich.logging import RichHandler
 from rich.tree import Tree
-from rich.text import Text
 from rich import box
-from rich.layout import Layout
 from rich.align import Align
 
 # --- Rust Extension Import ---
@@ -33,6 +32,8 @@ try:
     import data_deliver_rs
 except ImportError:
     data_deliver_rs = None
+
+__version__ = "0.1.0"
 
 # Initialize Rich Console
 console = Console()
@@ -136,7 +137,6 @@ def extract_sample_name_from_path(file_path: str) -> str:
     
     for suffix, replacement in patterns:
         if filename.endswith(suffix):
-            # Special handling for _R1/_R2 inside the name if necessary
             name = filename.replace(suffix, replacement)
             if name.endswith('_R1'): name = name[:-3]
             if name.endswith('_R2'): name = name[:-3]
@@ -198,7 +198,6 @@ def parse_fastp_json(json_path: str) -> Dict[str, Any]:
         summary = data.get('summary', {})
         before = summary.get('before_filtering', {})
         
-        # Basic Stats
         metrics.update({
             'input_reads': before.get('total_reads', 0),
             'input_bases': before.get('total_bases', 0),
@@ -207,11 +206,9 @@ def parse_fastp_json(json_path: str) -> Dict[str, Any]:
             'input_data_size_mb': round(before.get('total_bases', 0) / (1024**2), 2)
         })
 
-        # Duplication
         dup = data.get('duplication', {})
         metrics['duplication_rate'] = round(dup.get('rate', 0.0) * 100, 2)
 
-        # Insert Size (only for PE)
         ins = data.get('insert_size', {})
         metrics['insert_size_peak'] = ins.get('peak', 0)
 
@@ -235,7 +232,6 @@ def parse_fastq_screen(txt_path: str) -> Dict[str, Any]:
         with open(txt_path, 'r') as f:
             lines = f.readlines()
         
-        # Find header line index (Genome or Library)
         header_idx = -1
         for i, line in enumerate(lines):
             if line.startswith('Genome') or line.startswith('Library'):
@@ -248,22 +244,41 @@ def parse_fastq_screen(txt_path: str) -> Dict[str, Any]:
         for line in lines[header_idx+1:]:
             line = line.strip()
             if not line or line.startswith('%'): continue
-            parts = line.split()
-            if len(parts) < 3: continue
             
-            species = parts[0]
-            # Standard Format: Genome | #Reads | %Unmapped | %One_hit ...
-            try:
-                # %Unmapped is usually col 2 (index 2)
-                pct_unmapped = float(parts[2])
-                pct_hit = 100.0 - pct_unmapped
-                screen_data[species] = pct_hit
-            except ValueError:
-                continue
+            parts = line.split()
+            
+            # --- 修复逻辑开始 ---
+            # 智能寻找第一个数字列，以解决物种名包含空格导致的偏移问题 (解决负数BUG)
+            first_num_idx = -1
+            for i, p in enumerate(parts):
+                try:
+                    # 尝试寻找数字 (Reads数通常是整数，但这里只要是数字就行)
+                    float(p)
+                    first_num_idx = i
+                    break
+                except ValueError:
+                    continue
+            
+            # 如果找到了数字，并且后面还有列
+            if first_num_idx != -1 and len(parts) > first_num_idx + 1:
+                # 物种名是数字前的所有部分拼接
+                species = " ".join(parts[:first_num_idx])
+                
+                # first_num_idx 是 #Reads
+                # first_num_idx + 1 是 %Unmapped
+                try:
+                    pct_unmapped = float(parts[first_num_idx + 1])
+                    pct_hit = 100.0 - pct_unmapped
+                    # 防止浮点误差导致的微小负数
+                    if pct_hit < 0: pct_hit = 0.0
+                    screen_data[species] = pct_hit
+                except ValueError:
+                    continue
+            # --- 修复逻辑结束 ---
 
-        metrics['screen_no_hit'] = 100.0 # Default fallback
+        metrics['screen_no_hit'] = 100.0 
         for sp, hit_pct in screen_data.items():
-            key = f"screen_{sp.lower()}_pct"
+            key = f"screen_{sp.lower().replace(' ', '_')}_pct"
             metrics[key] = round(hit_pct, 2)
             
     except Exception as e:
@@ -361,12 +376,10 @@ def save_outputs(df: pd.DataFrame, output_dir: Path, prefix: str):
     output_dir.mkdir(parents=True, exist_ok=True)
     csv_path = output_dir / f"{prefix}_table.csv"
     
-    # Reorder columns for better readability
     cols = ['sample_name', 'reads_raw', 'data_mb_raw', 'gc_content', 'duplication_rate', 
             'reads_clean', 'data_mb_clean', 'q30_clean', 'avg_len_clean', 'insert_size']
-    # Add any extra screen columns found
     existing_cols = df.columns.tolist()
-    screen_cols = [c for c in existing_cols if c.startswith('screen_')] # Pick only screen columns
+    screen_cols = [c for c in existing_cols if c.startswith('screen_')]
     final_cols = [c for c in cols if c in existing_cols] + sorted(screen_cols)
     
     df[final_cols].to_csv(csv_path, index=False)
@@ -388,7 +401,6 @@ def save_outputs(df: pd.DataFrame, output_dir: Path, prefix: str):
 def display_summary_table(df: pd.DataFrame):
     if df.empty: return
     
-    # Create a nice looking table
     table = Table(
         title="📊 Detailed QC Summary Preview (Top 10)", 
         box=box.ROUNDED,
@@ -403,40 +415,31 @@ def display_summary_table(df: pd.DataFrame):
     table.add_column("GC\n(%)", justify="right")
     table.add_column("Dup\n(%)", justify="right")
     
-    # Add dynamic screen columns to display (e.g. Human)
     screen_keys = [c for c in df.columns if c.startswith('screen_') and 'no_hit' not in c]
-    # Pick top 1-2 contaminants to show in table
     display_screen = screen_keys[:2] 
     for sk in display_screen:
-        header = sk.replace('screen_', '').replace('_pct', '').title()
+        header = sk.replace('screen_', '').replace('_pct', '').replace('_', ' ').title()
         table.add_column(f"{header}\n(%)", justify="right", style="magenta")
 
-    # Sort and take top 10
     top_df = df.sort_values(by="sample_name").head(10)
     
     for _, row in top_df.iterrows():
-        # Conditional Formatting for Q30
         q30 = row.get('q30_clean', 0)
         q30_style = "green" if q30 >= 85 else ("yellow" if q30 >= 80 else "red")
-        q30_text = f"[{q30_style}]{q30}[/{q30_style}]"
         
-        # Dup Color
         dup = row.get('duplication_rate', 0)
         dup_style = "green" if dup < 50 else "yellow"
-        dup_text = f"[{dup_style}]{dup}[/{dup_style}]"
 
-        # GC Color
         gc = row.get('gc_content', 0)
         gc_style = "white"
         if gc < 30 or gc > 70: gc_style = "yellow"
-        gc_text = f"[{gc_style}]{gc}[/{gc_style}]"
 
         row_data = [
             str(row['sample_name']), 
             f"{row.get('data_mb_clean',0):.1f}", 
-            q30_text,
-            gc_text,
-            dup_text
+            f"[{q30_style}]{q30}[/{q30_style}]",
+            f"[{gc_style}]{gc}[/{gc_style}]",
+            f"[{dup_style}]{dup}[/{dup_style}]"
         ]
         
         for sk in display_screen:
@@ -456,9 +459,6 @@ def display_summary_table(df: pd.DataFrame):
 # -----------------------------------------------------------------------------
 
 def run_delivery_task(config: Dict, data_dir: Path, output_dir: Path):
-    """
-    Invokes the compiled Rust extension 'data_deliver_rs' for high-speed file handling.
-    """
     if data_deliver_rs is None:
         console.print(Panel("[bold red]❌ Rust extension 'data_deliver_rs' not found![/bold red]\n\nSkipping delivery task.\nTip: Run 'maturin develop --release' to build.", border_style="red"))
         return
@@ -472,7 +472,6 @@ def run_delivery_task(config: Dict, data_dir: Path, output_dir: Path):
     patterns = delivery_conf.get('include_patterns', [])
     exclude_patterns = delivery_conf.get('exclude_patterns', [])
     
-    # Resolve Include Patterns
     for pattern in patterns:
         if "qc_summary" in pattern:
             matches = list(output_dir.glob(pattern))
@@ -483,7 +482,6 @@ def run_delivery_task(config: Dict, data_dir: Path, output_dir: Path):
         for p in matches:
             files_to_deliver.add(str(p.absolute()))
 
-    # Resolve Exclude Patterns
     for pattern in exclude_patterns:
         matches = list(data_dir.glob(pattern))
         for p in matches:
@@ -495,7 +493,6 @@ def run_delivery_task(config: Dict, data_dir: Path, output_dir: Path):
         logger.warning("No files matched the delivery patterns.")
         return
 
-    # Call Rust Engine
     mode = delivery_conf.get('delivery_mode', 'symlink')
     threads = int(delivery_conf.get('threads', 4))
     
@@ -503,7 +500,6 @@ def run_delivery_task(config: Dict, data_dir: Path, output_dir: Path):
     logger.info(f"Invoking Rust engine for {len(file_list)} files...")
     
     try:
-        # Calls: run_local_delivery(files, output_dir, mode, threads) -> (success, failed, size_gb)
         with console.status("[bold green]Rust Engine Running...[/bold green]", spinner="dots"):
             success, failed, size_gb = data_deliver_rs.run_local_delivery(
                 file_list, 
@@ -512,7 +508,6 @@ def run_delivery_task(config: Dict, data_dir: Path, output_dir: Path):
                 threads
             )
         
-        # Result Panel
         stats_table = Table(show_header=False, box=None)
         stats_table.add_row("✅ Success:", f"[green]{success}[/green]")
         stats_table.add_row("❌ Failed:", f"[red]{failed}[/red]")
@@ -535,6 +530,7 @@ def run_delivery_task(config: Dict, data_dir: Path, output_dir: Path):
 
 def main():
     parser = argparse.ArgumentParser(description="RNAFlow QC Summary & Delivery Tool")
+    parser.add_argument("-v", "--version", action="version", version=f"%(prog)s {__version__}")
     parser.add_argument("-d", "--data-dir", type=str, default=".", help="Base directory (01.qc)")
     parser.add_argument("-o", "--output-dir", type=str, default="qc_delivery", help="Output directory")
     parser.add_argument("-c", "--config", type=str, default="config/qc_summary_config.yaml", help="Config YAML")
@@ -542,7 +538,6 @@ def main():
     
     args = parser.parse_args()
     
-    # Title Panel
     console.print("")
     console.print(Panel.fit(
         "[bold white]RNAFlow QC Summary Tool[/bold white]\n[dim]High-Performance Rust Accelerated[/dim]", 
@@ -558,18 +553,15 @@ def main():
     output_path = Path(args.output_dir)
 
     try:
-        # Step 1: Analyze & Parse
         df = process_qc_files(data_path, config)
         if df.empty:
             console.print(Panel("[bold red]No QC data found![/bold red]\nPlease check your input directory.", border_style="red"))
             sys.exit(1)
             
-        # Step 2: Save Summary Reports
         console.rule("[bold cyan]💾 Saving Reports[/bold cyan]")
         save_outputs(df, output_path, args.prefix)
         display_summary_table(df)
         
-        # Step 3: Deliver Data (Rust)
         run_delivery_task(config, data_path, output_path)
         
         console.print("")

@@ -1,0 +1,10 @@
+data_delivery:
+  delivery_mode: symlink
+  exclude_patterns: []
+  include_patterns:
+  - '*.bam'
+  - '*.bai'
+  - '*.vcf.gz'
+  include_qc_summary: true
+  output_dir: ./delivery
+  threads: 4
