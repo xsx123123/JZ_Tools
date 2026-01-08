@@ -18,12 +18,13 @@
 *   **云端交付**：支持直接上传到 S3 兼容对象存储 (如火山引擎 TOS)。
     *   基于 Rust `tokio` 异步运行时，支持高并发分片上传。
     *   自动计算文件 MD5 并校验。
+    *   **MD5 校验和汇总**：所有文件的 MD5 校验和现在统一保存在 `all_files.md5` 文件中，便于管理和验证。
 
 ### 3. 🔐 安全配置 (`config`)
 *   **加密存储**：敏感信息 (AK/SK) 使用 AES-GCM 加密存储于本地 (`~/.data_deliver/config.yaml`)。
 *   **自动读取**：交付任务会自动读取解密后的配置，无需在脚本中明文硬编码密钥。
 
-## 🛠️ 安装指南
+## 🛠️ 安装与卸载指南
 
 ### 预备条件
 *   Python >= 3.8
@@ -36,6 +37,19 @@ pip install maturin
 maturin develop --release  # 开发模式
 # 或
 maturin build --release && pip install target/wheels/*.whl
+```
+
+### 卸载方法
+```bash
+# 1. 卸载 Python 包
+pip uninstall data_deliver_rs
+
+# 2. 清理 Rust 编译产物
+cd /path/to/RNAFlow_Deliver_Tool  # 替换为实际路径
+cargo clean
+
+# 3. 如需彻底清理所有构建产物
+rm -rf build/ dist/ *.egg-info/ target/
 ```
 
 ## 📖 使用指南
@@ -61,6 +75,7 @@ rnaflow-cli qc -d ./01.qc -o ./qc_report
 # 将 bam 文件硬链接到 delivery 目录
 rnaflow-cli deliver -d ./analysis -o ./delivery -c config/delivery_config.yaml
 ```
+*   交付完成后，所有文件的 MD5 校验和将保存在输出目录的 `all_files.md5` 文件中。
 
 **云端模式：**
 ```bash
@@ -114,6 +129,7 @@ data_delivery:
 ## ⚡ 性能基准
 
 *   **MD5 计算**: Rust 引擎利用 SIMD 指令集与多线程，速度是标准 `md5sum` 命令的 1.5-2 倍。
+*   **MD5 管理**: 所有文件的 MD5 校验和统一保存在单个 `all_files.md5` 文件中，便于管理和批量验证。
 *   **文件扫描**: 并行文件系统扫描，支持百万级小文件快速处理。
 *   **云上传**: 自动根据网络带宽调整并发度，支持断点续传（依赖于云厂商 SDK 实现）。
 

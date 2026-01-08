@@ -16,6 +16,7 @@ use regex::Regex;
 use std::fs::{self, File};
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
+use std::sync::{Arc, Mutex};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::{Duration, Instant};
 use walkdir::WalkDir;
@@ -132,7 +133,7 @@ async fn run_local(args: LocalArgs, cmd_str: String, start_time: Instant) -> Res
     if !args.output.exists() { fs::create_dir_all(&args.output)?; }
     let log_path = args.output.join(format!("{}_{}_local.log", args.project_id, chrono::Local::now().format("%Y%m%d-%H%M%S")));
     setup_logger(args.debug, &log_path)?;
-    
+
     info!("COMMAND: {}", cmd_str);
     info!("🚀 [LOCAL] 任务启动...");
 
@@ -144,13 +145,22 @@ async fn run_local(args: LocalArgs, cmd_str: String, start_time: Instant) -> Res
     let pb = create_pb(entries.len() as u64);
     let stats = Stats { success: AtomicUsize::new(0), failed: AtomicUsize::new(0), total_bytes: AtomicUsize::new(0) };
 
+    // Collect MD5 checksums in a thread-safe vector
+    let md5_results = Arc::new(Mutex::new(Vec::new()));
+
     entries.par_iter().for_each(|src| {
         let dest = args.output.join(src.file_name().unwrap());
-        let md5 = format!("{}.md5", dest.display());
+        let md5_results_clone = Arc::clone(&md5_results);
         if !args.debug { pb.set_message(format!("{:?}", src.file_name().unwrap())); }
-        match process_local_file(src, &dest, &md5, args.mode, args.buffer_size) {
-            Ok((s, m)) => { 
-                stats.success.fetch_add(1, Ordering::Relaxed); 
+        match process_local_file_single(src, &dest, args.mode, args.buffer_size) {
+            Ok((s, m)) => {
+                // Collect the MD5 result for later writing to single file
+                let file_name = dest.file_name().unwrap().to_string_lossy().to_string();
+                if let Ok(mut results) = md5_results_clone.lock() {
+                    results.push((file_name, m.clone()));
+                }
+
+                stats.success.fetch_add(1, Ordering::Relaxed);
                 stats.total_bytes.fetch_add(s as usize, Ordering::Relaxed);
                 info!("✅ Local: {} -> {} (MD5: {})", src.display(), dest.display(), m);
             }
@@ -158,6 +168,16 @@ async fn run_local(args: LocalArgs, cmd_str: String, start_time: Instant) -> Res
         }
         pb.inc(1);
     });
+
+    // Write all MD5 checksums to a single file
+    if let Ok(results) = md5_results.lock() {
+        let md5_file_path = args.output.join("all_files.md5");
+        let mut md5_file = File::create(&md5_file_path)?;
+        for (file_name, hash_str) in results.iter() {
+            writeln!(md5_file, "{}  {}", hash_str, file_name)?;
+        }
+    }
+
     pb.finish_and_clear();
     print_summary("Local Delivery", &stats, &log_path, start_time.elapsed());
     Ok(())
@@ -345,7 +365,7 @@ fn print_summary(title: &str, stats: &Stats, log: &Path, dur: Duration) {
     println!("\n{}", table);
 }
 
-fn process_local_file(src: &Path, dest: &Path, md5_dest: &str, mode: Mode, buf_size: usize) -> Result<(u64, String)> {
+fn process_local_file_single(src: &Path, dest: &Path, mode: Mode, buf_size: usize) -> Result<(u64, String)> {
     if let Some(parent) = dest.parent() { fs::create_dir_all(parent)?; }
     let (hash_digest, file_len) = match mode {
         Mode::Copy => copy_and_hash(src, dest, buf_size)?,
@@ -364,6 +384,12 @@ fn process_local_file(src: &Path, dest: &Path, md5_dest: &str, mode: Mode, buf_s
         }
     };
     let hash_str = format!("{:x}", hash_digest);
+    let file_name = dest.file_name().unwrap().to_string_lossy();
+    Ok((file_len, hash_str))
+}
+
+fn process_local_file(src: &Path, dest: &Path, md5_dest: &str, mode: Mode, buf_size: usize) -> Result<(u64, String)> {
+    let (file_len, hash_str) = process_local_file_single(src, dest, mode, buf_size)?;
     let file_name = dest.file_name().unwrap().to_string_lossy();
     fs::write(md5_dest, format!("{}  {}\n", hash_str, file_name))?;
     Ok((file_len, hash_str))

@@ -1,0 +1,35 @@
+# RNAFlow Logger Plugin Configuration Example
+
+# This configuration file demonstrates how to use the RNAFlow logger plugin
+# with your Snakemake pipeline.
+
+# Enable the RNAFlow logger plugin
+logger_plugin: rnaflow
+
+# Configure plugin-specific settings
+logger_plugin_settings:
+  # Directory where log files will be stored
+  log_dir: "logs"
+  
+  # Prefix for log file names
+  log_file_prefix: "RNAFlow"
+  
+  # Maximum file size before rotation (to prevent huge log files)
+  max_file_size: "500 MB"
+  
+  # Whether to capture comprehensive runtime information at startup
+  capture_runtime_info: true
+
+# Other RNAFlow configuration parameters remain the same
+project_name: 'HYXM-251215018'
+Genome_Version: "GRCm39"
+raw_data_path:
+  - /data/jzhang/project/Temp/HYXM-251215018/00.raw_data/HYXM-251215018-SEQ/Fastq
+sample_csv: /data/jzhang/project/Temp/HYXM-251215018/01.workflow/sample.csv
+paired_csv: /data/jzhang/project/Temp/HYXM-251215018/01.workflow/contrasts.csv
+workflow: /data/jzhang/project/Temp/HYXM-251215018/01.workflow
+data_deliver: /data/jzhang/project/Temp/HYXM-251215018/02.data_deliver
+Library_Types: fr-firststrand
+call_variant: false
+noval_Transcripts: false
+rmats: true

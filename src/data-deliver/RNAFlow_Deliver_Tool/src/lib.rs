@@ -61,8 +61,7 @@ fn process_file_internal(src: &Path, output_dir: &Path, md5_file: bool, mode: Pr
         let total_size = get_directory_size(&dest)?;
         let hash_str = format!("{:x}", calculate_directory_hash(&dest)?);
         if md5_file {
-            let md5_path = format!("{}.md5", dest.display());
-            fs::write(md5_path, format!("{}  {}\n", hash_str, file_name.to_string_lossy()))?;
+            // Return hash for collection in single file later
         }
         Ok((total_size, hash_str))
     } else {
@@ -88,8 +87,7 @@ fn process_file_internal(src: &Path, output_dir: &Path, md5_file: bool, mode: Pr
 
         let hash_str = format!("{:x}", hash_digest);
         if md5_file {
-            let md5_path = format!("{}.md5", dest.display());
-            fs::write(md5_path, format!("{}  {}\n", hash_str, file_name.to_string_lossy()))?;
+            // Return hash for collection in single file later
         }
         Ok((file_len, hash_str))
     }
@@ -207,6 +205,8 @@ fn copy_and_hash(src: &Path, dest: &Path, buffer_size: usize) -> anyhow::Result<
     Ok((context.compute(), len))
 }
 
+use std::sync::{Arc, Mutex};
+
 // --- PyO3 接口定义 ---
 
 #[pyfunction]
@@ -226,10 +226,20 @@ fn run_local_delivery(
     let fail_count = AtomicUsize::new(0);
     let total_bytes = AtomicUsize::new(0);
 
+    // Collect MD5 checksums in a thread-safe vector
+    let md5_results = Arc::new(Mutex::new(Vec::new()));
+
     files.par_iter().for_each(|f| {
         let src_path = Path::new(f);
+        let md5_results_clone = Arc::clone(&md5_results);
         match process_file_internal(src_path, &out_path, true, process_mode, buffer_size) {
-            Ok((len, _)) => {
+            Ok((len, hash_str)) => {
+                // Collect the MD5 result for later writing to single file
+                let file_name = src_path.file_name().unwrap().to_string_lossy().to_string();
+                if let Ok(mut results) = md5_results_clone.lock() {
+                    results.push((file_name, hash_str));
+                }
+
                 success_count.fetch_add(1, Ordering::Relaxed);
                 total_bytes.fetch_add(len as usize, Ordering::Relaxed);
             },
@@ -239,6 +249,15 @@ fn run_local_delivery(
             }
         }
     });
+
+    // Write all MD5 checksums to a single file
+    if let Ok(results) = md5_results.lock() {
+        let md5_file_path = out_path.join("all_files.md5");
+        let mut md5_file = File::create(&md5_file_path).unwrap();
+        for (file_name, hash_str) in results.iter() {
+            writeln!(md5_file, "{}  {}", hash_str, file_name).unwrap();
+        }
+    }
 
     let s = success_count.load(Ordering::Relaxed);
     let f = fail_count.load(Ordering::Relaxed);

@@ -5,18 +5,18 @@ from rich.panel import Panel
 from rich.table import Table
 from rich.text import Text
 from rich.align import Align
-from RNAFlow_Deliver.modules import deliver, config, merge
+from RNAFlow_Deliver.modules import deliver, config
 
 __version__ = "0.2.0"
 console = Console()
 
 class RichArgumentParser(argparse.ArgumentParser):
     """Custom ArgumentParser that uses Rich for help output."""
-    
+
     def format_help(self):
         formatter = self._get_formatter()
         formatter.add_usage(self.usage, self._actions, self._mutually_exclusive_groups)
-        
+
         console.print("")
         console.print(Panel.fit(
             "[bold white]RNAFlow CLI[/bold white]\n[dim]High-Performance Bioinfo Data Delivery & QC[/dim]",
@@ -24,16 +24,16 @@ class RichArgumentParser(argparse.ArgumentParser):
             border_style="blue",
             padding=(1, 2)
         ))
-        
+
         if self.description:
             console.print(f"\n{self.description}\n")
 
         # Subcommands
         subparsers_actions = [
-            action for action in self._actions 
+            action for action in self._actions
             if isinstance(action, argparse._SubParsersAction)
         ]
-        
+
         if subparsers_actions:
             console.print("[bold yellow]Available Commands:[/bold yellow]")
             for action in subparsers_actions:
@@ -51,18 +51,18 @@ class RichArgumentParser(argparse.ArgumentParser):
         options_table = Table(box=None, padding=(0, 2), show_header=False)
         options_table.add_column("Option", style="bold green")
         options_table.add_column("Help")
-        
+
         console.print("[bold yellow]Global Options:[/bold yellow]")
         for action in self._actions:
             if isinstance(action, argparse._SubParsersAction): continue
             opts = ", ".join(action.option_strings)
             options_table.add_row(opts, action.help)
         console.print(options_table)
-        
+
         console.print(f"\n[dim]Version: {__version__}[/dim]")
         console.print("[dim]Use 'rnaflow-cli <command> -h' for command-specific help.[/dim]\n")
-        return "" 
-    
+        return ""
+
     def print_help(self, file=None):
         self.format_help()
 
@@ -71,7 +71,7 @@ def main():
         description="A unified tool for RNA-Seq QC summarization and high-speed data delivery."
     )
     parser.add_argument("-v", "--version", action="version", version=f"%(prog)s {__version__}", help="Show program's version number and exit")
-    
+
     subparsers = parser.add_subparsers(dest="command", required=True, title="Available commands")
 
     # --- Command: deliver ---
@@ -79,7 +79,7 @@ def main():
     dl_parser.add_argument("-d", "--data-dir", type=str, default=".", help="Base directory to search for files")
     dl_parser.add_argument("-o", "--output-dir", type=str, help="Destination directory (Local mode)")
     dl_parser.add_argument("-c", "--config", type=str, default="config/delivery_config.yaml", help="Config file defining patterns")
-    
+
     # Cloud Args
     dl_group = dl_parser.add_argument_group("Cloud Delivery Options")
     dl_group.add_argument("--cloud", action="store_true", help="Enable cloud upload mode")
@@ -94,13 +94,6 @@ def main():
     cfg_parser.add_argument("--ak", type=str, help="Access Key ID")
     cfg_parser.add_argument("--sk", type=str, help="Secret Access Key")
 
-    # --- Command: merge ---
-    merge_parser = subparsers.add_parser("merge", help="Merge multiple config files into JSON/TSV format")
-    merge_parser.add_argument("-p", "--config-pattern", type=str, default="config/*_config.yaml", help="Glob pattern for config files to merge")
-    merge_parser.add_argument("-o", "--output-dir", type=str, default="merged_output", help="Output directory for merged results")
-    merge_parser.add_argument("-f", "--format", type=str, choices=["json", "tsv"], default="tsv", help="Output format (json or tsv)")
-    merge_parser.add_argument("--prefix", type=str, default="merged_config", help="Output filename prefix")
-
     # Parse
     if len(sys.argv) == 1:
         parser.print_help()
@@ -112,8 +105,6 @@ def main():
         deliver.run(args)
     elif args.command == "config":
         config.run(args)
-    elif args.command == "merge":
-        merge.run(args)
 
 if __name__ == "__main__":
     main()
