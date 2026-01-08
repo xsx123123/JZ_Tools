@@ -1,205 +1,82 @@
-# RNAFlow Logger Plugin Installation and Usage Guide
+# Snakemake Rich Loguru Plugin
 
-## Overview
-This guide explains how to install and use the RNAFlow logger plugin that captures comprehensive runtime information with a clean, simple format.
+一个基于 `Rich` 和 `Loguru` 的 Snakemake 日志插件，提供美观的控制台输出和详细的结构化文件日志。
 
-## Important: Snakemake Version Compatibility Notice
+## ✨ 特性
 
-⚠️ **CRITICAL**: The logger plugin functionality described below requires Snakemake version 8.0 or higher with plugin interface support. Your current Snakemake version appears to be older and does not support the `--logger-plugin` option.
+- **终端美化 (Rich)**：
+  - 启动标题居中显示，视觉体验更佳。
+  - 关键信息（Rule, Jobid, Inputs）自动着色高亮。
+  - 进度条和状态信息清晰易读。
 
-For your current setup, RNAFlow uses the embedded logging system in `rules/00.log.smk` which provides the same clean, simple logging format.
+- **详细环境记录**：
+  - 每次运行自动记录：启动时间、系统信息、主机名、Python/Snakemake 版本、工作目录及完整执行命令。
+  - 方便后续排查问题和复现环境。
 
-## Installation (For Future Use)
+- **结构化文件日志 (Loguru)**：
+  - 采用清晰的 `时间 | 等级 | 消息` 格式。
+  - 自动轮转日志文件（支持设置大小限制），防止日志无限增长。
+  - 线程安全，高性能。
 
-### Method 1: Install as a Python Package (For Newer Snakemake Versions)
-1. Navigate to the RNAFlow directory:
-   ```bash
-   cd /home/jzhang/pipeline/RNAFlow
-   ```
+## 📸 日志示例
 
-2. Install the logger plugin in development mode:
-   ```bash
-   cd src/logger_plugin
-   pip install -e .
-   ```
+**控制台启动信息：**
+```text
+                       Snakemake Pipeline Initialized                       
+[14:35:48] INFO     Start Time: 2026-01-08 14:35:48
+           INFO     System: Linux 5.4.0-generic
+           INFO     User: zhangsan | Host: server01
+           INFO     Python Version: 3.12.0
+           INFO     Snakemake Version: 8.0.0
+           INFO     Log File: logs/snakemake_2026-01-08_14-35-48.log
+           INFO     Working Directory: /home/zhangsan/projects/rna-seq
+           INFO     Command: snakemake --cores 16
+           INFO     ------------------------------------------------------------
+```
 
-### Method 2: Direct Installation
-If you want to install the plugin directly without modifying the RNAFlow structure:
+## 📦 安装
+
+在项目根目录下执行：
+
 ```bash
-pip install snakemake-interface-logger-plugins loguru
-cd /home/jzhang/pipeline/RNAFlow/src/logger_plugin
-python -m pip install -e .
-```
-
-## Configuration and Usage (For Newer Snakemake Versions)
-
-### Using the Plugin with Snakemake (Future Compatibility)
-
-The plugin can be used in several ways once you upgrade to a compatible Snakemake version:
-
-#### Option 1: Command Line
-Run your Snakemake pipeline with the logger plugin:
-```bash
-snakemake --logger-plugin rnaflow --cores 8
-```
-
-#### Option 2: Configuration File
-Add to your config file:
-```yaml
-logger_plugin: rnaflow
-logger_plugin_settings:
-  log_dir: "logs"
-  log_file_prefix: "RNAFlow"
-  max_file_size: "500 MB"
-  capture_runtime_info: true
-```
-
-#### Option 3: In Snakefile (Advanced)
-If you want to programmatically configure the logger, you can modify your Snakefile to use the plugin directly.
-
-## Current Usage (With Your Existing Setup)
-
-For your current Snakemake version, the logging is handled automatically by the `rules/00.log.smk` script that's included in your snakefile. All runtime information is captured in clean, readable format in the `logs/` directory.
-
-Simply run your pipeline as usual:
-```bash
-snakemake --cores=50 -p --conda-frontend mamba --use-conda --rerun-triggers mtime --dry-run
-```
-
-## Plugin Settings (For Future Use)
-
-The RNAFlow logger plugin supports the following settings:
-
-- `log_dir`: Directory to store log files (default: "logs")
-- `log_file_prefix`: Prefix for log file names (default: "RNAFlow")
-- `max_file_size`: Maximum size before log rotation (default: "500 MB")
-- `capture_runtime_info`: Whether to capture runtime information (default: true)
-
-## Log File Location
-
-Log files will be created in the specified log directory with names following the pattern:
-```
-{log_file_prefix}_{project_name}_runtime_{timestamp}.log
-```
-
-For example: `RNAFlow_HYXM-251215018_runtime_2026-01-08_14-35-48.log`
-
-## Features
-
-- Clean, simple log format for better readability
-- Comprehensive runtime information capture
-- Automatic log rotation
-- Detailed pipeline configuration logging
-- Timestamped entries for tracking execution
-
-## Upgrading Snakemake for Plugin Support
-
-To use the logger plugin with the `--logger-plugin` option, you'll need to upgrade to a newer version of Snakemake (8.0+) that supports the plugin interface:
-
-### Option 1: Upgrade via Conda/Mamba (Recommended)
-```bash
-# Update to the latest Snakemake
-mamba install -c conda-forge snakemake>=8.0
-
-# Or using conda
-conda install -c conda-forge snakemake>=8.0
-```
-
-### Option 2: Upgrade via Pip
-```bash
-pip install snakemake>=8.0
-```
-
-### Verify Plugin Support
-After upgrading, verify that plugin support is available:
-```bash
-snakemake --help | grep logger-plugin
-```
-
-If you see the `--logger-plugin` option in the help output, your Snakemake version supports plugins.
-
-### Check Available Plugins
-```bash
-# List available logger plugins
-python -c "import snakemake.plugins; print(snakemake.plugins.list_plugins('logger'))"
-```
-
-## Registering and Using the Plugin
-
-Once you have a compatible Snakemake version, the plugin will be automatically detected after installation. Here's how to register and use it:
-
-### Plugin Registration
-The plugin is automatically registered when you install it using:
-```bash
-cd /home/jzhang/pipeline/RNAFlow/src/logger_plugin
 pip install -e .
 ```
 
-The plugin registers itself via the entry point defined in `setup.py`:
-```python
-entry_points={
-    "snakemake_logger_plugins": [
-        "rnaflow = logger_plugin:LogHandler",
-    ],
-},
-```
+## 🚀 使用方法
 
-### Verification
-After installation, verify the plugin is registered:
+### 命令行方式
+
+在运行 Snakemake 时指定该插件：
+
 ```bash
-python -c "from snakemake_interface_logger_plugins.registry import LoggerPluginRegistry; registry = LoggerPluginRegistry(); print(registry.get_registered_plugins())"
+snakemake --logger rich-loguru --cores 1
 ```
 
-### Usage Examples
-Once registered, use the plugin with any of these approaches:
+### 配置文件方式
 
-#### Command Line
-```bash
-snakemake --logger-plugin rnaflow --cores 8
-```
+在 `config.yaml` 或 `snakemake` 配置文件中指定：
 
-#### With Custom Settings
-```bash
-snakemake --logger-plugin rnaflow \
-         --logger-plugin-settings '{"log_dir": "logs", "log_file_prefix": "RNAFlow", "capture_runtime_info": true}' \
-         --cores 8
-```
-
-#### In Configuration File
 ```yaml
-logger_plugin: rnaflow
-logger_plugin_settings:
-  log_dir: "logs"
-  log_file_prefix: "RNAFlow"
-  max_file_size: "500 MB"
-  capture_runtime_info: true
+logger: rich-loguru
+logger_settings:
+  log_dir: "logs"              # 日志存储目录
+  log_file_prefix: "snakemake" # 日志文件前缀
+  max_file_size: "100 MB"      # 单个日志最大大小
 ```
 
-## Backward Compatibility
+## ⚙️ 插件设置说明
 
-The current RNAFlow pipeline is designed to work with both older and newer versions of Snakemake:
+| 参数 | 说明 | 默认值 |
+|------|------|--------|
+| `log_dir` | 日志文件存储的文件夹路径 | `logs` |
+| `log_file_prefix` | 日志文件名的前缀 | `snakemake` |
+| `max_file_size` | 日志轮转阈值，支持 KB, MB, GB | `100 MB` |
 
-### For Current Setup (Older Snakemake)
-- The `rules/00.log.smk` script provides the same clean logging functionality
-- No plugin system required
-- Simply run: `snakemake --cores 50 -p --conda-frontend mamba --use-conda --rerun-triggers mtime --dry-run`
-- All runtime information is captured in the same clean format
+## 🛠️ 开发与测试
 
-### For Future Setup (Newer Snakemake with Plugins)
-- The plugin provides identical functionality with additional configuration options
-- Same clean log format maintained
-- Enhanced flexibility with plugin settings
+测试用例位于 `tests/` 目录下：
 
-### Migration Path
-When upgrading to a newer Snakemake version:
-1. Upgrade Snakemake as described above
-2. Install the logger plugin: `pip install -e src/logger_plugin/`
-3. Optionally update your workflow to use the `--logger-plugin rnaflow` option
-4. Your existing log format and behavior will remain consistent
-
-## Troubleshooting
-
-If the plugin is not recognized in newer versions:
-1. Verify installation: `pip list | grep rnaflow`
-2. Check that snakemake-interface-logger-plugins is installed
-3. Ensure the package was installed in the same environment as Snakemake
+```bash
+cd tests
+snakemake --logger rich-loguru --cores 1
+```

@@ -1,0 +1,20 @@
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.poetry]
+name = "snakemake-logger-plugin-rich-loguru"
+version = "0.1.0"
+description = "A Snakemake logger plugin using Loguru and Rich for beautiful console and file logging."
+authors = ["ZHANGJIAN <zhangjian199567@outlook.com>"]
+readme = "README.md"
+packages = [{include = "snakemake_logger_plugin_rich_loguru"}]
+
+[tool.poetry.dependencies]
+python = "^3.8"
+snakemake-interface-logger-plugins = ">=1.0.0"
+loguru = "^0.7.0"
+rich = "^13.0.0"
+
+[tool.poetry.plugins."snakemake.loggers"]
+rich_loguru = "snakemake_logger_plugin_rich_loguru:LogHandler"
