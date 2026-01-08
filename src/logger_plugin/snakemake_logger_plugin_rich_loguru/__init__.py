@@ -46,6 +46,9 @@ class LogHandlerSettings(LogHandlerSettingsBase):
 
 class LogHandler(LogHandlerBase):
     def __post_init__(self) -> None:
+        # Ensure logging.Handler is initialized (fixes missing 'filters' attribute)
+        logging.Handler.__init__(self)
+
         # Initialize log directory
         self.log_dir = Path(self.settings.log_dir)
         self.log_dir.mkdir(parents=True, exist_ok=True)
