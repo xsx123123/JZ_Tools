@@ -14,29 +14,3 @@ data_delivery:
   include_qc_summary: true
   output_dir: ./mapping_delivery
   threads: 4
-metrics:
-  calculate_mapping_rates: true
-  calculate_duplicate_rates: true
-  calculate_coverage: true
-mapping_files:
-  alignment:
-  - 02.mapping/STAR/sort_index/*.sort.bam
-  - 02.mapping/STAR/sort_index/*.sort.bam.bai
-  - 02.mapping/STAR/*/*.Log.final.out
-  qc:
-  - 02.mapping/qualimap_report/*/
-  - 02.mapping/samtools_flagstat/*_bam_flagstat.tsv
-  - 02.mapping/samtools_stats/*_bam_stats.tsv
-  coverage:
-  - 02.mapping/bamCoverage/*.bw
-  general:
-  - 02.mapping_report/multiqc_mapping_report.html
-mapping_summary_columns:
-- sample_name
-- total_reads
-- mapped_reads
-- unmapped_reads
-- mapping_rate
-- duplicate_rate
-- avg_coverage
-- genome_coverage_percent

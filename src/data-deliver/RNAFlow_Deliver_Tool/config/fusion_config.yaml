@@ -10,22 +10,3 @@ data_delivery:
   include_qc_summary: true
   output_dir: ./fusion_delivery
   threads: 4
-metrics:
-  calculate_fusion_events: true
-  calculate_fusion_stats: true
-fusion_files:
-  fusion_results:
-  - 06.fusion/arriba/*_fusions.tsv
-  - 06.fusion/arriba/*_fusions.discarded.tsv
-  fusion_visualization:
-  - 06.fusion/arriba/*_fusions.pdf
-  general:
-  - 06.fusion/arriba/
-fusion_summary_columns:
-- sample_name
-- total_fusions
-- high_confidence_fusions
-- known_fusions
-- novel_fusions
-- fusion_genes_count
-- expressed_fusion_genes

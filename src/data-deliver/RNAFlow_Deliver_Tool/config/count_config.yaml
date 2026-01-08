@@ -15,31 +15,3 @@ data_delivery:
   include_qc_summary: true
   output_dir: ./count_delivery
   threads: 4
-metrics:
-  calculate_expression: true
-  calculate_tpm: true
-  calculate_fpkm: true
-  calculate_counts: true
-count_files:
-  rsem_results:
-  - 03.count/rsem/*.genes.results
-  - 03.count/rsem/*.isoforms.results
-  - 03.count/rsem/*.stat/*.cnt
-  - 03.count/rsem/*.stat/*.model
-  - 03.count/rsem/*.stat/*.theta
-  merged_results:
-  - 03.count/merge_rsem_tpm.tsv
-  - 03.count/merge_rsem_counts.tsv
-  - 03.count/merge_rsem_fpkm.tsv
-  ultimate_results:
-  - 03.count/rsem_ultimate/
-  general:
-  - 03.count/multiqc_rsem_report.html
-count_summary_columns:
-- sample_name
-- total_genes
-- expressed_genes
-- tpm
-- fpkm
-- raw_counts
-- normalized_counts
