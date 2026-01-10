@@ -83,7 +83,7 @@ run_core_enricher <- function(genes, annot, out_dir, prefix, suffix, cutoff) {
     return(NULL)
   }
   
-  log_info(paste0("正在分析 [", suffix, "] 组，有效基因数: ", length(genes)))
+  log_info(paste0("正在分析 [", suffix, "] 组，有效输入基因数: ", length(genes)))
   
   tryCatch({
     res <- enricher(genes, 
@@ -93,7 +93,7 @@ run_core_enricher <- function(genes, annot, out_dir, prefix, suffix, cutoff) {
                     qvalueCutoff = cutoff)
     
     if (is.null(res) || nrow(res@result) == 0) {
-      log_warn(paste0(suffix, ": 未发现显著富集结果。"))
+      log_warn(paste0(suffix, ": 未发现显著富集结果。可能是因为 P-value 未达标或 ID 匹配失败。"))
     } else {
       filename <- paste0(prefix, "_", suffix, ".csv")
       out_path <- file.path(out_dir, filename)
@@ -107,7 +107,7 @@ run_core_enricher <- function(genes, annot, out_dir, prefix, suffix, cutoff) {
 }
 
 # ==========================================
-# 4. 子模块：差异表格处理 (带正则清理)
+# 4. 子模块：差异表格处理 (带智能 ID 修理)
 # ==========================================
 
 module_process_table <- function(opt, annot) {
@@ -124,20 +124,32 @@ module_process_table <- function(opt, annot) {
   
   df_clean <- df %>% filter(!is.na(!!sym(opt$padj_col)) & !is.na(!!sym(opt$lfc_col)))
   
-  # --- 执行基因名清洗 (Regex) ---
+  # --- 智能 ID 清理与匹配 ---
+  ref_ids <- unique(annot$term2gene$GeneID)
+  current_ids <- as.character(df_clean[[opt$gene_col]])
+  
+  # 优先尝试用户指定的正则
   if (!is.null(opt$gene_regex)) {
     parts <- strsplit(opt$gene_regex, "/")[[1]]
-    pattern <- parts[1]
-    replacement <- if(length(parts) > 1) parts[2] else ""
-    
-    original_sample <- head(df_clean[[opt$gene_col]], 1)
-    df_clean <- df_clean %>%
-      mutate(!!sym(opt$gene_col) := str_replace_all(as.character(!!sym(opt$gene_col)), pattern, replacement))
-    new_sample <- head(df_clean[[opt$gene_col]], 1)
-    
-    log_info(paste0("正则清理已应用: '", original_sample, "' -> '", new_sample, "'"))
+    pattern <- parts[1]; replacement <- if(length(parts) > 1) parts[2] else ""
+    current_ids <- str_replace_all(current_ids, pattern, replacement)
+    log_info("已应用用户自定义正则清洗 ID。")
   }
   
+  # 自动检测版本号并修复 (.13 后缀)
+  match_count <- sum(current_ids %in% ref_ids)
+  if (match_count == 0) {
+    log_warn("发现匹配率为 0，启动智能检测...")
+    trimmed_ids <- sub("\\.[0-9]+$", "", current_ids)
+    if (sum(trimmed_ids %in% ref_ids) > 0) {
+      log_info("检测到版本号引起的不匹配，已自动移除小数点后缀。")
+      current_ids <- trimmed_ids
+    }
+  }
+  
+  df_clean[[opt$gene_col]] <- current_ids
+  
+  # 提取基因
   genes_up <- df_clean %>%
     filter(!!sym(opt$padj_col) < opt$padj_th & !!sym(opt$lfc_col) >= opt$lfc_th) %>%
     pull(!!sym(opt$gene_col)) %>% unique()
@@ -162,14 +174,14 @@ main <- function() {
     make_option(c("-a", "--assoc"), type="character", help="关联文件"),
     make_option(c("-d", "--out_dir"), type="character", default="go_results", help="输出文件夹"),
     make_option(c("-n", "--name"), type="character", default="Enrich", help="输出文件前缀"),
-    make_option(c("-c", "--cutoff"), type="numeric", default=0.05, help="P-value 阈值"),
+    make_option(c("-c", "--cutoff"), type="numeric", default=0.05, help="富集分析 P-value 阈值"),
     make_option(c("-t", "--table"), type="character", help="差异分析表格"),
     make_option(c("--gene_col"), default="GeneID", help="基因列名"),
     make_option(c("--padj_col"), default="padj", help="Padj列名"),
     make_option(c("--lfc_col"), default="log2FoldChange", help="LFC列名"),
-    make_option(c("--padj_th"), type="numeric", default=0.05, help="Padj 阈值"),
-    make_option(c("--lfc_th"), type="numeric", default=1.0, help="LFC 绝对值阈值"),
-    make_option(c("--gene_regex"), type="character", default=NULL, help="清洗基因名的正则, 格式 'pattern/replacement'")
+    make_option(c("--padj_th"), type="numeric", default=0.05, help="差异基因 Padj 筛选阈值"),
+    make_option(c("--lfc_th"), type="numeric", default=1.0, help="差异基因 LFC 绝对值阈值"),
+    make_option(c("--gene_regex"), type="character", default=NULL, help="手动正则清理, 格式 'pattern/replacement'")
   )
   
   opt <- parse_args(OptionParser(option_list=option_list))
@@ -184,7 +196,6 @@ main <- function() {
   } else {
     stop("请指定 -t (表格模式)")
   }
-  
   log_info("所有任务执行完毕。")
 }
 

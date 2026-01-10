@@ -17,6 +17,9 @@ import socket
 from loguru import logger
 from rich.logging import RichHandler
 
+# Export utilities for external analysis scripts
+from .utils import setup_analysis_logging, get_logger, initialize_analysis_logger, get_analysis_logger, get_analysis_log_file_path
+
 @dataclass
 class LogHandlerSettings(LogHandlerSettingsBase):
     log_dir: Optional[str] = field(
@@ -95,21 +98,21 @@ class LogHandler(LogHandlerBase):
             width = shutil.get_terminal_size().columns
         except Exception:
             width = 80
-        
+
         # Estimate prefix length (Time + Level + spacing) ~ 25 chars for RichHandler
         # Adjusting the message to be centered in the remaining space
         msg = f"{self.settings.log_file_prefix} Pipeline Initialized"
-        prefix_len = 25
-        padding = max(0, (width - prefix_len - len(msg)) // 2)
-        centered_msg = " " * padding + msg
+        # prefix_len = 25
+        # padding = max(0, (width - prefix_len - len(msg)) // 2)
+        # centered_msg = " " * padding + msg
 
-        logger.info(f"[bold green]{centered_msg}[/bold green]")
-        
+        logger.info(f"[bold green]{msg}[/bold green]")
+
         # Collect detailed info
         timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         system_info = f"{platform.system()} {platform.release()}"
         python_version = platform.python_version()
-        
+
         try:
             import snakemake
             snakemake_version = snakemake.__version__
@@ -144,13 +147,13 @@ class LogHandler(LogHandlerBase):
             level = record.levelname
 
         # Find caller info to pass to loguru so it looks like it came from the original source
-        # Note: 'opt(depth=...)' allows us to adjust the stack depth if needed, 
+        # Note: 'opt(depth=...)' allows us to adjust the stack depth if needed,
         # but since we are emitting a pre-made record, we mostly care about the message.
-        
+
         # We use the 'opt' method to force the exception traceback if present
         rec_opt = logger.opt(exception=record.exc_info, depth=6)
-        
-        # Construct the message. 
+
+        # Construct the message.
         # Snakemake sometimes sends already formatted messages, or raw args.
         msg = record.getMessage()
 
@@ -167,7 +170,7 @@ class LogHandler(LogHandlerBase):
         if "Execute" in msg and "jobs..." in msg:
              msg = f"[bold yellow]{msg}[/bold yellow]"
         # ----------------------------
-        
+
         # Log it!
         rec_opt.log(level, msg)
 
@@ -178,8 +181,8 @@ class LogHandler(LogHandlerBase):
 
     @property
     def writes_to_file(self) -> bool:
-        # We handle file output via Loguru internally, but Snakemake forbids a plugin 
-        # from declaring itself as BOTH stream and file handler. 
+        # We handle file output via Loguru internally, but Snakemake forbids a plugin
+        # from declaring itself as BOTH stream and file handler.
         # We declare as stream (to handle console), and handle file writing as a side effect.
         return False
 

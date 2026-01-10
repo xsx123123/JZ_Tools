@@ -6,11 +6,8 @@ import urllib.parse
 from loguru import logger
 
 
-logger.remove()
-logger.add(
-    sys.stderr,
-    format="<green>{time:YYYY-MM-DD HH:mm:ss}</green> | <level>{level: <8}</level> | <level>{message}</level>"
-)
+# Get the logger instance to use
+logger = get_analysis_logger()
 
 def parse_attributes(attr_str):
     """
