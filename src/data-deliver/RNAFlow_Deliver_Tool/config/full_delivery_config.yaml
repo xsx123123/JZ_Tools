@@ -1,28 +1,84 @@
 data_delivery:
   delivery_mode: copy
-  exclude_patterns: []
-  include_patterns:
-  - qc_summary_table.csv
-  - qc_summary_paths.json
-  - mapping_summary_table.csv
-  - mapping_summary_paths.json
-  - count_summary_table.csv
-  - count_summary_paths.json
-  - variant_summary_table.csv
-  - variant_summary_paths.json
-  - deg_summary_table.csv
-  - deg_summary_paths.json
-  - as_summary_table.csv
-  - as_summary_paths.json
-  - fusion_summary_table.csv
-  - fusion_summary_paths.json
-  - 01.qc/
-  - 02.mapping/
-  - 03.count/
-  - 04.variant/
-  - 06.DEG/
-  - 07.AS/
-  - 06.fusion/
-  include_qc_summary: true
   output_dir: ./full_delivery
   threads: 8
+  include_qc_summary: true
+  exclude_patterns: []
+  
+  include_patterns:
+    # --- 1. 项目汇总 (Summary) ---
+    - pattern: "*_summary_table.csv"
+      dest: "Summary"
+    - pattern: "*_summary_paths.json"
+      dest: "Summary"
+    - pattern: "01.qc/md5_check.tsv"
+      dest: "Summary"
+
+    # --- 2. 质控报告 (QC) ---
+    - pattern: "01.qc/fastq_screen_multiqc_r1/"
+      dest: "01_QC/FastQ_Screen_R1"
+    - pattern: "01.qc/fastq_screen_multiqc_r2/"
+      dest: "01_QC/FastQ_Screen_R2"
+    - pattern: "01.qc/short_read_r1_multiqc/"
+      dest: "01_QC/Raw_Data_MultiQC_R1"
+    - pattern: "01.qc/short_read_r2_multiqc/"
+      dest: "01_QC/Raw_Data_MultiQC_R2"
+    - pattern: "01.qc/multiqc_short_read_trim/"
+      dest: "01_QC/Clean_Data_MultiQC"
+    - pattern: "01.qc/multiqc_merge_qc/"
+      dest: "01_QC/Overall_MultiQC"
+
+    # --- 3. 比对结果 (Mapping) ---
+    # BAM Files
+    - pattern: "02.mapping/STAR/sort_index/*.sort.bam"
+      dest: "02_Mapping/BAM"
+    - pattern: "02.mapping/STAR/sort_index/*.sort.bam.bai"
+      dest: "02_Mapping/BAM"
+    
+    # Coverage (BigWig)
+    - pattern: "02.mapping/bamCoverage/"
+      dest: "02_Mapping/BigWig"
+    
+    # Mapping QC Reports
+    - pattern: "02.mapping/qualimap_report/"
+      dest: "02_Mapping/Reports/Qualimap"
+    - pattern: "02.mapping/samtools_flagstat/"
+      dest: "02_Mapping/Reports/Flagstat"
+    - pattern: "02.mapping/samtools_stats/"
+      dest: "02_Mapping/Reports/Stats"
+
+    # --- 4. 定量结果 (Expression) ---
+    # Expression Matrices
+    - pattern: "03.count/merge_rsem_counts.tsv"
+      dest: "03_Expression/Matrix"
+    - pattern: "03.count/merge_rsem_fpkm.tsv"
+      dest: "03_Expression/Matrix"
+    - pattern: "03.count/merge_rsem_tpm.tsv"
+      dest: "03_Expression/Matrix"
+    
+    # RSEM Detailed Results
+    - pattern: "03.count/rsem_ultimate/"
+      dest: "03_Expression/RSEM_Samples"
+    
+    # RSEM MultiQC
+    - pattern: "03.count/multiqc_rsem_report.html"
+      dest: "03_Expression/Reports"
+    - pattern: "03.count/multiqc_rsem_report_data/"
+      dest: "03_Expression/Reports/multiqc_rsem_report_data"
+
+    # --- 5. 变异检测 (Variant) ---
+    - pattern: "04.variant/"
+      dest: "04_Variant"
+
+    # --- 6. 差异表达 (DEG) ---
+    - pattern: "06.DEG/"
+      dest: "05_DEG"
+
+    # --- 7. 可变剪切 (AS) ---
+    - pattern: "07.AS/"
+      dest: "06_AS"
+
+    # --- 8. 融合基因 (Fusion) ---
+    # 如果有 fusion 文件夹
+    # - pattern: "06.fusion/"
+    #   dest: "07_Fusion"
