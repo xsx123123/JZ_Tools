@@ -3,8 +3,8 @@
 # ==============================================================================
 # DESeq2 Pipeline with Advanced Volcano Plots, PCA & Stats
 # Author: Jian Zhang (Integrated by Hajimi)
-# Date: 2026-01-03
-# Version: 3.7 (Fixed: Prevent creating output dir on error)
+# Date: 2026-01-10
+# Version: 3.8 (Fixed: Switched to Raw P-value for filtering and plotting)
 # ==============================================================================
 
 # 0. 加载必要的包 ---------------------------------------------------------
@@ -46,10 +46,10 @@ log4r_init <- function(level = "INFO", log_file = NULL){
   return(log4r::logger(threshold = level, appenders = appenders_list))
 }
 
-# 2. 定义绘图函数 ---------------------------------------------------------
+# 2. 定义绘图函数 (已修改为使用 P-value) -----------------------------------
 DrawVolcano <- function(deg_result,
                         EXP_NAEE = NULL,
-                        padjCutoff = 0.05,
+                        pvalCutoff = 0.05,   # 参数名已修改
                         LFCCutoff = 1,
                         y_aes = 100,
                         TOP_GENE = 10,
@@ -57,20 +57,24 @@ DrawVolcano <- function(deg_result,
   require(ggpubr)
   require(cowplot)
   
-  # padj 零值修正
-  if (min(deg_result$padj, na.rm=T) == 0) {
-    deg_result$padj[which(deg_result$padj == 0)] <- .Machine$double.xmin
+  # 【修改点1】: 针对 pvalue 进行零值修正（防止 -log10 无穷大）
+  if (min(deg_result$pvalue, na.rm=T) == 0) {
+    deg_result$pvalue[which(deg_result$pvalue == 0)] <- .Machine$double.xmin
   }
   
+  # 【修改点2】: 计算 -log10(pvalue) 而不是 padj
   deg_result <- deg_result %>% tibble() |>
-    mutate(log10 = -log10(padj)) # 依赖 padj 列
+    mutate(log10 = -log10(pvalue)) 
   
   deg_result$label = NA
   deg_result$Group <- "Non-significant"
-  deg_result$Group[which((deg_result$padj < padjCutoff) & (deg_result$log2FC > LFCCutoff))] = "Up-regulated"
-  deg_result$Group[which((deg_result$padj < padjCutoff) & (deg_result$log2FC < -LFCCutoff))] = "Down-regulated"
   
-  deg_result <- deg_result %>% arrange(padj)
+  # 【修改点3】: 分组逻辑改为 pvalue
+  deg_result$Group[which((deg_result$pvalue < pvalCutoff) & (deg_result$log2FC > LFCCutoff))] = "Up-regulated"
+  deg_result$Group[which((deg_result$pvalue < pvalCutoff) & (deg_result$log2FC < -LFCCutoff))] = "Down-regulated"
+  
+  # 【修改点4】: 排序也按 pvalue
+  deg_result <- deg_result %>% arrange(pvalue)
   
   non_deg_result <- subset(deg_result, deg_result$Group =="Non-significant")
   up_deg_result <- subset(deg_result, deg_result$Group =="Up-regulated")
@@ -135,9 +139,11 @@ DrawVolcano <- function(deg_result,
                size=0.7,shape = 21,color="#41b6e6",fill="#41b6e6",alpha=0.6) +
     geom_vline(xintercept=LFCCutoff,lty=2,col="#C0C0C0",lwd=0.1) +
     geom_vline(xintercept=-LFCCutoff,lty=2,col="#C0C0C0",lwd=0.1) +
-    geom_hline(yintercept = -log10(padjCutoff),lty=2,col="#C0C0C0",lwd=0.1) +
+    # 【修改点5】: 阈值线改为 -log10(pvalCutoff)
+    geom_hline(yintercept = -log10(pvalCutoff),lty=2,col="#C0C0C0",lwd=0.1) +
+    # 【修改点6】: Y轴 Label 改为 P-value
     labs(x= bquote("RNA-seq " * log[2] * " fold change " * .(EXP_NAEE) * ""),
-         y= expression(paste(-log[10], "(Adjusted P-value)")), 
+         y= expression(paste(-log[10], "(P-value)")), 
          title =paste0(EXP_NAEE," Volcano Plot")) +
     geom_text_repel(data = deg_result_up,aes(log2FC, log10, label= Symbol),size=1.5,colour="black",fontface="bold.italic",
                     segment.alpha = 0.5,segment.size = 0.15,segment.color = "black",min.segment.length=0,
@@ -171,9 +177,10 @@ DrawVolcano <- function(deg_result,
                size=0.7,shape = 21,color="#41b6e6",fill="#41b6e6",alpha=0.6) +
     geom_vline(xintercept=LFCCutoff,lty=2,col="#C0C0C0",lwd=0.1) +
     geom_vline(xintercept=-LFCCutoff,lty=2,col="#C0C0C0",lwd=0.1) +
-    geom_hline(yintercept = -log10(padjCutoff),lty=2,col="#C0C0C0",lwd=0.1) +
+    geom_hline(yintercept = -log10(pvalCutoff),lty=2,col="#C0C0C0",lwd=0.1) +
+    # 【修改点7】: Y轴 Label 改为 P-value
     labs(x= bquote("RNA-seq " * log[2] * " fold change " * .(EXP_NAEE) * ""),
-         y= expression(paste(-log[10], "(Adjusted P-value)")), 
+         y= expression(paste(-log[10], "(P-value)")), 
          title =paste0(EXP_NAEE," Volcano Plot")) +
     scale_x_continuous(limits=c(-(x_max*1.2),(x_max*1.2)),n.breaks = 8) +
     scale_y_continuous(limits=c(0,y_aes_value)) +
@@ -196,13 +203,13 @@ option_list <- list(
   make_option(c("-o", "--outdir"), type = "character", default = "./results", help = "Output Path"),
   make_option(c("-l", "--log_file"), type = "character", default = "deseq2.log", help = "Log Filename"),
   make_option(c("--lfc"), type = "numeric", default = 1.0, help = "Log2 Fold Change Cutoff"),
-  make_option(c("--pval"), type = "numeric", default = 0.05, help = "Adjusted P-value (padj) Cutoff")
+  # 【修改点8】: 帮助文档更新，这里现在代表 Raw P-value
+  make_option(c("--pval"), type = "numeric", default = 0.05, help = "Raw P-value Cutoff (Standard Analysis)")
 )
 opt_parser <- OptionParser(option_list = option_list)
 opt <- parse_args(opt_parser)
 
-# 【Fix】: 先创建一个纯 Console 的 Logger 用于检查参数
-# 防止参数错误时，脚本就创建了 output 目录
+# 参数检查与日志初始化 (保留之前的 Fix)
 temp_logger <- log4r_init(level = "INFO", log_file = NULL)
 
 if (is.null(opt$counts) || is.null(opt$metadata) || is.null(opt$pairs)){
@@ -211,7 +218,6 @@ if (is.null(opt$counts) || is.null(opt$metadata) || is.null(opt$pairs)){
   stop("Execution halted.", call. = FALSE)
 }
 
-# 【Fix】: 参数检查通过后，再创建目录和文件 Logger
 if(!dir.exists(opt$outdir)) dir.create(opt$outdir, recursive = TRUE)
 log_path <- file.path(opt$outdir, basename(opt$log_file))
 
@@ -219,7 +225,7 @@ log_path <- file.path(opt$outdir, basename(opt$log_file))
 logger <- log4r_init(level = "INFO", log_file = log_path)
 
 cat(paste0("Log file location: ", log_path, "\n"))
-log4r::info(logger, paste0("Settings -> LFC: ", opt$lfc, " | Padj: ", opt$pval))
+log4r::info(logger, paste0("Settings -> LFC: ", opt$lfc, " | Raw P-value Cutoff: ", opt$pval))
 
 # 4. 数据读取 --------------------------------------------------
 read_data <- function(file_path){
@@ -291,7 +297,6 @@ tryCatch({
 # 6. 差异分析主循环 & 统计 --------------------------------------------
 contrast_pairs <- read.csv(opt$pairs, stringsAsFactors = F)
 
-# 初始化统计列表
 deg_stat_list <- list()
 
 for(i in 1:nrow(contrast_pairs)){
@@ -314,8 +319,10 @@ for(i in 1:nrow(contrast_pairs)){
   dds <- dds[rowSums(counts(dds)) > 1, ] 
   dds <- DESeq(dds, quiet = TRUE)
   
+  # DESeq2 results, alpha 参数只是为了优化 filtering，不影响 pvalue 的输出
   res <- results(dds, contrast = c("Group", treat, ctrl), alpha = opt$pval)
-  res_df <- as.data.frame(res) %>% rownames_to_column("ENSEMBL") %>% arrange(padj)
+  # 【修改点9】: 按照 pvalue 排序输出表格
+  res_df <- as.data.frame(res) %>% rownames_to_column("ENSEMBL") %>% arrange(pvalue)
   
   if(!is.null(anno_db)){
     res_df <- left_join(res_df, anno_db, by = "ENSEMBL")
@@ -325,12 +332,11 @@ for(i in 1:nrow(contrast_pairs)){
   
   write.csv(res_df, file.path(opt$outdir, paste0(name, "_DEG.csv")), row.names = F)
   
-  # 统计差异基因数量
-  n_up <- sum(res_df$padj < opt$pval & res_df$log2FoldChange > opt$lfc, na.rm = TRUE)
-  n_down <- sum(res_df$padj < opt$pval & res_df$log2FoldChange < -opt$lfc, na.rm = TRUE)
+  # 【修改点10】: 统计数量时，使用 res_df$pvalue
+  n_up <- sum(res_df$pvalue < opt$pval & res_df$log2FoldChange > opt$lfc, na.rm = TRUE)
+  n_down <- sum(res_df$pvalue < opt$pval & res_df$log2FoldChange < -opt$lfc, na.rm = TRUE)
   n_total_deg <- n_up + n_down
   
-  # 存入列表
   deg_stat_list[[i]] <- data.frame(
     Contrast = name,
     Control = ctrl,
@@ -339,21 +345,21 @@ for(i in 1:nrow(contrast_pairs)){
     Down_Regulated = n_down,
     Total_DEG = n_total_deg,
     LFC_Cutoff = opt$lfc,
-    Padj_Cutoff = opt$pval,
+    Pvalue_Cutoff = opt$pval, # 列名更新
     stringsAsFactors = FALSE
   )
   
   # 画图数据准备
   plot_data <- res_df %>% 
     dplyr::rename(log2FC = log2FoldChange) %>% 
-    dplyr::filter(!is.na(padj) & !is.na(log2FC)) 
+    dplyr::filter(!is.na(pvalue) & !is.na(log2FC)) # 过滤 pvalue 为 NA 的
   
-  log4r::info(logger, paste0("   - Stats: Up=", n_up, " | Down=", n_down))
-  log4r::info(logger, paste0("   - Drawing Volcano Plot..."))
+  log4r::info(logger, paste0("   - Stats (Raw P < ",opt$pval,"): Up=", n_up, " | Down=", n_down))
+  log4r::info(logger, paste0("   - Drawing Volcano Plot (P-value mode)..."))
   
   tryCatch({
     DrawVolcano(deg_result = plot_data, 
-                padjCutoff = opt$pval,
+                pvalCutoff = opt$pval, # 传入参数
                 LFCCutoff = opt$lfc, 
                 EXP_NAEE = name, 
                 deg_figure_dir = opt$outdir) 
