@@ -21,36 +21,7 @@ except ImportError:
 def load_config(config_path: str) -> Dict[str, Any]:
     path = Path(config_path)
     if not path.exists():
-        # Default config with examples of new features
-        default_config = {
-            "data_delivery": {
-                "include_qc_summary": True,
-                "output_dir": "./delivery",
-                "delivery_mode": "symlink",
-                "threads": 4,
-                "include_patterns": [
-                    "*.bam", 
-                    {"pattern": "01.qc/*.html", "dest": "reports/qc"},
-                    {"pattern": "02.mapping/*.bam", "dest": "alignment"}
-                ],
-                "exclude_patterns": [],
-                "cloud": {
-                    "enabled": False,
-                    "bucket": "my-bucket",
-                    "prefix": "project_A/",
-                    "endpoint": "",
-                    "region": "",
-                    "project_id": "",
-                    "part_size_mb": 20,
-                    "task_num": 3
-                }
-            }
-        }
-        path.parent.mkdir(parents=True, exist_ok=True)
-        with open(path, 'w', encoding='utf-8') as f:
-            yaml.dump(default_config, f, default_flow_style=False, allow_unicode=True)
-        return default_config
-    
+        return {}
     with open(path, 'r', encoding='utf-8') as f:
         return yaml.safe_load(f)
 
@@ -68,8 +39,6 @@ def run(args):
 
     logger.info(f"Source: {data_dir.absolute()}")
     
-    # --- Resolve Files and Destinations ---
-    # Transfer List: [(source_abs_path, dest_abs_path_or_key)]
     transfer_list: List[Tuple[str, str]] = []
     seen_sources = set()
 
@@ -80,66 +49,70 @@ def run(args):
         logger.warning("No include_patterns defined in config.")
         return
 
-    # Determine Base Output (Local or Cloud Prefix)
     base_local_output = Path(args.output_dir) if args.output_dir else Path(delivery_conf.get('output_dir', './delivery'))
     cloud_global_prefix = cloud_conf.get('prefix', '')
 
     for item in include_patterns:
         pattern = ""
-        target_subdir = "" # Relative to output root
+        target_dest = "" 
 
-        # Parse Config Item (String or Dict)
         if isinstance(item, str):
             pattern = item
         elif isinstance(item, dict):
             pattern = item.get('pattern')
-            target_subdir = item.get('dest', "")
+            target_dest = item.get('dest', "")
         
         if not pattern: continue
 
-        # Glob Search
-        # 1. Try relative to data_dir
         matches = list(data_dir.glob(pattern))
-        # 2. If no matches, try current dir (fallback)
         if not matches: 
             matches = list(Path('.').glob(pattern))
         
+        # 如果有通配符且指定了明确的文件名（非目录结尾），需要警告
+        if len(matches) > 1 and target_dest and not target_dest.endswith('/'):
+            logger.warning(f"Pattern '{pattern}' matched multiple files, but 'dest' is a file name. They will overwrite each other!")
+
         for p in matches:
             src_abs = str(p.absolute())
-            
-            # Skip duplicates
-            if src_abs in seen_sources: 
-                continue
-            
-            # Check Excludes
-            # Exclude patterns are matched against the filename or relative path
-            # Simple check: match filename
-            if any(p.match(ex) for ex in exclude_patterns):
-                continue
-                
+            if src_abs in seen_sources: continue
+            if any(p.match(ex) for ex in exclude_patterns): continue
             seen_sources.add(src_abs)
             
-            # Calculate Destination
             fname = p.name
             
+            # --- 核心逻辑：判定是 放入目录 还是 重命名 ---
+            # 1. 如果 target_dest 以 / 结尾，或者 target_dest 为空，或者是文件夹
+            #    则将文件放入该目录下，保留原名
+            # 2. 否则，视为重命名
+            
+            is_rename = False
+            if target_dest and not target_dest.endswith('/') and not p.is_dir():
+                is_rename = True
+
             if is_cloud_mode:
-                # Cloud Key = GlobalPrefix / TargetSubdir / Filename
-                # Use forward slashes for S3
-                key_parts = [cloud_global_prefix.strip('/'), target_subdir.strip('/'), fname]
-                # Filter empty parts
+                if is_rename:
+                    # 重命名模式：直接使用 target_dest 作为 Key
+                    key_parts = [cloud_global_prefix.strip('/'), target_dest.strip('/')]
+                else:
+                    # 目录模式：追加原文件名
+                    key_parts = [cloud_global_prefix.strip('/'), target_dest.strip('/'), fname]
+                
                 key = "/".join([k for k in key_parts if k])
                 transfer_list.append((src_abs, key))
             else:
-                # Local Path = BaseOutput / TargetSubdir / Filename
-                dest_path = base_local_output / target_subdir / fname
+                if is_rename:
+                    # 本地重命名
+                    dest_path = base_local_output / target_dest
+                else:
+                    # 本地放入目录
+                    dest_path = base_local_output / target_dest / fname
+                
                 transfer_list.append((src_abs, str(dest_path.absolute())))
 
     if not transfer_list:
         logger.warning("No files matched for delivery.")
         return
 
-    # Report Output Directory (Local path where JSON log is saved)
-    # Even in cloud mode, we save the log locally
     report_output_dir = base_local_output
 
     if is_cloud_mode:
@@ -151,33 +124,26 @@ def run(args):
 def run_local_mode(transfer_list, output_dir, conf):
     mode = conf.get('delivery_mode', 'symlink')
     threads = int(conf.get('threads', 4))
-    
     console.rule(f"[bold magenta]📦 Delivering {len(transfer_list)} files (Local Mode: {mode})[/bold magenta]")
     
     try:
         with console.status("[bold green]Rust Engine Running...[/bold green]", spinner="dots"):
-            # Rust now accepts Vec<(String, String)>
             success, failed, size_gb = data_deliver_rs.run_local_delivery(
                 transfer_list, 
-                str(output_dir.absolute()), # Used for MD5 file location
+                str(output_dir.absolute()), 
                 mode, 
                 threads
             )
-        
         display_result(success, failed, size_gb)
         write_json_report(transfer_list, output_dir, success, failed, size_gb, is_cloud=False)
     except Exception as e:
         console.print(Panel(f"Rust Local Error: {e}", border_style="red"))
-        import traceback
-        traceback.print_exc()
 
 def run_cloud_mode(transfer_list, conf, args, report_dir):
-    # Credentials Logic
     bucket = args.bucket or conf.get('bucket')
     endpoint = args.endpoint or conf.get('endpoint')
     region = args.region or conf.get('region')
     project_id = conf.get('project_id', 'unknown_project')
-    
     ak = os.getenv("TOS_ACCESS_KEY", "")
     sk = os.getenv("TOS_SECRET_KEY", "")
 
@@ -188,7 +154,6 @@ def run_cloud_mode(transfer_list, conf, args, report_dir):
             if not region and c_rg: region = c_rg
             if not ak and c_ak: ak = c_ak
             if not sk and c_sk: sk = c_sk
-            if c_ep or c_ak: logger.info("Loaded credentials from encrypted local config.")
         except Exception: pass
 
     if not (bucket and endpoint and region and ak and sk):
@@ -197,30 +162,16 @@ def run_cloud_mode(transfer_list, conf, args, report_dir):
 
     task_num = int(conf.get('task_num', 3))
     part_size = int(conf.get('part_size_mb', 20)) * 1024 * 1024
-
     console.rule(f"[bold magenta]☁️  Uploading {len(transfer_list)} files to s3://{bucket}[/bold magenta]")
 
     try:
         with console.status("[bold cyan]Rust Cloud Engine Running...[/bold cyan]", spinner="earth"):
-            # Rust now accepts Vec<(Source, Key)>
-            # Prefix is already embedded in the Key by Python
             success, failed, size_gb = data_deliver_rs.run_cloud_delivery(
-                transfer_list,
-                bucket,
-                "", # Prefix handled in key
-                endpoint,
-                region,
-                ak,
-                sk,
-                project_id,
-                task_num,
-                part_size
+                transfer_list, bucket, "", endpoint, region, ak, sk, project_id, task_num, part_size
             )
         display_result(success, failed, size_gb)
-        
         cloud_base_path = f"s3://{bucket}"
         write_json_report(transfer_list, report_dir, success, failed, size_gb, is_cloud=True, cloud_base_path=cloud_base_path)
-        
     except Exception as e:
         console.print(Panel(f"Rust Cloud Error: {e}", border_style="red"))
 
@@ -235,19 +186,15 @@ def write_json_report(transfer_list, output_dir, success, failed, size_gb, is_cl
     output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
     report_path = output_dir / "delivery_manifest.json"
-    
     deliverables = {}
-    
-    # transfer_list contains (src, dest)
     for src, dest in transfer_list:
-        fname = Path(src).name
+        # 在报告中，我们希望 key 是最终的文件名，value 是路径
+        final_name = Path(dest).name
         if is_cloud:
-            final_path = f"{cloud_base_path.rstrip('/')}/{dest}" # dest is the key
+            final_path = f"{cloud_base_path.rstrip('/')}/{dest}"
         else:
             final_path = dest
-        
-        deliverables[fname] = final_path
-        
+        deliverables[final_name] = final_path
     data = {
         "meta": {
             "timestamp": datetime.now().isoformat(),
@@ -259,7 +206,6 @@ def write_json_report(transfer_list, output_dir, success, failed, size_gb, is_cl
         },
         "files": deliverables
     }
-    
     try:
         with open(report_path, 'w', encoding='utf-8') as f:
             json.dump(data, f, indent=4, ensure_ascii=False)
