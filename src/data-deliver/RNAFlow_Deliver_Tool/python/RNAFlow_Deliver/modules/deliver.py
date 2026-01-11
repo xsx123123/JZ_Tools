@@ -10,6 +10,7 @@ from loguru import logger
 from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
+from rich.text import Text
 
 console = Console()
 
@@ -17,6 +18,10 @@ try:
     from RNAFlow_Deliver import data_deliver_rs
 except ImportError:
     data_deliver_rs = None
+
+# Configure Loguru to write to a file, and keep stderr clean
+logger.remove() # Remove default handler
+logger.add(sys.stderr, format="<level>{message}</level>", level="WARNING") # Only show warnings/errors in console
 
 def load_config(config_path: str) -> Dict[str, Any]:
     path = Path(config_path)
@@ -37,7 +42,16 @@ def run(args):
     data_dir = Path(args.data_dir)
     is_cloud_mode = args.cloud or cloud_conf.get('enabled', False)
 
-    logger.info(f"Source: {data_dir.absolute()}")
+    # Setup file logging for this run
+    base_local_output = Path(args.output_dir) if args.output_dir else Path(delivery_conf.get('output_dir', './delivery'))
+    base_local_output.mkdir(parents=True, exist_ok=True)
+    log_file = base_local_output / "delivery_details.log"
+    logger.add(log_file, rotation="10 MB", format="{time:YYYY-MM-DD HH:mm:ss} | {level} | {message}", level="INFO")
+
+    # Beautiful Console Output
+    console.print(f"[bold blue]Source:[/bold blue] {data_dir.absolute()}")
+    if not is_cloud_mode:
+        console.print(f"[bold blue]Target:[/bold blue] {base_local_output.absolute()}")
     
     transfer_list: List[Tuple[str, str]] = []
     seen_sources = set()
@@ -49,7 +63,6 @@ def run(args):
         logger.warning("No include_patterns defined in config.")
         return
 
-    base_local_output = Path(args.output_dir) if args.output_dir else Path(delivery_conf.get('output_dir', './delivery'))
     cloud_global_prefix = cloud_conf.get('prefix', '')
 
     for item in include_patterns:
@@ -62,7 +75,7 @@ def run(args):
         elif isinstance(item, dict):
             pattern = item.get('pattern')
             target_dest = item.get('dest', "")
-            explicit_type = item.get('type') # 'file'/'rename' or 'dir'/'folder'
+            explicit_type = item.get('type')
         
         if not pattern: continue
 
@@ -70,14 +83,12 @@ def run(args):
         if not matches: 
             matches = list(Path('.').glob(pattern))
         
-        # 逻辑检查：如果 type=file/rename，但匹配了多个文件，这是危险的
         if explicit_type in ['file', 'rename'] and len(matches) > 1:
-            logger.error(f"Config Error: Pattern '{pattern}' matched {len(matches)} files, but type='{explicit_type}' (rename mode). Cannot rename multiple files to single '{target_dest}'. Skipping.")
+            logger.error(f"Config Error: Pattern '{pattern}' matched {len(matches)} files, but type='{explicit_type}' (rename mode). Skipping.")
             continue
             
-        # 兼容性警告：未指定 type，且匹配多个文件，且 dest 看起来像文件名
         if not explicit_type and len(matches) > 1 and target_dest and not target_dest.endswith('/'):
-            logger.warning(f"Ambiguity Warning: Pattern '{pattern}' matched multiple files, but 'dest' ('{target_dest}') looks like a filename (no trailing slash). Assuming you meant a directory and appending '/' automatically.")
+            logger.warning(f"Ambiguity Warning: Pattern '{pattern}' matched multiple files, but 'dest' ('{target_dest}') looks like a filename. Appending '/' automatically.")
             target_dest += "/"
 
         for p in matches:
@@ -88,19 +99,16 @@ def run(args):
             
             fname = p.name
             
-            # --- 核心逻辑：判定是 放入目录 还是 重命名 ---
             is_rename = False
-            
             if explicit_type:
                 if explicit_type in ['file', 'rename']:
                     if p.is_dir():
-                        logger.warning(f"Skipping rename for directory '{fname}'. type='file' is only for files.")
+                        logger.warning(f"Skipping rename for directory '{fname}'.")
                         continue
                     is_rename = True
                 elif explicit_type in ['dir', 'folder']:
                     is_rename = False
             else:
-                # Fallback to trailing slash logic
                 if target_dest and not target_dest.endswith('/') and not p.is_dir():
                     is_rename = True
                 else:
@@ -111,7 +119,6 @@ def run(args):
                     key_parts = [cloud_global_prefix.strip('/'), target_dest.strip('/')]
                 else:
                     key_parts = [cloud_global_prefix.strip('/'), target_dest.strip('/'), fname]
-                
                 key = "/".join([k for k in key_parts if k])
                 transfer_list.append((src_abs, key))
             else:
@@ -119,19 +126,22 @@ def run(args):
                     dest_path = base_local_output / target_dest
                 else:
                     dest_path = base_local_output / target_dest / fname
-                
                 transfer_list.append((src_abs, str(dest_path.absolute())))
 
     if not transfer_list:
         logger.warning("No files matched for delivery.")
         return
 
+    # Log plan
+    logger.info(f"Prepared {len(transfer_list)} transfers.")
+    for src, dest in transfer_list:
+        logger.info(f"PLAN: {src} -> {dest}")
+
     report_output_dir = base_local_output
 
     if is_cloud_mode:
         run_cloud_mode(transfer_list, cloud_conf, args, report_output_dir)
     else:
-        logger.info(f"Target (Local): {base_local_output.absolute()}")
         run_local_mode(transfer_list, base_local_output, delivery_conf)
 
 def run_local_mode(transfer_list, output_dir, conf):
@@ -149,8 +159,10 @@ def run_local_mode(transfer_list, output_dir, conf):
             )
         display_result(success, failed, size_gb)
         write_json_report(transfer_list, output_dir, success, failed, size_gb, is_cloud=False)
+        logger.info(f"Delivery Finished. Success: {success}, Failed: {failed}")
     except Exception as e:
         console.print(Panel(f"Rust Local Error: {e}", border_style="red"))
+        logger.error(f"Rust Error: {e}")
 
 def run_cloud_mode(transfer_list, conf, args, report_dir):
     bucket = args.bucket or conf.get('bucket')
@@ -185,8 +197,10 @@ def run_cloud_mode(transfer_list, conf, args, report_dir):
         display_result(success, failed, size_gb)
         cloud_base_path = f"s3://{bucket}"
         write_json_report(transfer_list, report_dir, success, failed, size_gb, is_cloud=True, cloud_base_path=cloud_base_path)
+        logger.info(f"Cloud Upload Finished. Success: {success}, Failed: {failed}")
     except Exception as e:
         console.print(Panel(f"Rust Cloud Error: {e}", border_style="red"))
+        logger.error(f"Rust Cloud Error: {e}")
 
 def display_result(success, failed, size_gb):
     table = Table(show_header=False, box=None)
@@ -221,6 +235,7 @@ def write_json_report(transfer_list, output_dir, success, failed, size_gb, is_cl
     try:
         with open(report_path, 'w', encoding='utf-8') as f:
             json.dump(data, f, indent=4, ensure_ascii=False)
-        logger.info(f"JSON Report written to: {report_path}")
+        # Log to file, but not to console (removed console print)
+        logger.info(f"JSON Report written to: {report_path}") 
     except Exception as e:
         logger.error(f"Failed to write JSON report: {e}")

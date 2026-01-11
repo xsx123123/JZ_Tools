@@ -8,78 +8,145 @@ data_delivery:
   include_patterns:
     # --- 0. 原始数据 (Raw Data) ---
     - pattern: "00.raw_data/link_dir/*"
-      dest: "00_Raw_Data/"  # 加斜杠！表示放入此目录
+      dest: "00_Raw_Data/"
+      type: "dir"
 
     # --- 1. 项目汇总 (Summary) ---
-    - pattern: "*_summary_table.csv"
-      dest: "Summary/"
-    - pattern: "*_summary_paths.json"
-      dest: "Summary/"
+    - pattern: "01.qc/multiqc_merge_qc/multiqc_merge_qc_report_data/multiqc_fastq_screen.txt"
+      dest: "Summary/fastq_screen_result.txt"
+      type: "file"
+
+    - pattern: "01.qc/multiqc_merge_qc/multiqc_merge_qc_report_data/multiqc_general_stats.txt"
+      dest: "Summary/qc_general_stats.txt"
+      type: "file"
+
+    - pattern: "01.qc/multiqc_merge_qc/multiqc_merge_qc_report_data/multiqc_fastqc.txt"
+      dest: "Summary/fastqc.txt"
+      type: "file"
+
+    - pattern: "01.qc/multiqc_merge_qc/multiqc_merge_qc_report_data/multiqc_fastp.txt"
+      dest: "Summary/fastp.txt"
+      type: "file"
+
+    - pattern: "02.mapping/mapping_report/multiqc_mapping_report/multiqc_general_stats.txt"
+      dest: "Summary/mapping_general_stats.txt"
+      type: "file"
+
+    - pattern: "02.mapping/mapping_report/multiqc_mapping_report/star_summary_table.txt"
+      dest: "Summary/star_summary_table.txt"
+      type: "file"
+
+    - pattern: "02.mapping/mapping_report/multiqc_mapping_report/multiqc_qualimap_bamqc_genome_results.txt"
+      dest: "Summary/qualimap_bamqc_genome_results.txt"
+      type: "file"
+
+    - pattern: "03.count/multiqc_rsem_report_data/multiqc_general_stats.txt"
+      dest: "Summary/rsem_general_stats.txt"
+      type: "file"
+
     - pattern: "01.qc/md5_check.tsv"
-      dest: "Summary/"
+      dest: "Summary/md5_check.tsv"
+      type: "file"
 
     # --- 2. 质控报告 (QC) ---
     - pattern: "01.qc/fastq_screen_multiqc_r1/"
       dest: "01_QC/FastQ_Screen_R1/"
+      type: "dir"
+
     - pattern: "01.qc/fastq_screen_multiqc_r2/"
       dest: "01_QC/FastQ_Screen_R2/"
+      type: "dir"
     - pattern: "01.qc/short_read_r1_multiqc/"
       dest: "01_QC/Raw_Data_MultiQC_R1/"
+      type: "dir"
+
     - pattern: "01.qc/short_read_r2_multiqc/"
       dest: "01_QC/Raw_Data_MultiQC_R2/"
+      type: "dir"
+
     - pattern: "01.qc/multiqc_short_read_trim/"
       dest: "01_QC/Clean_Data_MultiQC/"
+      type: "dir"
+
     - pattern: "01.qc/multiqc_merge_qc/"
       dest: "01_QC/Overall_MultiQC/"
-    
-    # 你的特殊需求：重命名文件
-    - pattern: "01.qc/multiqc_merge_qc/multiqc_merge_qc_report_data/multiqc_fastq_screen.txt"
-      dest: "Summary/fastq_screen_result.txt" # 这里不要加斜杠，因为是重命名
+      type: "dir"
 
     # --- 3. 比对结果 (Mapping) ---
     - pattern: "02.mapping/STAR/sort_index/*.sort.bam"
-      dest: "02_Mapping/BAM/" # 加斜杠！
+      dest: "02_Mapping/BAM/"
+      type: "dir"
+
     - pattern: "02.mapping/STAR/sort_index/*.sort.bam.bai"
-      dest: "02_Mapping/BAM/" # 加斜杠！
+      dest: "02_Mapping/BAM/"
+      type: "dir"
     
     - pattern: "02.mapping/bamCoverage/"
       dest: "02_Mapping/BigWig/"
+      type: "dir"
     
     - pattern: "02.mapping/qualimap_report/"
       dest: "02_Mapping/Reports/Qualimap/"
+      type: "dir"
+
     - pattern: "02.mapping/samtools_flagstat/"
       dest: "02_Mapping/Reports/Flagstat/"
+      type: "dir"
+
     - pattern: "02.mapping/samtools_stats/"
       dest: "02_Mapping/Reports/Stats/"
+      type: "dir"
 
     # --- 4. 定量结果 (Expression) ---
     - pattern: "03.count/merge_rsem_counts.tsv"
       dest: "03_Expression/Matrix/"
+      type: "dir"
+
     - pattern: "03.count/merge_rsem_fpkm.tsv"
       dest: "03_Expression/Matrix/"
+      type: "dir"
+
     - pattern: "03.count/merge_rsem_tpm.tsv"
       dest: "03_Expression/Matrix/"
+      type: "dir"
     
     - pattern: "03.count/rsem_ultimate/"
       dest: "03_Expression/RSEM_Samples/"
+      type: "dir"
     
     - pattern: "03.count/multiqc_rsem_report.html"
       dest: "03_Expression/Reports/"
+      type: "dir"
+
     - pattern: "03.count/multiqc_rsem_report_data/"
       dest: "03_Expression/Reports/multiqc_rsem_report_data/"
+      type: "dir"
 
     # --- 5. 变异检测 (Variant) ---
     - pattern: "04.variant/"
       dest: "04_Variant/"
+      type: "dir"
 
     # --- 6. 差异表达 (DEG) ---
-    - pattern: "06.DEG/"
-      dest: "05_DEG/"
+    - pattern: "06.DEG/DESEQ2/"
+      dest: "05_DEG/DESEQ2/"
+      type: "dir"
+    - pattern: "06.DEG/Gene_Expression/"
+      dest: "05_DEG/Gene_Expression/"
+      type: "dir"
+    - pattern: "06.DEG/Heatmap_fpkm/"
+      dest: "05_DEG/Heatmap_fpkm/"
+      type: "dir"
+    - pattern: "06.DEG/Heatmap_tpm/"
+      dest: "05_DEG/Heatmap_tpm/"
+      type: "dir"
     
     # --- 7. 富集分析 (Enrichments) ---
     - pattern: "07.Enrichments/*"
-      dest: "06_Enrichments/" # 加斜杠！
+      dest: "06_Enrichments/"
+      type: "dir"
 
     # --- 8. 可变剪切 (AS) ---
     - pattern: "07.AS/"
       dest: "07_AS/"
+      type: "dir"
