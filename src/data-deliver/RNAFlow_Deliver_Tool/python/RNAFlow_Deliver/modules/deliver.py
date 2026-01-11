@@ -55,12 +55,14 @@ def run(args):
     for item in include_patterns:
         pattern = ""
         target_dest = "" 
+        explicit_type = None
 
         if isinstance(item, str):
             pattern = item
         elif isinstance(item, dict):
             pattern = item.get('pattern')
             target_dest = item.get('dest', "")
+            explicit_type = item.get('type') # 'file'/'rename' or 'dir'/'folder'
         
         if not pattern: continue
 
@@ -68,9 +70,15 @@ def run(args):
         if not matches: 
             matches = list(Path('.').glob(pattern))
         
-        # 如果有通配符且指定了明确的文件名（非目录结尾），需要警告
-        if len(matches) > 1 and target_dest and not target_dest.endswith('/'):
-            logger.warning(f"Pattern '{pattern}' matched multiple files, but 'dest' is a file name. They will overwrite each other!")
+        # 逻辑检查：如果 type=file/rename，但匹配了多个文件，这是危险的
+        if explicit_type in ['file', 'rename'] and len(matches) > 1:
+            logger.error(f"Config Error: Pattern '{pattern}' matched {len(matches)} files, but type='{explicit_type}' (rename mode). Cannot rename multiple files to single '{target_dest}'. Skipping.")
+            continue
+            
+        # 兼容性警告：未指定 type，且匹配多个文件，且 dest 看起来像文件名
+        if not explicit_type and len(matches) > 1 and target_dest and not target_dest.endswith('/'):
+            logger.warning(f"Ambiguity Warning: Pattern '{pattern}' matched multiple files, but 'dest' ('{target_dest}') looks like a filename (no trailing slash). Assuming you meant a directory and appending '/' automatically.")
+            target_dest += "/"
 
         for p in matches:
             src_abs = str(p.absolute())
@@ -81,30 +89,35 @@ def run(args):
             fname = p.name
             
             # --- 核心逻辑：判定是 放入目录 还是 重命名 ---
-            # 1. 如果 target_dest 以 / 结尾，或者 target_dest 为空，或者是文件夹
-            #    则将文件放入该目录下，保留原名
-            # 2. 否则，视为重命名
-            
             is_rename = False
-            if target_dest and not target_dest.endswith('/') and not p.is_dir():
-                is_rename = True
+            
+            if explicit_type:
+                if explicit_type in ['file', 'rename']:
+                    if p.is_dir():
+                        logger.warning(f"Skipping rename for directory '{fname}'. type='file' is only for files.")
+                        continue
+                    is_rename = True
+                elif explicit_type in ['dir', 'folder']:
+                    is_rename = False
+            else:
+                # Fallback to trailing slash logic
+                if target_dest and not target_dest.endswith('/') and not p.is_dir():
+                    is_rename = True
+                else:
+                    is_rename = False
 
             if is_cloud_mode:
                 if is_rename:
-                    # 重命名模式：直接使用 target_dest 作为 Key
                     key_parts = [cloud_global_prefix.strip('/'), target_dest.strip('/')]
                 else:
-                    # 目录模式：追加原文件名
                     key_parts = [cloud_global_prefix.strip('/'), target_dest.strip('/'), fname]
                 
                 key = "/".join([k for k in key_parts if k])
                 transfer_list.append((src_abs, key))
             else:
                 if is_rename:
-                    # 本地重命名
                     dest_path = base_local_output / target_dest
                 else:
-                    # 本地放入目录
                     dest_path = base_local_output / target_dest / fname
                 
                 transfer_list.append((src_abs, str(dest_path.absolute())))
@@ -188,7 +201,6 @@ def write_json_report(transfer_list, output_dir, success, failed, size_gb, is_cl
     report_path = output_dir / "delivery_manifest.json"
     deliverables = {}
     for src, dest in transfer_list:
-        # 在报告中，我们希望 key 是最终的文件名，value 是路径
         final_name = Path(dest).name
         if is_cloud:
             final_path = f"{cloud_base_path.rstrip('/')}/{dest}"
