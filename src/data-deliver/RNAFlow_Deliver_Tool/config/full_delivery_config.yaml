@@ -1,7 +1,7 @@
 data_delivery:
   delivery_mode: copy
   output_dir: ./full_delivery
-  threads: 8
+  threads: 16
   include_qc_summary: true
   exclude_patterns: []
   
@@ -13,7 +13,10 @@ data_delivery:
       dest: "Summary"
     - pattern: "01.qc/md5_check.tsv"
       dest: "Summary"
-
+    # --- 1. 原始数据 (raw data) ---
+    - pattern: "00.raw_data/link_dir/*"
+      dest: "00_Raw_Data"
+    
     # --- 2. 质控报告 (QC) ---
     - pattern: "01.qc/fastq_screen_multiqc_r1/"
       dest: "01_QC/FastQ_Screen_R1"
@@ -71,14 +74,20 @@ data_delivery:
       dest: "04_Variant"
 
     # --- 6. 差异表达 (DEG) ---
-    - pattern: "06.DEG/"
-      dest: "05_DEG"
+    - pattern: "06.DEG/DESEQ2"
+      dest: "05_DEG/DESEQ2"
+    - pattern: "06.DEG/Gene_Expression"
+      dest: "05_DEG/Gene_Expression"
+    - pattern: "06.DEG/Heatmap_fpkm"
+      dest: "05_DEG/Heatmap_fpkm"
+    - pattern: "06.DEG/Heatmap_tpm"
+      dest: "05_DEG/Heatmap_tpm"
 
     # --- 7. 可变剪切 (AS) ---
-    - pattern: "07.AS/"
-      dest: "06_AS"
+    - pattern: "07.AS/qc"
+      dest: "06_AS/strandness"
+    - pattern: "07.AS/rmats_pair"
+      dest: "06_AS/rmats_pair"
+    - pattern: "07.AS/rmats_single"
+      dest: "06_AS/rmats_single"
 
-    # --- 8. 融合基因 (Fusion) ---
-    # 如果有 fusion 文件夹
-    # - pattern: "06.fusion/"
-    #   dest: "07_Fusion"

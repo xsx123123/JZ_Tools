@@ -9,10 +9,15 @@ use md5::{Context as Md5Context, Digest};
 use rayon::prelude::*;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
+use std::collections::HashMap; // Added Import
 use config_manager::ConfigManager;
 
 #[derive(Clone, Copy)]
-enum ProcessMode { Copy, Hardlink, Symlink }
+enum ProcessMode {
+    Copy,
+    Hardlink,
+    Symlink,
+}
 
 impl From<&str> for ProcessMode {
     fn from(s: &str) -> Self {
@@ -56,7 +61,7 @@ fn process_file_internal(src: &Path, dest: &Path, _md5_file: bool, mode: Process
             }
         }
         let total_size = get_directory_size(dest)?;
-        let hash_str = format!("{:x}", calculate_directory_hash(dest)?);
+        let hash_str = format!("{:x}", calculate_directory_hash(dest)?) ;
         Ok((total_size, hash_str))
     } else {
         let (hash_digest, file_len) = match mode {
@@ -226,10 +231,36 @@ fn run_local_delivery(
     });
 
     if let Ok(results) = md5_results.lock() {
+        // 1. Write Global Manifest
         let md5_file_path = out_root.join("delivery_manifest.md5");
         let mut md5_file = File::create(&md5_file_path).unwrap();
         for (name, hash) in results.iter() {
             writeln!(md5_file, "{}  {}", hash, name).unwrap();
+        }
+
+        // 2. Write Per-Directory MD5.txt
+        let mut dir_map: HashMap<PathBuf, Vec<(String, String)>> = HashMap::new();
+        for (rel_path_str, hash) in results.iter() {
+            let full_path = out_root.join(rel_path_str);
+            if let Some(parent) = full_path.parent() {
+                let file_name = full_path.file_name().unwrap().to_string_lossy().to_string();
+                dir_map.entry(parent.to_path_buf())
+                       .or_default()
+                       .push((file_name, hash.clone()));
+            }
+        }
+
+        for (dir_path, entries) in dir_map {
+            // Sort by filename for deterministic output
+            let mut sorted_entries = entries;
+            sorted_entries.sort_by(|a, b| a.0.cmp(&b.0));
+
+            let md5_path = dir_path.join("MD5.txt");
+            if let Ok(mut f) = File::create(md5_path) {
+                for (name, hash) in sorted_entries {
+                    writeln!(f, "{}  {}", hash, name).ok();
+                }
+            }
         }
     }
 

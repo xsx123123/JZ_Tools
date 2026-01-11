@@ -57,7 +57,7 @@ def load_config(config_path: str) -> Dict[str, Any]:
 def run(args):
     if data_deliver_rs is None:
         console.print(Panel("[bold red]Rust extension not found! Please build it first.[/bold red]", border_style="red"))
-        return
+        sys.exit(1)
 
     config = load_config(args.config)
     delivery_conf = config.get('data_delivery', {})
