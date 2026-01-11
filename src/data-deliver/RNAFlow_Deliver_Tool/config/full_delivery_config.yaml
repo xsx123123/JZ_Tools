@@ -128,16 +128,16 @@ data_delivery:
       type: "dir"
 
     # --- 6. 差异表达 (DEG) ---
-    - pattern: "06.DEG/DESEQ2/"
+    - pattern: "06.DEG/DESEQ2/*"
       dest: "05_DEG/DESEQ2/"
       type: "dir"
-    - pattern: "06.DEG/Gene_Expression/"
+    - pattern: "06.DEG/Gene_Expression/*"
       dest: "05_DEG/Gene_Expression/"
       type: "dir"
-    - pattern: "06.DEG/Heatmap_fpkm/"
+    - pattern: "06.DEG/Heatmap_fpkm/*"
       dest: "05_DEG/Heatmap_fpkm/"
       type: "dir"
-    - pattern: "06.DEG/Heatmap_tpm/"
+    - pattern: "06.DEG/Heatmap_tpm/*"
       dest: "05_DEG/Heatmap_tpm/"
       type: "dir"
     
