@@ -46,10 +46,10 @@ data_delivery:
       dest: "data/index/contrasts.csv"
       type: "file"
 
-    - pattern: "06.DEG/DESEQ2/"
+    - pattern: "06.DEG/DESEQ2/*_DEG.csv"
       dest: "data/res/DEG/"
       type: "dir"
 
-    - pattern: "07.Enrichments/"
+    - pattern: "07.Enrichments/*.csv"
       dest: "data/res/Enrichments/"
       type: "dir"
