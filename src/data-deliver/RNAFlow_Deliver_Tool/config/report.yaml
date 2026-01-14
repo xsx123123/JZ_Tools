@@ -39,7 +39,7 @@ data_delivery:
       type: "dir"
 
     - pattern: "02.mapping/mapping_report/multiqc_mapping_report_data/"
-      dest: "data/QualiMap/multiqc_data/2
+      dest: "data/QualiMap/multiqc_data/
       type: "dir"
     
     - pattern: "contrasts.csv"
