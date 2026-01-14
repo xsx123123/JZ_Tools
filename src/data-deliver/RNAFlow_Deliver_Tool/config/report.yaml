@@ -38,10 +38,14 @@ data_delivery:
       dest: "data/fastq_screen_report/fastq_screen_multiqc_r2/multiqc_r2_fastq_screen_report_data/"
       type: "dir"
 
-    - pattern: "02.mapping/mapping_report/multiqc_mapping_report_data/"
+    - pattern: "02.mapping/mapping_report/multiqc_mapping_report_data/*"
       dest: "data/QualiMap/multiqc_data/"
       type: "dir"
-    
+
+    - pattern: "02.mapping/mapping_report/multiqc_mapping_report_data/*"
+      dest: "data/QualiMap/multiqc_data/"
+      type: "dir"
+  
     - pattern: "contrasts.csv"
       dest: "data/index/contrasts.csv"
       type: "file"
