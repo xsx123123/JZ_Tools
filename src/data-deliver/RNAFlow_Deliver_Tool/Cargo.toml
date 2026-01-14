@@ -2,7 +2,7 @@
 name = "data_deliver"
 version = "0.6.0"
 edition = "2021"
-license = "Non-Commercial"
+license = "CC-BY-NC-4.0"
 
 [lib]
 name = "data_deliver_rs"

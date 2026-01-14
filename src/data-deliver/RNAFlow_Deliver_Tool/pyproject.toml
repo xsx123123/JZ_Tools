@@ -3,10 +3,11 @@ requires = ["maturin>=1.0,<2.0"]
 build-backend = "maturin"
 
 [project]
-name = "RNAFlow_Deliver_Tool"
-version = "0.1.0"
+name = "rnaflow-deliver-tool"
+version = "0.1.1"
 description = "RNAFlow QC Summary tool with Rust acceleration"
 requires-python = ">=3.8"
+license = {text = "CC BY-NC 4.0"}
 dependencies = [
     "pandas>=1.3",
     "rich>=10.0",

@@ -1,0 +1,47 @@
+{% set name = "rnaflow-deliver-tool" %}
+{% set version = "0.1.1" %}
+
+package:
+  name: {{ name|lower }}
+  version: {{ version }}
+
+source:
+  url: https://pypi.org/packages/source/{{ name[0] }}/{{ name }}/rnaflow_deliver_tool-{{ version }}.tar.gz
+  sha256: 26d3d561300e6df5b2bde076382052c4dcfe06396189a00921af2840e59dcf45
+
+build:
+  entry_points:
+    - rnaflow-cli = RNAFlow_Deliver.cli:main
+  noarch: python
+  script: {{ PYTHON }} -m pip install . -vv --no-deps --no-build-isolation
+  number: 0
+
+requirements:
+  host:
+    - python >=3.10,<3.13
+    - maturin >=1.0,<2.0
+    - pip
+  run:
+    - python >=3.10,<3.13
+    - pandas >=1.3
+    - rich >=10.0
+    - loguru >=0.5
+    - pyyaml >=5.0
+
+test:
+  imports:
+    - rnaflow_deliver_tool
+  commands:
+    - pip check
+    - rnaflow-cli --help
+  requires:
+    - pip
+
+about:
+  summary: RNAFlow QC Summary tool with Rust acceleration
+  license: ''
+  license_file: PLEASE_ADD_LICENSE_FILE
+
+extra:
+  recipe-maintainers:
+    - Slightedlove

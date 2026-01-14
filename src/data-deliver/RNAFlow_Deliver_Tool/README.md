@@ -1,73 +1,146 @@
-# RNAFlow Delivery Tool
+# RNAFlow CLI
 
-**基于 Rust 加速的高性能生物信息数据交付系统。**
+**High-Performance Bioinfo Data Delivery & QC Tool**
 
-专门用于将复杂的分析流程（如 Snakemake）产生的零散结果，根据配置自动整理、过滤并交付到结构化的目标目录（本地或云端对象存储）。
+A unified tool for RNA-Seq QC summarization and high-speed data delivery, built with Rust for maximum performance.
 
-## 🚀 核心特性
+## 🚀 Core Features
 
-*   **Rust 核心驱动**: 采用 Rust 编写后端 (`data_deliver_rs`)，支持多线程并发传输与 MD5 计算，性能远超纯 Python 实现。
-*   **结构化重组**: 支持通过 `pattern` 匹配文件，并利用 `dest` 将其重定向或重命名。
-*   **多级校验**: 
-    *   **全局校验**: 根目录生成 `delivery_manifest.md5` 包含所有文件。
-    *   **目录校验**: 每个交付子目录下自动生成 `MD5.txt`，仅包含该目录内的文件。
-*   **智能报告**: 生成 `delivery_manifest.json`，完美对接 Quarto 报告系统。
+*   **Rust-Powered Engine**: Built with Rust for superior performance, supporting multi-threaded concurrent transfers and MD5 computation.
+*   **Structured Reorganization**: Supports file matching via `pattern` and redirection/rename using `dest`.
+*   **Multi-Level Verification**:
+    *   **Global Check**: Generates `delivery_manifest.md5` at root containing all files.
+    *   **Directory Check**: Auto-generates `MD5.txt` in each delivery subdirectory containing files in that directory.
+*   **Smart Reporting**: Generates `delivery_manifest.json` for seamless integration with Quarto reporting systems.
 
-## 🛠️ 环境准备
+## 📦 Installation
+
+Install the tool using pip:
 
 ```bash
-# 1. 编译 Rust 后端
-cd src/src/data-deliver/RNAFlow_Deliver_Tool
-cargo build --release
-
-# 2. 安装扩展
-cp target/release/libdata_deliver_rs.so python/RNAFlow_Deliver/data_deliver_rs.so
-
-# 3. 设置环境变量
-export PYTHONPATH=$PYTHONPATH:$(pwd)/python
+pip install rnaflow-deliver-tool
 ```
 
-## ⚙️ 交付模式 (`delivery_mode`)
+## 💻 Usage
 
-在配置文件中，你可以通过 `delivery_mode` 指定文件的处理方式：
+### Main Interface
 
-| 模式 | 说明 | 优点 | 缺点 |
+```
+rnaflow-cli
+
+╭───────────────────────────────────────────────╮
+│                                               │
+│  RNAFlow CLI                                  │
+│  High-Performance Bioinfo Data Delivery & QC  │
+│                                               │
+╰───────────────────────────────────────────────╯
+
+A unified tool for RNA-Seq QC summarization and high-speed data delivery.
+
+Available Commands:
+  deliver    High-performance file delivery using Rust engine
+  config     Manage cloud credentials (encrypted)
+
+Global Options:
+  -h, --help       show this help message and exit
+  -v, --version    Show program's version number and exit
+
+Version: 0.2.0
+Use 'rnaflow-cli <command> -h' for command-specific help.
+```
+
+### Deliver Command
+
+Use the `deliver` command for high-performance file delivery:
+
+```bash
+rnaflow-cli deliver [OPTIONS]
+```
+
+### Config Command
+
+Use the `config` command to manage cloud credentials securely:
+
+```bash
+rnaflow-cli config [OPTIONS]
+```
+
+## ⚙️ Delivery Modes (`delivery_mode`)
+
+In the configuration file, you can specify how files are processed using `delivery_mode`:
+
+| Mode | Description | Advantages | Disadvantages |
 | :--- | :--- | :--- | :--- |
-| `copy` | **物理复制**。文件会被完整拷贝到目标位置。 | 交付结果完全独立，移动或删除源码不影响交付数据。 | 耗费磁盘空间，大文件传输较慢。 |
-| `symlink` | **软链接 (Symbolic Link)**。目标位置仅创建一个指向源码的快捷方式。 | 极速，不占用额外磁盘空间。 | 如果源码被移动或删除，链接会失效。 |
-| `hardlink` | **硬链接 (Hard Link)**。目标位置创建一个新的文件表项指向相同的物理数据。 | 极速，不占空间，删除源码后交付数据依然有效。 | 不能跨分区（跨磁盘），不支持文件夹（工具会自动对文件夹内容进行硬链）。 |
+| `copy` | **Physical Copy**. Files are fully copied to the destination. | Delivered results are completely independent; moving or deleting source code doesn't affect delivered data. | Consumes disk space, slower for large files. |
+| `symlink` | **Symbolic Link**. Creates a shortcut pointing to the source. | Instant, no extra disk space required. | Links become invalid if source is moved or deleted. |
+| `hardlink` | **Hard Link**. Creates a new file entry pointing to the same physical data. | Instant, no space usage, delivered data remains valid after source deletion. | Cannot cross partitions/disks, doesn't support directories (tool automatically hard-links directory contents). |
 
-## 📖 配置文件指南 (`full_delivery_config.yaml`)
+## 📝 Configuration Guide (`full_delivery_config.yaml`)
+
+The configuration file supports different types of delivery patterns:
 
 ```yaml
 data_delivery:
-  delivery_mode: copy        # 设置交付模式 (copy, symlink, hardlink)
+  delivery_mode: copy        # Set delivery mode (copy, symlink, hardlink)
   output_dir: ./full_delivery
   threads: 8
-  
+
   include_patterns:
-    # 模式 1: 放入目录 (dest 以 / 结尾)
-    - pattern: "02.mapping/*.bam"
-      dest: "02_Mapping/BAM/"
-    
-    # 模式 2: 重命名文件 (dest 不以 / 结尾)
+    # Type "file": Deliver individual files with optional renaming
     - pattern: "01.qc/.../multiqc_fastq_screen.txt"
       dest: "Summary/fastq_screen_result.txt"
+      type: "file"
+
+    # Type "dir": Deliver entire directories with all contents
+    - pattern: "02.mapping/"
+      dest: "02_Mapping/"
+      type: "dir"
+
+    # File delivery with renaming
+    - pattern: "02.mapping/*.bam"
+      dest: "02_Mapping/BAM/"
+      type: "file"
 ```
 
-## 📂 交付结果示例
+### Pattern Types
+
+*   **`type: "file"`**: Used for delivering individual files. Allows for file renaming and reorganization.
+    *   Can match specific files and rename them during delivery
+    *   Can place files in specific destination directories
+    *   Supports wildcards and recursive patterns
+
+*   **`type: "dir"`**: Used for delivering entire directories. All contents of the matched directory will be delivered.
+    *   Delivers the entire directory structure and all files within
+    *   Maintains the internal structure of the directory
+    *   Useful for delivering complete analysis results organized in folders
+
+## 📂 Delivery Result Example
 
 ```text
 delivery_output/
 ├── 01_QC/
 │   ├── Reports/
 │   │   ├── sample1_report.html
-│   │   └── MD5.txt              <-- 本目录文件校验和
-├── delivery_manifest.json       <-- 自动化报告映射表
-├── delivery_manifest.md5        <-- 全局校验文件
+│   │   └── MD5.txt              <-- Directory checksum
+├── delivery_manifest.json       <-- Automated report mapping
+├── delivery_manifest.md5        <-- Global checksum file
 └── ...
 ```
 
-## ☁️ 云端交付 (S3/TOS)
+## ☁️ Cloud Delivery (S3/TOS)
 
-使用 `--cloud` 参数开启云端模式（此模式下 `delivery_mode` 将失效，始终为上传模式）。
+Use the `--cloud` parameter to enable cloud mode (in this mode `delivery_mode` is ignored, always uses upload mode).
+
+## 📄 License
+
+This project is licensed under the **CC BY-NC 4.0** (Creative Commons Attribution-NonCommercial 4.0 International) license.
+
+This means you are free to:
+*   **Share** — copy and redistribute the material in any medium or format
+*   **Adapt** — remix, transform, and build upon the material
+
+Under the following terms:
+*   **Attribution** — You must give appropriate credit to the original author
+*   **NonCommercial** — You may not use the material for commercial purposes
+
+See the LICENSE file for full details.
