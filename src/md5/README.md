@@ -23,6 +23,8 @@
   - SRA 数据 (SE): `[SED]RR#######.fq.gz` (如 SRR#######.fq.gz)
   - Long-read 数据 (SE): `<样本名>.fq.gz`
 
+- **支持样本批量重命名**：支持通过 CSV 样本表 (`--sample-sheet`) 将原始 ID（如 SRA 编号）映射为有意义的样本名称。
+
 - **自动检测文库类型**：支持自动检测、仅处理双端数据或仅处理单端数据
 
 - **智能文件处理**：
@@ -50,6 +52,10 @@ cargo build --target-dir ../Compile_release/seq_preprocessor_x86_64 --release
 ```bash
 # 自动检测并处理 PE 和 SE 数据
 ./seq_preprocessor --input /path/to/raw_data --output /path/to/processed_data
+
+# 使用样本信息表进行重命名
+# CSV 必须包含 'sample' (原始名) 和 'sample_name' (新名称) 两列
+./seq_preprocessor --input /path/to/raw_data --output /path/to/processed_data --sample-sheet samples.csv
 
 # 仅处理双端 (PE) 数据
 ./seq_preprocessor --input /path/to/raw_data --output /path/to/processed_data --library-type ShortRead
@@ -108,7 +114,7 @@ cargo build --target-dir ../Compile_release/json_md5_verifier_x86_64 --release
 
 ## check_md5.py
 
-`check_md5.py` 是一个轻量级的 Python 脚本，旨在通过并发处理提高标准 MD5 列表文件的验证速度。它非常适合验证由 `md5sum` 命令或 `seq_preprocessor`（通过 `--summary-md5` 选项）生成的传统校验和文件。
+`check_md5.py` 是一个轻量级的 Python 脚本，旨在通过并发处理提高标准 MD5 列表文件的验证速度 。它非常适合验证由 `md5sum` 命令或 `seq_preprocessor`（通过 `--summary-md5` 选项）生成的传统校验和文件。
 
 ### 功能特性
 

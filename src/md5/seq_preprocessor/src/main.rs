@@ -107,6 +107,11 @@ struct Cli {
     #[arg(long)]
     json_report: Option<PathBuf>,
 
+    /// (可选) 包含样本重命名信息的 CSV 文件。
+    /// 必须包含表头，且必须包含 "sample" (原始名) 和 "sample_name" (新名) 两列。
+    #[arg(long)]
+    sample_sheet: Option<PathBuf>,
+
     // --- 新增：指定文库类型参数 ---
     /// 指定要处理的文库类型
     #[arg(long, value_enum, default_value_t = LibraryType::Auto)]
@@ -118,6 +123,32 @@ fn main() -> Result<()> {
     println!("{}", banner);
 
     let cli = Cli::parse();
+
+    // 0. (新增) 加载 Sample Sheet (如果提供)
+    let mut sample_rename_map: HashMap<String, String> = HashMap::new();
+    if let Some(sheet_path) = &cli.sample_sheet {
+        if !sheet_path.exists() {
+            anyhow::bail!("Sample sheet 文件不存在: {}", sheet_path.display());
+        }
+        println!("- 正在加载样本信息表: {}", sheet_path.display());
+        let file = fs::File::open(sheet_path)?;
+        let mut rdr = csv::Reader::from_reader(file);
+        
+        // 验证表头
+        let headers = rdr.headers()?;
+        let sample_idx = headers.iter().position(|h| h == "sample").context("CSV 缺少 'sample' 列")?;
+        let name_idx = headers.iter().position(|h| h == "sample_name").context("CSV 缺少 'sample_name' 列")?;
+
+        for result in rdr.records() {
+            let record = result?;
+            let original_name = record.get(sample_idx).unwrap_or_default().trim().to_string();
+            let new_name = record.get(name_idx).unwrap_or_default().trim().to_string();
+            if !original_name.is_empty() && !new_name.is_empty() {
+                sample_rename_map.insert(original_name, new_name);
+            }
+        }
+        println!("  - 已加载 {} 条重命名规则。", sample_rename_map.len());
+    }
 
     // 准备输出目录
     fs::create_dir_all(&cli.output).context(format!("无法创建输出目录: {}", cli.output.display()))?;
@@ -424,7 +455,14 @@ fn main() -> Result<()> {
     // 5. 处理 PE (Short-Read) 样本
     // --- 修改：循环 `pe_samples` ---
     for (sample_name, (r1_opt, r2_opt, is_r1_sra, is_r2_sra)) in pe_samples {
-        println!("  - 正在处理 PE 样本: {}", sample_name);
+        // --- 重命名逻辑 ---
+        let final_sample_name = if let Some(new_name) = sample_rename_map.get(&sample_name) {
+            println!("  - 正在处理 PE 样本: {} -> {} (已重命名)", sample_name, new_name);
+            new_name.clone()
+        } else {
+            println!("  - 正在处理 PE 样本: {}", sample_name);
+            sample_name.clone()
+        };
 
         let (original_r1, original_r2) = match (r1_opt, r2_opt) {
             (Some(r1), Some(r2)) => (r1, r2),
@@ -434,25 +472,25 @@ fn main() -> Result<()> {
             }
         };
 
-        let sample_output_dir = cli.output.join(&sample_name);
+        let sample_output_dir = cli.output.join(&final_sample_name);
         fs::create_dir_all(&sample_output_dir)
-            .context(format!("无法为样本 {} 创建目录", sample_name))?;
+            .context(format!("无法为样本 {} 创建目录", final_sample_name))?;
 
-        let new_r1_name = format!("{}_R1.fq.gz", sample_name);
-        let new_r2_name = format!("{}_R2.fq.gz", sample_name);
+        let new_r1_name = format!("{}_R1.fq.gz", final_sample_name);
+        let new_r2_name = format!("{}_R2.fq.gz", final_sample_name);
         let new_r1_path = sample_output_dir.join(&new_r1_name);
         let new_r2_path = sample_output_dir.join(&new_r2_name);
 
         // --- 修改：使用辅助函数处理文件 ---
         #[cfg(unix)]
         {
-            process_file_link(&new_r1_path, &original_r1, "R1", &sample_name)?;
-            process_file_link(&new_r2_path, &original_r2, "R2", &sample_name)?;
+            process_file_link(&new_r1_path, &original_r1, "R1", &final_sample_name)?;
+            process_file_link(&new_r2_path, &original_r2, "R2", &final_sample_name)?;
         }
         #[cfg(not(unix))]
         {
-            process_file_copy(&new_r1_path, &original_r1, "R1", &sample_name)?;
-            process_file_copy(&new_r2_path, &original_r2, "R2", &sample_name)?;
+            process_file_copy(&new_r1_path, &original_r1, "R1", &final_sample_name)?;
+            process_file_copy(&new_r2_path, &original_r2, "R2", &final_sample_name)?;
         }
         // --- 文件处理逻辑结束 ---
 
@@ -485,15 +523,15 @@ fn main() -> Result<()> {
             }
         }
 
-        let relative_r1_path = PathBuf::from(&sample_name).join(&new_r1_name);
-        let relative_r2_path = PathBuf::from(&sample_name).join(&new_r2_name);
+        let relative_r1_path = PathBuf::from(&final_sample_name).join(&new_r1_name);
+        let relative_r2_path = PathBuf::from(&final_sample_name).join(&new_r2_name);
         if let Some(c) = &checksum_r1 { summary_md5_lines.push(format!("{}  {}", c, relative_r1_path.display())); }
         if let Some(c) = &checksum_r2 { summary_md5_lines.push(format!("{}  {}", c, relative_r2_path.display())); }
 
         // --- 修改：填充 JSON 报告条目 (PE) ---
         if cli.json_report.is_some() {
             json_report_entries.push(RenamingReportEntry {
-                sample_name: sample_name.clone(),
+                sample_name: final_sample_name.clone(),
                 library_type: "PE".to_string(),
 
                 new_r1_path_relative: Some(relative_r1_path.to_string_lossy().to_string()),
@@ -513,27 +551,36 @@ fn main() -> Result<()> {
 
     // --- 6. 新增：处理 SE (Long-Read) 样本 ---
     for se_file_info in &se_fastq_files {
-        let sample_name = &se_file_info.sample_name;
+        let original_sample_name = &se_file_info.sample_name;
         let original_path = &se_file_info.original_path;
         let is_se_sra = se_file_info.is_sra; // Store whether this is SRA data
-        println!("  - 正在处理 SE 样本: {}", sample_name);
 
-        let sample_output_dir = cli.output.join(sample_name);
+        // --- 重命名逻辑 ---
+        let final_sample_name = if let Some(new_name) = sample_rename_map.get(original_sample_name) {
+             println!("  - 正在处理 SE 样本: {} -> {} (已重命名)", original_sample_name, new_name);
+             new_name.clone()
+        } else {
+             println!("  - 正在处理 SE 样本: {}", original_sample_name);
+             original_sample_name.clone()
+        };
+
+
+        let sample_output_dir = cli.output.join(&final_sample_name);
         fs::create_dir_all(&sample_output_dir)
-            .context(format!("无法为 SE 样本 {} 创建目录", sample_name))?;
+            .context(format!("无法为 SE 样本 {} 创建目录", final_sample_name))?;
 
         // --- SE 命名：直接使用 <样本名>.fq.gz (例如 DR_CK.fq.gz) ---
-        let new_se_name = format!("{}.fq.gz", sample_name);
+        let new_se_name = format!("{}.fq.gz", final_sample_name);
         let new_se_path = sample_output_dir.join(&new_se_name);
 
         // --- 使用辅助函数处理文件 ---
         #[cfg(unix)]
         {
-            process_file_link(&new_se_path, original_path, "SE", sample_name)?;
+            process_file_link(&new_se_path, original_path, "SE", &final_sample_name)?;
         }
         #[cfg(not(unix))]
         {
-            process_file_copy(&new_se_path, original_path, "SE", sample_name)?;
+            process_file_copy(&new_se_path, original_path, "SE", &final_sample_name)?;
         }
 
         // --- MD5 和报告 ---
@@ -560,7 +607,7 @@ fn main() -> Result<()> {
             }
         }
 
-        let relative_se_path = PathBuf::from(sample_name).join(&new_se_name);
+        let relative_se_path = PathBuf::from(&final_sample_name).join(&new_se_name);
         if let Some(c) = &checksum_se {
             summary_md5_lines.push(format!("{}  {}", c, relative_se_path.display()));
         }
@@ -568,7 +615,7 @@ fn main() -> Result<()> {
         // --- 填充 JSON 报告条目 (SE) ---
         if cli.json_report.is_some() {
             json_report_entries.push(RenamingReportEntry {
-                sample_name: sample_name.clone(),
+                sample_name: final_sample_name.clone(),
                 library_type: "SE".to_string(),
 
                 new_r1_path_relative: None,
