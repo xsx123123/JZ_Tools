@@ -134,6 +134,7 @@ fn main() -> Result<()> {
     }
 
     pb.finish_with_message("Done!");
+    eprintln!();
 
     // 6. 生成统计信息
     let discarded_pairs = total_pairs - kept_pairs;
