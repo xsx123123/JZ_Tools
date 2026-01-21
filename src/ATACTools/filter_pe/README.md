@@ -1,7 +1,5 @@
 # ATAC-seq Paired-End Filter (Rust Version)
 
-[中文文档 (Chinese Documentation)](#atac-seq-paired-end-filter-rust-版)
-
 A high-performance, multi-threaded tool designed to **strictly filter** Paired-End ATAC-seq (or ChIP-seq) data.
 
 This tool is a Rust implementation of complex filtering logic that is difficult to achieve with standard `samtools` one-liners. It ensures that if **one read** of a pair fails quality checks (e.g., wrong orientation, chimeric alignment), **both reads** are discarded to maintain strict paired-end integrity.
