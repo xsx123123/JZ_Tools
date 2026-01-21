@@ -9,6 +9,8 @@
 *.fq
 *.fastq
 *.gz
+/target
+target
 ./build
 ./examples
 ./deps
