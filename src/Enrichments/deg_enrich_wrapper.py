@@ -14,6 +14,7 @@ def get_args():
     parser.add_argument("--rscript", required=True, help="R 脚本 go_enricher.r 的路径")
     parser.add_argument("--deg_info", required=True, help="All_Contrast_DEG_Statistics.csv 的路径")
     parser.add_argument("--deg_dir", required=True, help="包含具体差异分析结果 CSV 的文件夹")
+    parser.add_argument("--lib_type", default="RNA", help="富集分析的文库类型")
     
     # 转发给 R 的参数
     parser.add_argument("-o", "--obo", required=True, help="GO obo 文件")
@@ -44,8 +45,13 @@ def main():
 
     # 2. 遍历并调用 R
     for contrast in contrasts:
-        input_table = os.path.join(args.deg_dir, f"{contrast}_DEG.csv")
-        
+        if args.lib_type == 'ATAC':
+            input_table = os.path.join(args.deg_dir, f"{contrast}_Differential_Peaks.csv")
+        elif args.lib_type == 'RNA':
+            input_table = os.path.join(args.deg_dir, f"{contrast}_DEG.csv")
+        else:
+            input_table = os.path.join(args.deg_dir, f"{contrast}_DEG.csv")
+
         if not os.path.exists(input_table):
             logger.warning(f"⚠️ 跳过: 找不到文件 {input_table}")
             continue

@@ -48,7 +48,6 @@ DrawVolcano <- function(deg_result, EXP_NAEE = NULL, pvalCutoff = 0.05, LFCCutof
   require(ggpubr)
   require(cowplot)
 
-  # 防止 -log10(0) 报错
   deg_result$pvalue[which(deg_result$pvalue == 0)] <- .Machine$double.xmin
   deg_result <- deg_result %>% tibble() |> mutate(log10 = -log10(pvalue))
 
@@ -60,7 +59,6 @@ DrawVolcano <- function(deg_result, EXP_NAEE = NULL, pvalCutoff = 0.05, LFCCutof
   deg_result_up <- head(subset(deg_result, deg_result$Group == "Up-regulated"), TOP_GENE)
   deg_result_down <- head(subset(deg_result, deg_result$Group == "Down-regulated"), TOP_GENE)
 
-  # 动态确定 Y 轴高度
   y_aes_vals <- deg_result$log10[is.finite(deg_result$log10)]
   y_aes_value <- if(length(y_aes_vals) > 0) max(y_aes_vals)*1.1 else 10
   x_max <- min(max(abs(na.omit(deg_result$log2FC))), 7.5) # 限制X轴极值，防止散点太分散
@@ -77,8 +75,6 @@ DrawVolcano <- function(deg_result, EXP_NAEE = NULL, pvalCutoff = 0.05, LFCCutof
     scale_x_continuous(limits=c(-(x_max*1.2),(x_max*1.2))) +
     scale_y_continuous(limits=c(0,y_aes_value)) +
     theme_pubclean() + theme(legend.position = "bottom")
-
-  # 如果有差异 Peak，则添加 Label
   if(nrow(deg_result_up) > 0 || nrow(deg_result_down) > 0) {
     p <- p + geom_text_repel(data = rbind(deg_result_up, deg_result_down),
                              aes(log2FC, log10, label= Label),
@@ -95,6 +91,8 @@ option_list <- list(
   make_option(c("-c", "--counts"), type = "character", help = "ATAC-seq Annotated Peak Counts (e.g. from HOMER)"),
   make_option(c("-m", "--metadata"), type = "character", help = "Sample metadata"),
   make_option(c("-p", "--pairs"), type = "character", help = "Contrast pairs"),
+  make_option(c("-s", "--samples"), type = "numeric", default = 2, help = "Peak Sample Count Cutoff"),
+  make_option(c("-t", "--count_cutoff"), type = "numeric", default = 10, help = "Peak Count Cutoff (Threshold)"),
   make_option(c("-o", "--outdir"), type = "character", default = "./ATAC_results", help = "Output Path"),
   make_option(c("--lfc"), type = "numeric", default = 0.585, help = "Log2 FC Cutoff (0.585 = 1.5 fold)"),
   make_option(c("--pval"), type = "numeric", default = 0.05, help = "P-value Cutoff"),
@@ -104,7 +102,6 @@ option_list <- list(
 opt_parser <- OptionParser(option_list = option_list)
 opt <- parse_args(opt_parser)
 
-# 【防御性检查】输入参数检查机制
 if (is.null(opt$counts) || is.null(opt$metadata) || is.null(opt$pairs)){
   print_help(opt_parser)
   cat("\n")
@@ -117,10 +114,8 @@ if(!dir.exists(opt$outdir)) dir.create(opt$outdir, recursive = TRUE)
 # 4. ATAC-seq 数据读取与矩阵拆分 -----------------------------------------
 log4r::info(logger, ">>> Loading ATAC-seq Peak Data...")
 
-# 读取包含注释的 Count 表格
 raw_peaks <- read.delim(opt$counts, check.names = FALSE, stringsAsFactors = FALSE)
 
-# 寻找 Count 数据列的起始位置
 split_idx <- which(colnames(raw_peaks) == "10 Distance to nearest Peak, Peak ID") + 1
 
 if(length(split_idx) == 0){
@@ -128,31 +123,25 @@ if(length(split_idx) == 0){
   stop("Format Error", call. = FALSE)
 }
 
-# 拆分 Annotation 和 Count Matrix
 peak_anno <- raw_peaks[, 1:(split_idx-1)]
 count_matrix <- raw_peaks[, split_idx:ncol(raw_peaks)]
 peak_anno$PeakID <- as.character(peak_anno$PeakID)
 rownames(count_matrix) <- peak_anno$PeakID
 
-# 智能读取 Metadata (支持 csv 和 tsv)
 if(grepl(".csv$", opt$metadata)) {
   meta_data <- read.csv(opt$metadata, stringsAsFactors = F, check.names = F)
 } else {
   meta_data <- read.delim(opt$metadata, header = T, stringsAsFactors = F, check.names = F)
 }
 
-# 精准锁定 SRR ID 所在的列 (解决 sample vs sample_name 问题)
 if("sample" %in% colnames(meta_data)) colnames(meta_data)[colnames(meta_data) == "sample"] <- "Sample"
 
-# 统一分组列名 (大小写敏感处理)
 if("group" %in% colnames(meta_data)) colnames(meta_data)[colnames(meta_data) == "group"] <- "Group"
 
 rownames(meta_data) <- meta_data$Sample
 
-# 获取共有样本
 common_samples <- intersect(colnames(count_matrix), meta_data$Sample)
 
-# 硬核报错检查：如果找不到共有样本，立刻打印前几个名字帮助排查
 if(length(common_samples) == 0){
   log4r::fatal(logger, "🔥 致命错误: Count矩阵与Metadata之间没有找到匹配的样本名！")
   log4r::info(logger, paste0("Count 矩阵中的样本名示例: ", paste(head(colnames(count_matrix), 3), collapse=", ")))
@@ -160,7 +149,6 @@ if(length(common_samples) == 0){
   stop("Sample ID mismatch.", call. = FALSE)
 }
 
-# 子集化并强制转换为数值型矩阵（防止 logical 报错）
 count_matrix <- count_matrix[, common_samples, drop=FALSE]
 count_matrix <- as.matrix(sapply(count_matrix, as.numeric))
 meta_data <- meta_data[common_samples, ]
@@ -168,45 +156,43 @@ meta_data <- meta_data[common_samples, ]
 log4r::info(logger, paste0("Detected ", nrow(count_matrix), " peaks and ", ncol(count_matrix), " samples."))
 
 # 5. Global PCA Analysis --------------------------------------------------
-log4r::info(logger, ">>> Running Global PCA for ATAC-seq...")
+log4r::info(logger, ">>> Filtering low-count peaks and Running Global PCA...")
 dds_all <- DESeqDataSetFromMatrix(countData = round(count_matrix), colData = meta_data, design = ~Group)
-vst_data <- vst(dds_all, blind = TRUE)
-pca_plot <- plotPCA(vst_data, intgroup="Group") + theme_pubclean() + ggtitle("ATAC-seq Peak PCA")
+min_samples <- opt$samples
+min_count <- opt$count_cutoff
+keep <- rowSums(counts(dds_all) >= min_count) >= min_samples
+removed_peaks <- nrow(dds_all) - sum(keep)
+log4r::info(logger, paste0("   - Filter Criteria: Count >= ", min_count, " in at least ", min_samples, " samples."))
+log4r::info(logger, paste0("   - Kept: ", sum(keep), " peaks | Removed (Noise): ", removed_peaks, " peaks."))
+dds_all <- dds_all[keep, ]
+vst_data <- varianceStabilizingTransformation(dds_all, blind = TRUE)
+pca_plot <- plotPCA(vst_data, intgroup="Group") + 
+  theme_pubclean() + 
+  ggtitle(paste0("ATAC-seq Peak PCA (Filtered: ", sum(keep), " peaks)"))
 ggsave(file.path(opt$outdir, "Global_PCA.pdf"), plot = pca_plot, width = 6, height = 4)
 ggsave(file.path(opt$outdir, "Global_PCA.png"), plot = pca_plot, width = 6, height = 4)
 
 # 6. 差异分析主循环 -------------------------------------------------------
 contrast_pairs <- read.csv(opt$pairs, stringsAsFactors = F)
-
 deg_stat_list <- list()
-
 for(i in 1:nrow(contrast_pairs)){
   ctrl <- contrast_pairs[i, "Control"]
   treat <- contrast_pairs[i, "Treat"]
   name <- paste0(treat, "_vs_", ctrl)
-
   log4r::info(logger, paste0(">>> Running Contrast: ", name))
-
   sub_meta <- meta_data[meta_data$Group %in% c(ctrl, treat), ]
   sub_meta$Group <- factor(sub_meta$Group, levels = c(ctrl, treat))
   sub_counts <- count_matrix[, sub_meta$Sample]
-
   dds <- DESeqDataSetFromMatrix(countData = round(sub_counts), colData = sub_meta, design = ~Group)
   dds <- dds[rowSums(counts(dds)) > 1, ]  # 过滤低计数 peaks
   dds <- DESeq(dds, quiet = TRUE)
-
   res <- results(dds, contrast = c("Group", treat, ctrl), alpha = opt$pval)
   res_df <- as.data.frame(res) %>% rownames_to_column("PeakID") %>% arrange(pvalue)
-
-  # 将 ATAC-seq 特有的注释信息合并回来
   res_annotated <- left_join(res_df, peak_anno, by = "PeakID")
   write.csv(res_annotated, file.path(opt$outdir, paste0(name, "_Differential_Peaks.csv")), row.names = FALSE)
-
-  # 统计数量时，使用 pvalue
   n_up <- sum(res_df$pvalue < opt$pval & res_df$log2FoldChange > opt$lfc, na.rm = TRUE)
   n_down <- sum(res_df$pvalue < opt$pval & res_df$log2FoldChange < -opt$lfc, na.rm = TRUE)
   n_total_deg <- n_up + n_down
-
   deg_stat_list[[i]] <- data.frame(
     Contrast = name,
     Control = ctrl,
@@ -219,18 +205,15 @@ for(i in 1:nrow(contrast_pairs)){
     stringsAsFactors = FALSE
   )
 
-  # 检查用户指定的标签列是否存在
   label_col_name <- opt$label_col
   if (!label_col_name %in% colnames(res_annotated)) {
     log4r::warn(logger, paste0("Specified label column '", label_col_name, "' not found. Falling back to PeakID."))
     label_col_name <- "PeakID"
   }
 
-  # 准备绘图数据：动态映射 Label 列
   plot_data <- res_annotated %>%
     dplyr::rename(log2FC = log2FoldChange) %>%
     dplyr::filter(!is.na(pvalue)) %>%
-    # 动态使用用户指定的列进行注释，如果为空则用 PeakID 兜底
     mutate(Label = ifelse(is.na(!!sym(label_col_name)) | !!sym(label_col_name) == "", PeakID, !!sym(label_col_name)))
 
   DrawVolcano(deg_result = plot_data, EXP_NAEE = name, pvalCutoff = opt$pval, LFCCutoff = opt$lfc, deg_figure_dir = opt$outdir)
@@ -239,7 +222,7 @@ for(i in 1:nrow(contrast_pairs)){
 }
 
 
-# 输出总统计表
+
 if(length(deg_stat_list) > 0){
   final_stats <- do.call(rbind, deg_stat_list)
   stats_file <- file.path(opt$outdir, "All_Contrast_Differential_Peaks_Statistics.csv")
