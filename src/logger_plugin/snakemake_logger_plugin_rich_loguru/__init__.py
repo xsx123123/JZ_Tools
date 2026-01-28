@@ -274,6 +274,10 @@ class LogHandler(LogHandlerBase):
         # We use the 'opt' method to force the exception traceback if present
         rec_opt = logger.opt(exception=record.exc_info, depth=6)
 
+        # Skip records with None message (common in some Snakemake internal logging)
+        if record.msg is None or record.msg == "":
+            return
+
         # Construct the message.
         # Snakemake sometimes sends already formatted messages, or raw args.
         msg = record.getMessage()
