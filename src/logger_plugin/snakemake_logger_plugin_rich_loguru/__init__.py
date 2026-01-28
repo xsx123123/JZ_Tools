@@ -12,10 +12,19 @@ import logging
 import shutil
 import getpass
 import socket
+import time
 
 # Import loguru and rich
 from loguru import logger
 from rich.logging import RichHandler
+from rich.console import Console
+from rich.panel import Panel
+from rich.text import Text
+from rich.progress import Progress, SpinnerColumn, BarColumn, TextColumn
+from rich.table import Table
+from rich.align import Align
+from rich import box
+import pyfiglet
 
 # Export utilities for external analysis scripts
 from .utils import setup_analysis_logging, get_logger, initialize_analysis_logger, get_analysis_logger, get_analysis_log_file_path
@@ -49,6 +58,9 @@ class LogHandlerSettings(LogHandlerSettingsBase):
 
 class LogHandler(LogHandlerBase):
     def __post_init__(self) -> None:
+        # Show splash screen first
+        self._show_splash_screen()
+
         # Ensure logging.Handler is initialized (fixes missing 'filters' attribute)
         logging.Handler.__init__(self)
 
@@ -91,6 +103,111 @@ class LogHandler(LogHandlerBase):
         )
 
         self._capture_startup_info()
+
+    def _show_splash_screen(self):
+        """Display a startup animation."""
+        # Only show animation if outputting to terminal
+        try:
+            if not sys.stderr.isatty():
+                return
+        except Exception:
+            pass
+
+        console = Console(file=sys.stderr)
+        
+        # Animation: Simulated System Boot with more flair
+        steps = [
+            ("📡 Initializing Core Systems...", 0.8),
+            ("🔌 Loading Logger Plugins...", 0.6),
+            ("🛡️ Verifying Environment...", 0.7),
+            ("🚀 Connecting to HPC Cluster...", 1.0),
+            ("🧬 Scanning Workflow DAG...", 0.8),
+        ]
+
+        # Use a more colorful and slower progress bar
+        from rich.progress import SpinnerColumn, BarColumn, TextColumn, TimeElapsedColumn
+        
+        console.print()
+        console.rule("[bold cyan]🚀 Snakemake Runtime Sequence[/bold cyan]", style="dim blue")
+        console.print()
+
+        with Progress(
+            SpinnerColumn("dots12", style="bold magenta"),
+            TextColumn("[bold blue]{task.description}"),
+            BarColumn(
+                bar_width=40, # Fixed width for a more compact look
+                style="dim cyan", 
+                complete_style="bold green", 
+                finished_style="bold green"
+            ),
+            TextColumn("[bold cyan]{task.percentage:>3.0f}%"),
+            TimeElapsedColumn(),
+            console=console,
+            transient=True,
+            expand=False # Disable full width expansion
+        ) as progress:
+            task = progress.add_task("Booting...", total=100)
+            
+            # Simulate boot steps with slower, more variable timing
+            for desc, delay in steps:
+                progress.update(task, description=desc)
+                # Animate the bar filling up for this step
+                chunk_size = 100 / len(steps)
+                steps_in_chunk = 20
+                for _ in range(steps_in_chunk):
+                    time.sleep(delay / steps_in_chunk)
+                    progress.advance(task, chunk_size / steps_in_chunk)
+            
+            progress.update(task, description="[bold green]System Ready[/bold green]", completed=100)
+            time.sleep(0.5)
+
+        # --- ASCII Art Banner ---
+        # Using 'slant' font for a dynamic look
+        f = pyfiglet.Figlet(font='slant')
+        ascii_art = f.renderText('Snakemake')
+        logo = Text(ascii_art, style="bold cyan")
+
+        # --- System Info Grid ---
+        # Fetch Info
+        user = getpass.getuser()
+        host = socket.gethostname()
+        py_ver = platform.python_version()
+        
+        try:
+            import snakemake
+            sm_ver = snakemake.__version__
+        except ImportError:
+            sm_ver = "unknown"
+
+        # Create a grid for the info
+        grid = Table(show_header=False, expand=True, box=None, padding=(0, 2))
+        grid.add_column(justify="right", style="bold cyan")  # Labels Left
+        grid.add_column(justify="left", style="white")       # Values Left
+        grid.add_column(justify="right", style="bold magenta") # Labels Right
+        grid.add_column(justify="left", style="white")       # Values Right
+        
+        grid.add_row("User:", user, "Snakemake:", f"v{sm_ver}")
+        grid.add_row("Host:", host, "Python:", f"v{py_ver}")
+        grid.add_row("System:", platform.system(), "Time:", datetime.now().strftime("%H:%M:%S"))
+
+        # --- Main Dashboard Panel ---
+        dashboard = Panel(
+            grid,
+            title="[bold green]✔ Workflow Engine Online[/bold green]",
+            subtitle="[dim]Powered by Rich & Loguru[/dim]",
+            border_style="blue",
+            box=box.ROUNDED,
+            padding=(1, 2),
+            width=80,  # Fixed width for a grand appearance
+        )
+        
+        # Print Centered
+        console.print()
+        console.print(Align.center(logo))
+        console.print(Align.center(dashboard))
+        console.print()
+        console.rule("[bold dim blue]Initialized & Ready[/bold dim blue]", style="dim blue")
+        console.print()
 
     def _capture_startup_info(self):
         """Capture environment info at startup."""
