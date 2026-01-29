@@ -55,9 +55,25 @@ class SeqHandler:
             
             # Map Loguru record to CLEF (Compact Log Event Format)
             # https://docs.datalust.co/docs/posting-raw-events#compact-log-event-format
+            
+            # Strip Rich markup for Seq
+            raw_msg = record["message"]
+            try:
+                clean_msg = Text.from_markup(raw_msg).plain
+            except Exception:
+                clean_msg = raw_msg
+
+            # Skip "None" messages
+            if clean_msg.strip() == "None":
+                return
+
+            # Prepend project name to the message
+            if self.project_name:
+                clean_msg = f"[{self.project_name}] {clean_msg}"
+
             clef_event = {
                 "@t": datetime.fromtimestamp(record["time"]["timestamp"]).isoformat(),
-                "@m": record["message"],
+                "@m": clean_msg,
                 "@l": record["level"]["name"],
                 "Validation": True
             }

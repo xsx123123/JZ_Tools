@@ -10,6 +10,9 @@
 - **Seq 远程监控深度整合**：
     - 将流程日志实时以结构化 JSON 格式推送到 Seq 服务器。
     - **自动附加时间戳**：项目名称自动追加 `_YYYY-MM-DD_HH-mm` 后缀，轻松区分不同运行批次。
+    - **智能日志清洗**：自动去除终端的高亮颜色代码（Rich Markup），确保 Seq 中展示纯净文本。
+    - **项目标识增强**：日志消息体自动添加 `[ProjectName]` 前缀，便于快速识别。
+    - **噪声过滤**：自动屏蔽无意义的 "None" 日志。
     - 支持 HTTP/HTTPS 协议及 API Key 鉴权。
 - **非阻塞架构**：日志发送由 Loguru 的异步 Sink 处理，确保在高并发任务下不阻塞 Snakemake 主进程。
 - **零配置开销**：支持自动读取配置文件，或直接通过 Snakemake 命令行参数控制。
@@ -114,7 +117,19 @@ Project = 'My_Analysis_Project_2026-01-29_16-45'
 
 日志会自动包含以下字段：
 - `@t`: 时间戳
-- `@m`: 消息内容
+- `@m`: 消息内容（自动去除颜色代码，并添加 `[ProjectName]` 前缀）
 - `@l`: 日志级别 (INFO, ERROR, etc.)
 - `Project`: 项目名称 + 运行时间戳
 - 以及您在 Python 代码中通过 `extra={...}` 传递的任何额外字段。
+
+## 📅 后续更新计划
+
+为了满足更广泛的监控需求，本项目计划在后续版本中引入 **多平台推送扩展 (Multi-platform Push Extensions)**，支持将关键任务状态推送到更多协作与告警平台：
+
+- [ ] **企业级即时通讯**：支持 钉钉 (DingTalk)、飞书 (Lark)、企业微信 (WeChat Work) 的 Webhook 机器人通知。
+- [ ] **多端推送服务**：集成 Bark (iOS)、PushDeer、Server酱 等移动端推送工具。
+- [ ] **标准协议支持**：支持通过 SMTP 发送关键错误邮件告警。
+- [ ] **日志存储优化**：提供对 ELK (Elasticsearch, Logstash, Kibana) 或 Loki 的原生导出支持。
+- [ ] **交互式监控**：开发简单的 Web Dashboard 实时预览多个 Snakemake 实例的状态。
+
+欢迎通过 Issue 提交您的功能需求或贡献代码！
