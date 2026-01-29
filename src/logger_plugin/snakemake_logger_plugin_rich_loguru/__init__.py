@@ -97,40 +97,89 @@ def install(snakemake_config):
     """
     Install the monitor plugin configuration.
     
-    Loads configuration from:
-    1. snakemake_config['monitor_conf']
-    2. env var SNAKEMAKE_MONITOR_CONF
-    3. ./monitor_config.yaml
-    
-    Configures Loguru to send logs to Seq if seq_url is found.
+    Priority of config loading:
+    1. SNAKEMAKE_MONITOR_CONF (Environment Variable)
+    2. --config monitor_conf=... (Command Line Args)
+    3. --config analysisyaml=... (Command Line Args - User specific)
+    4. ./config/config.yaml (Standard Snakemake config)
+    5. ./monitor_config.yaml (Plugin default)
     """
-    # 1. Determine config path
-    monitor_conf_path = snakemake_config.get("monitor_conf")
-    
-    if not monitor_conf_path:
-        monitor_conf_path = os.environ.get("SNAKEMAKE_MONITOR_CONF")
-    
-    if not monitor_conf_path:
-        monitor_conf_path = "monitor_config.yaml"
-        
-    # 2. Load Configuration
-    config = {}
-    if os.path.exists(monitor_conf_path):
+
+    # Helper: Parse CLI args manually because Snakemake config isn't ready yet during plugin init
+    def _get_cli_config_value(key_name):
         try:
-            with open(monitor_conf_path, "r", encoding="utf-8") as f:
-                config = yaml.safe_load(f) or {}
-            logger.info(f"Loaded monitor config from {monitor_conf_path}")
-        except Exception as e:
-            logger.warning(f"Failed to load monitor config from {monitor_conf_path}: {e}")
+            if "--config" in sys.argv:
+                idx = sys.argv.index("--config")
+                # Iterate over args after --config until next flag
+                for arg in sys.argv[idx+1:]:
+                    if arg.startswith("-"): 
+                        break 
+                    if "=" in arg:
+                        k, v = arg.split("=", 1)
+                        if k == key_name:
+                            return v
+        except Exception:
+            pass
+        return None
+
+    # 1. Determine config path candidates
+    # We look for specific config overrides first, then the workflow's main config, then defaults
+    possible_paths = [
+        snakemake_config.get("monitor_conf"),          # From function arg (usually empty init)
+        os.environ.get("SNAKEMAKE_MONITOR_CONF"),      # From Env Var
+        _get_cli_config_value("monitor_conf"),         # CLI: monitor_conf=...
+        _get_cli_config_value("analysisyaml"),         # CLI: analysisyaml=... (Your specific workflow config)
+        "config/config.yaml",                          # Standard config location
+        "monitor_config.yaml",                         # Legacy default
+    ]
+
+    # 2. Find the first valid existing file and check for required keys
+    config = {}
+    loaded_path = None
+    
+    for path in possible_paths:
+        if path and os.path.exists(path):
+            try:
+                with open(path, "r", encoding="utf-8") as f:
+                    # Load the yaml
+                    loaded_config = yaml.safe_load(f) or {}
+                    
+                    # We check if this config file actually contains the sequence url.
+                    # This prevents loading a generic config.yaml that doesn't have our settings,
+                    # and stopping the search prematurely.
+                    if "seq_url" in loaded_config or "seq_server_url" in loaded_config:
+                        config = loaded_config
+                        loaded_path = path
+                        break
+            except Exception as e:
+                logger.warning(f"Failed to load config from {path}: {e}")
+
+    if loaded_path:
+        logger.info(f"Loaded monitor config from: {loaded_path}")
     else:
-        if monitor_conf_path != "monitor_config.yaml":
-             logger.warning(f"Monitor config file specified but not found: {monitor_conf_path}")
+        # If no config with seq_url was found, we still might want to load the project_id 
+        # from analysisyaml if available, even if seq_url is missing (though seq_url is needed for logging)
+        # But for now, we'll just proceed with empty config if nothing matched.
+        pass
 
     # 3. Extract Settings (File > Snakemake Config)
-    seq_url = config.get("seq_url") or config.get("seq_server_url") or snakemake_config.get("seq_url") or snakemake_config.get("seq_server_url")
+    seq_url = (
+        config.get("seq_url") or 
+        config.get("seq_server_url") or 
+        snakemake_config.get("seq_url") or 
+        snakemake_config.get("seq_server_url")
+    )
+    
     api_key = config.get("api_key") or snakemake_config.get("api_key")
     
-    base_project_name = config.get("project_name") or snakemake_config.get("project_name") or "SnakemakeWorkflow"
+    # Smart Project Naming: Look for project_name OR project_id
+    base_project_name = (
+        config.get("project_name") or 
+        config.get("project_id") or 
+        snakemake_config.get("project_name") or 
+        "SnakemakeWorkflow"
+    )
+    
     timestamp_suffix = datetime.now().strftime("%Y-%m-%d_%H-%M")
     project_name = f"{base_project_name}_{timestamp_suffix}"
 
