@@ -5,6 +5,10 @@ from dataclasses import dataclass, field
 from typing import Optional
 import sys
 import os
+import yaml
+import json
+import urllib.request
+from urllib.error import URLError, HTTPError
 import platform
 from datetime import datetime
 from pathlib import Path
@@ -28,6 +32,124 @@ import pyfiglet
 
 # Export utilities for external analysis scripts
 from .utils import setup_analysis_logging, get_logger, initialize_analysis_logger, get_analysis_logger, get_analysis_log_file_path
+
+class SeqHandler:
+    """
+    A custom Loguru sink for Seq integration.
+    """
+    def __init__(self, server_url, api_key=None, project_name=None):
+        self.server_url = server_url.rstrip("/")
+        self.api_key = api_key
+        self.project_name = project_name
+        self.endpoint = f"{self.server_url}/api/events/raw?clef"
+
+    def write(self, message):
+        """
+        Loguru calls this method with the formatted message (if not serialized)
+        or the serialized JSON string (if serialize=True).
+        We use serialize=True for Seq.
+        """
+        try:
+            data = json.loads(message)
+            record = data["record"]
+            
+            # Map Loguru record to CLEF (Compact Log Event Format)
+            # https://docs.datalust.co/docs/posting-raw-events#compact-log-event-format
+            clef_event = {
+                "@t": datetime.fromtimestamp(record["time"]["timestamp"]).isoformat(),
+                "@m": record["message"],
+                "@l": record["level"]["name"],
+                "Validation": True
+            }
+            
+            # Add exception if present
+            if record.get("exception"):
+                clef_event["@x"] = record["exception"]["text"]
+
+            # Add extra fields
+            if self.project_name:
+                clef_event["Project"] = self.project_name
+            
+            # Add all extra fields from loguru
+            for k, v in record.get("extra", {}).items():
+                clef_event[k] = v
+
+            # Send to Seq
+            data = json.dumps(clef_event).encode("utf-8")
+            req = urllib.request.Request(self.endpoint, data=data, method="POST")
+            req.add_header("Content-Type", "application/vnd.serilog.clef")
+            
+            if self.api_key:
+                req.add_header("X-Seq-ApiKey", self.api_key)
+            
+            with urllib.request.urlopen(req) as response:
+                pass
+                
+        except Exception as e:
+            # Fail silently to avoid breaking the workflow, 
+            # or print to stderr if critical.
+            # We assume Loguru handles sink exceptions (it prints them to stderr by default).
+            sys.stderr.write(f"Seq logging error: {e}\n")
+            if isinstance(e, HTTPError) and e.code == 400:
+                 sys.stderr.write(f"Payload was: {json.dumps(clef_event, indent=2)}\n")
+
+def install(snakemake_config):
+    """
+    Install the monitor plugin configuration.
+    
+    Loads configuration from:
+    1. snakemake_config['monitor_conf']
+    2. env var SNAKEMAKE_MONITOR_CONF
+    3. ./monitor_config.yaml
+    
+    Configures Loguru to send logs to Seq if seq_url is found.
+    """
+    # 1. Determine config path
+    monitor_conf_path = snakemake_config.get("monitor_conf")
+    
+    if not monitor_conf_path:
+        monitor_conf_path = os.environ.get("SNAKEMAKE_MONITOR_CONF")
+    
+    if not monitor_conf_path:
+        monitor_conf_path = "monitor_config.yaml"
+        
+    # 2. Load Configuration
+    config = {}
+    if os.path.exists(monitor_conf_path):
+        try:
+            with open(monitor_conf_path, "r", encoding="utf-8") as f:
+                config = yaml.safe_load(f) or {}
+            logger.info(f"Loaded monitor config from {monitor_conf_path}")
+        except Exception as e:
+            logger.warning(f"Failed to load monitor config from {monitor_conf_path}: {e}")
+    else:
+        if monitor_conf_path != "monitor_config.yaml":
+             logger.warning(f"Monitor config file specified but not found: {monitor_conf_path}")
+
+    # 3. Extract Settings (File > Snakemake Config)
+    seq_url = config.get("seq_url") or config.get("seq_server_url") or snakemake_config.get("seq_url") or snakemake_config.get("seq_server_url")
+    api_key = config.get("api_key") or snakemake_config.get("api_key")
+    
+    base_project_name = config.get("project_name") or snakemake_config.get("project_name") or "SnakemakeWorkflow"
+    timestamp_suffix = datetime.now().strftime("%Y-%m-%d_%H-%M")
+    project_name = f"{base_project_name}_{timestamp_suffix}"
+
+    # 4. Bind to Loguru (Seq Sink)
+    if seq_url:
+        try:
+            handler = SeqHandler(seq_url, api_key, project_name)
+            logger.add(
+                handler.write,
+                serialize=True, # Pass JSON string to handler
+                enqueue=True,   # Async logging
+                level="INFO",   # Adjust level as needed
+                format="{message}" # Format doesn't matter much for serialize=True, but strictly generic
+            )
+            logger.success(f"Seq logging enabled: {seq_url} (Project: {project_name})")
+        except Exception as e:
+            logger.error(f"Failed to initialize Seq sink: {e}")
+    else:
+        logger.debug("Seq URL not found. Remote logging disabled.")
 
 @dataclass
 class LogHandlerSettings(LogHandlerSettingsBase):
@@ -212,6 +334,10 @@ class LogHandler(LogHandlerBase):
         )
 
         self._capture_startup_info()
+        
+        # Auto-configure Seq if monitor_config.yaml exists
+        # passing empty dict since we can't access snakemake config here directly
+        install({})
 
     def _capture_startup_info(self):
         """Capture environment info at startup."""

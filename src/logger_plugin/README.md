@@ -1,37 +1,18 @@
 # Snakemake Logger 增强插件：Rich-Loguru
 
-这是一个基于 Loguru 和 Rich 开发的 Snakemake 日志插件，旨在为生物信息学流程提供极度舒适的终端输出、结构化的本地记录，以及基于 Grafana Loki 的远程可视化监控。
+这是一个基于 Loguru 和 Rich 开发的 Snakemake 日志插件，旨在为生物信息学流程提供极度舒适的终端输出、结构化的本地记录，以及基于 **Seq** (https://datalust.co/seq) 的远程可视化监控。
 
 ## 🌟 核心特性
 
-- 华丽的终端输出：利用 Rich 库优化 Snakemake 运行状态，支持进度条展示和规则高亮。
-- 沉浸式启动体验：内置系统自检风格的启动过场动画与状态面板，提供专业的 CLI 交互感。
-- 结构化本地日志：Loguru 驱动，支持自动滚动、多级别记录（JSON 或文本）。
-- Grafana Loki 深度整合：支持将分析流程实时推送到 Web 端，通过 Grafana 仪表盘监控任务进度。
-- 金融级加密传输：远程日志支持 AES-256-GCM 端到端加密，确保敏感路径和样本信息不泄露。
-- 异步非阻塞架构：日志发送由独立线程（Async Worker）处理，在高并发生信任务下依然保持零性能损耗。
-- 统一分析环境：提供简单的 API，让你的 Python 脚本、Rust 工具与 Snakemake 共享同一套日志配置。
-
-## 🏗 技术架构
-
-```mermaid
-graph TD
-    A[Snakemake 流程] --> B[Rich-Loguru 插件]
-    B --> C{内存队列缓冲区}
-    subgraph "异步处理后台线程"
-    C --> D[AES-256-GCM 加密层]
-    D --> E[批量数据处理器]
-    E --> F[HTTPS 安全传输]
-    end
-    F --> G[Grafana Loki 数据源]
-    G --> H[网页端 Grafana Dashboard]
-```
-
-### 核心组件说明：
-
-- **队列缓冲区**：即使集群网络波动，日志也会暂存在内存中，不会阻塞 Snakemake 任务执行。
-- **加密层**：在数据离开内网前完成加密，保护科研数据安全。
-- **远程观测**：不仅是日志，更是监控。支持在网页端查看任务耗时分布、错误率统计。
+- **华丽的终端输出**：利用 Rich 库优化 Snakemake 运行状态，支持进度条展示和规则高亮。
+- **沉浸式启动体验**：内置系统自检风格的启动过场动画与状态面板，提供专业的 CLI 交互感。
+- **结构化本地日志**：Loguru 驱动，支持自动滚动、多级别记录（JSON 或文本）。
+- **Seq 远程监控深度整合**：
+    - 将流程日志实时以结构化 JSON 格式推送到 Seq 服务器。
+    - **自动附加时间戳**：项目名称自动追加 `_YYYY-MM-DD_HH-mm` 后缀，轻松区分不同运行批次。
+    - 支持 HTTP/HTTPS 协议及 API Key 鉴权。
+- **非阻塞架构**：日志发送由 Loguru 的异步 Sink 处理，确保在高并发任务下不阻塞 Snakemake 主进程。
+- **零配置开销**：支持自动读取配置文件，或直接通过 Snakemake 命令行参数控制。
 
 ## 🚀 安装指南
 
@@ -39,60 +20,101 @@ graph TD
 pip install snakemake-logger-plugin-rich-loguru
 ```
 
-## 📊 远程监控配置 (Grafana Loki)
+（请根据实际包名调整安装命令，如果是本地开发，请使用 `pip install -e .`）
 
-在你的配置文件（如 logging_config.json）中开启远程模块：
+## 📊 远程监控配置 (Seq)
 
-```json
-{
-  "remote_logging": {
-    "enabled": true,
-    "provider": "loki",
-    "server_url": "https://your-loki-server:3100/loki/api/v1/push",
-    "encryption": {
-      "algorithm": "AES-256-GCM",
-      "key_env_var": "LOG_ENCRYPTION_KEY"
-    },
-    "labels": {
-      "project": "Lettuce_Genomics_PhD",
-      "user": "jzhang",
-      "cluster": "HAU_HPC"
-    },
-    "batch_size": 20,
-    "flush_interval_seconds": 5
-  }
-}
+该插件支持通过多种方式加载 Seq 配置，优先级如下：
+
+1.  **Snakemake 配置文件** (`config.yaml` 或 `--config` 参数)
+2.  **环境变量** (`SNAKEMAKE_MONITOR_CONF`)
+3.  **独立配置文件** (`monitor_config.yaml`，默认查找当前目录)
+
+### 配置参数
+
+| 参数名 | 描述 | 示例 |
+| :--- | :--- | :--- |
+| `seq_server_url` / `seq_url` | Seq 服务器地址 | `http://192.168.1.10:5341` |
+| `api_key` | (可选) Seq API Key | `SecretKey123` |
+| `project_name` | 项目名称 (会自动追加时间戳) | `GenomicsPipeline` |
+
+### 方式一：集成到 Snakemake 主配置（推荐）
+
+直接在您的 `config.yaml` 中添加监控配置：
+
+```yaml
+# config.yaml
+samples: "samples.tsv"
+genome: "hg38"
+
+# === 监控配置 ===
+seq_server_url: "http://192.168.1.10:5341"
+project_name: "My_Analysis_Project"
 ```
 
-### 网页端可视化效果：
+在运行 Snakemake 时，确保显式加载插件：
 
-- **实时流**：在 Grafana Explore 页面通过 {project="Lettuce_Genomics_PhD"} 查看实时日志。
-- **自动报警**：当检测到日志中出现 "Error" 或 "Rule Failed" 时，自动推送到钉钉/微信。
-- **耗时分析**：统计每个 Rule 的运行时间，帮助寻找流程瓶颈。
+```bash
+snakemake --logger rich-loguru --configfile config.yaml ...
+```
+
+### 方式二：使用独立配置文件 (monitor_config.yaml)
+
+在工作流根目录下创建 `monitor_config.yaml`：
+
+```yaml
+seq_server_url: "http://localhost:5341"
+project_name: "Debug_Run"
+```
+
+插件会在启动时自动检测并加载该文件。
 
 ## 🛠 使用方法
 
-### 在 Snakemake 命令行中使用
+### 基础运行
+
+只需指定 logger 插件即可：
 
 ```bash
-snakemake --logger rich-loguru --configfile logging_config.json
+snakemake --logger rich-loguru --cores 4
 ```
 
-### 在流程内部脚本中使用
+### 进阶：在 Python 脚本中使用
 
-为了保持日志风格统一，你可以在 Python 脚本中这样调用：
+您的 `scripts/` 目录下的 Python 脚本也可以复用该日志配置，将分析日志也推送到 Seq。
 
 ```python
-from snakemake_logger_plugin_rich_loguru import initialize_analysis_logger
+# scripts/analysis.py
+from snakemake_logger_plugin_rich_loguru import get_logger, install
 
-# 初始化（会自动识别 Snakemake 的配置）
-logger = initialize_analysis_logger(project_name="ATAC-seq-Filter")
+# 如果是独立脚本运行（非 Snakemake 规则内），可以手动初始化
+# install({"seq_server_url": "...", "project_name": "..."})
 
-logger.info("正在处理 BAM 文件...")
-logger.error("检测到异常序列！")
+logger = get_logger()
+
+def analyze_data():
+    logger.info("开始处理样本...", extra={"sample_id": "S1"})
+    try:
+        # ... 业务逻辑 ...
+        logger.success("样本 S1 处理完成")
+    except Exception as e:
+        logger.exception("处理失败")
+
+if __name__ == "__main__":
+    analyze_data()
 ```
 
-## 🔒 安全与性能
+## 📈 Seq 中的展示效果
 
-- **低开销**：日志处理线程优先级低于计算任务，确保不抢占生物信息比对/分析所需的 CPU 资源。
-- **零信任**：即使监控平台被攻破，没有密钥也无法还原加密的日志内容。
+在 Seq 仪表盘中，您可以通过以下过滤器查看特定批次的日志：
+
+```sql
+Project = 'My_Analysis_Project_2026-01-29_16-45'
+```
+
+日志会自动包含以下字段：
+- `@t`: 时间戳
+- `@m`: 消息内容
+- `@l`: 日志级别 (INFO, ERROR, etc.)
+- `Project`: 项目名称 + 运行时间戳
+- 以及您在 Python 代码中通过 `extra={...}` 传递的任何额外字段。
