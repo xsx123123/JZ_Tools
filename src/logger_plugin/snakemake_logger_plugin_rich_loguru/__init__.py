@@ -68,11 +68,13 @@ class LokiHandler:
             properties["Snakemake_Rule"] = match1.group(1)
             properties["Snakemake_JobId"] = int(match1.group(2))
 
-        # Pattern 2: Finished jobid: <id> (Rule: <name>)
-        match2 = re.search(r"Finished jobid:\s+(\d+)\s+\(Rule:\s+(.+?)\)", plain_text)
+        # Pattern 2: Finished jobid: <id> (Rule: <name>) or Finished jobid <id>
+        # Improved regex to handle optional colon and optional rule part
+        match2 = re.search(r"Finished jobid[:\s]\s*(\d+)(?:\s+\(Rule:\s+(.+?)\))?", plain_text)
         if match2:
             properties["Snakemake_JobId"] = int(match2.group(1))
-            properties["Snakemake_Rule"] = match2.group(2)
+            if match2.group(2):
+                properties["Snakemake_Rule"] = match2.group(2)
             properties["Event_Type"] = "JobFinished"
 
         # Pattern 3: Shell command

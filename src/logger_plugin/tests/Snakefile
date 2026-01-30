@@ -1,3 +1,61 @@
+# --------------------------
+# 1. 定义全局变量（批量处理的样本）
+# --------------------------
+SAMPLES = ["sample1", "sample2"]  # 可直接修改样本数量
+
+# --------------------------
+# 2. 步骤1：生成模拟输入文件（替代真实原始数据）
+# --------------------------
+rule generate_input:
+    output:
+        "input/{sample}.txt"  # wildcard {sample} 对应批量样本
+    run:
+        # 生成包含随机字符串的文本文件
+        from pathlib import Path
+        Path("input").mkdir(exist_ok=True)
+        with open(output[0], "w") as f:
+            for i in range(5):
+                f.write(f"Line {i+1} for {wildcards.sample}\n")
+        print(f"✅ 生成输入文件: {output[0]}")
+
+# --------------------------
+# 3. 步骤2：处理文件（转大写+统计行数）
+# --------------------------
+rule process_data:
+    input:
+        "input/{sample}.txt"  # 依赖步骤1的输出
+    output:
+        "processed/{sample}_processed.txt"
+    shell:
+        """
+        # 1. 转大写 2. 开头追加行数统计
+        line_count=$(wc -l < {input})
+        echo "Total lines: $line_count" > {output}
+        tr 'a-z' 'A-Z' < {input} >> {output}
+        """
+    run_after:
+        print(f"✅ 处理完成: {output[0]}")
+
+# --------------------------
+# 4. 步骤3：合并所有处理结果
+# --------------------------
+rule merge_results:
+    input:
+        # 自动批量匹配所有处理后的文件
+        expand("processed/{sample}_processed.txt", sample=SAMPLES)
+    output:
+        "final_summary.txt"
+    shell:
+        """
+        cat {input} > {output}
+        echo -e "\n==== 所有样本合并完成 ====" >> {output}
+        """
+    run_after:
+        print(f"✅ 最终结果已生成: {output[0]}")
+
+# --------------------------
+# 顶层规则：定义流程的最终目标（Snakemake会自动推导依赖链）
+# --------------------------
 rule all:
-   run:
-      print("Hello from Snakemake!"),
+    input:
+        "final_summary.txt"  # 流程最终要得到的文件

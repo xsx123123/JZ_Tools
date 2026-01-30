@@ -35,9 +35,10 @@ def format_payload_for_loki(raw_log: Dict[str, Any], estimated_total_jobs: int =
 
     # Case B: "Finished jobid" event (Incremental)
     # Use explicit Event_Type from handler or regex scan
-    elif raw_log.get("Event_Type") == "JobFinished" or "Finished jobid:" in msg:
+    # Robust match: "Finished jobid" with optional colon
+    elif raw_log.get("Event_Type") == "JobFinished" or re.search(r"Finished jobid[:\s]\s*(\d+)", msg):
         # Try to extract Job ID to avoid double counting same job
-        job_id_match = re.search(r"Finished jobid:\s*(\d+)", msg)
+        job_id_match = re.search(r"Finished jobid[:\s]\s*(\d+)", msg)
         if job_id_match:
             job_id = job_id_match.group(1)
             if job_id not in state["finished_ids"]:
@@ -49,11 +50,15 @@ def format_payload_for_loki(raw_log: Dict[str, Any], estimated_total_jobs: int =
 
     # Case C: "Job stats" table (Total detection)
     # Snakemake prints a table with a 'total' row at the start
-    if "Job stats:" in msg or "count" in msg:
-        # Look for the 'total' row in the table, e.g., "total     14"
-        match_total = re.search(r"total\s+(\d+)", msg)
-        if match_total:
-             state["real_total"] = int(match_total.group(1))
+    # We remove the restrictive if-condition to catch 'total' lines even if they are sent separately
+    match_total = re.search(r"^total\s+(\d+)", msg, re.MULTILINE) or re.search(r"total\s+(\d+)", msg)
+    if match_total:
+         # To avoid false positives (like 'total time'), we check if real_total is still 0 
+         # or if we are reasonably sure this is a job count.
+         # In the context of Snakemake logs, 'total' at start of line or in table is usually job count.
+         found_total = int(match_total.group(1))
+         if found_total > 0:
+             state["real_total"] = found_total
 
     # Case D: Completion/Nothing to be done
     if "Complete log(s):" in msg or "Nothing to be done" in msg:
