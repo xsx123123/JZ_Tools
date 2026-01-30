@@ -7,6 +7,7 @@ import sys
 import os
 import yaml
 import json
+import re
 import urllib.request
 from urllib.error import URLError, HTTPError
 import platform
@@ -33,123 +34,143 @@ import pyfiglet
 # Export utilities for external analysis scripts
 from .utils import setup_analysis_logging, get_logger, initialize_analysis_logger, get_analysis_logger, get_analysis_log_file_path
 
-class SeqHandler:
+class LokiHandler:
     """
-    A custom Loguru sink for Seq integration.
+    A Custom Loguru sink for Grafana Loki integration.
     """
-    def __init__(self, server_url, api_key=None, project_name=None):
-        self.server_url = server_url.rstrip("/")
-        self.api_key = api_key
+    def __init__(self, loki_url, project_name=None):
+        # Normalize URL to ensure it points to the push API
+        if not loki_url.endswith("/loki/api/v1/push"):
+            self.endpoint = f"{loki_url.rstrip('/')}/loki/api/v1/push"
+        else:
+            self.endpoint = loki_url
+            
         self.project_name = project_name
-        self.endpoint = f"{self.server_url}/api/events/raw?clef"
+
+    def _process_message(self, message):
+        """
+        Extract clean text and properties from a message.
+        """
+        # 1. Strip Markup
+        try:
+            plain_text = Text.from_markup(message).plain
+        except Exception:
+            plain_text = message
+            
+        properties = {}
+        
+        # 2. Extract Data (Simple Parsing)
+        # Pattern 1: Rule: <name>, Jobid: <id>
+        match1 = re.search(r"Rule:\s+(.+?),\s+Jobid:\s+(\d+)", plain_text)
+        if match1:
+            properties["Snakemake_Rule"] = match1.group(1)
+            properties["Snakemake_JobId"] = int(match1.group(2))
+
+        # Pattern 2: Finished jobid: <id> (Rule: <name>)
+        match2 = re.search(r"Finished jobid:\s+(\d+)\s+\(Rule:\s+(.+?)\)", plain_text)
+        if match2:
+            properties["Snakemake_JobId"] = int(match2.group(1))
+            properties["Snakemake_Rule"] = match2.group(2)
+            properties["Event_Type"] = "JobFinished"
+
+        # Pattern 3: Shell command
+        if plain_text.startswith("Shell command: "):
+            properties["Shell_Command"] = plain_text.replace("Shell command: ", "").strip()
+            properties["Event_Type"] = "ShellCommand"
+
+        return plain_text, properties
 
     def write(self, message):
         """
-        Loguru calls this method with the formatted message (if not serialized)
-        or the serialized JSON string (if serialize=True).
-        We use serialize=True for Seq.
+        Loguru calls this method with the serialized JSON string (since serialize=True).
+        We construct the Loki payload and send it via HTTP POST.
         """
         try:
+            # message is a JSON string containing the full record
             data = json.loads(message)
             record = data["record"]
             
-            # Map Loguru record to CLEF (Compact Log Event Format)
-            # https://docs.datalust.co/docs/posting-raw-events#compact-log-event-format
-            
-            # Strip Rich markup for Seq
-            raw_msg = record["message"]
-            try:
-                clean_msg = Text.from_markup(raw_msg).plain
-            except Exception:
-                clean_msg = raw_msg
+            # Timestamp: Loki requires nanoseconds as a string
+            ts_ns = str(int(record["time"]["timestamp"] * 1e9))
 
-            # Skip "None" messages
-            if clean_msg.strip() == "None":
-                return
+            # Process Message
+            plain_text, extra_props = self._process_message(record["message"])
 
-            # Prepend project name to the message
-            if self.project_name:
-                clean_msg = f"[{self.project_name}] {clean_msg}"
-
-            clef_event = {
-                "@t": datetime.fromtimestamp(record["time"]["timestamp"]).isoformat(),
-                "@m": clean_msg,
-                "@l": record["level"]["name"],
-                "Validation": True
+            # Prepare Labels
+            labels = {
+                "job": "snakemake",
+                "level": record["level"]["name"].lower()
             }
-            
-            # Add exception if present
-            if record.get("exception"):
-                clef_event["@x"] = record["exception"]["text"]
-
-            # Add extra fields
             if self.project_name:
-                clef_event["Project"] = self.project_name
+                labels["project"] = self.project_name
             
-            # Add all extra fields from loguru
-            for k, v in record.get("extra", {}).items():
-                clef_event[k] = v
+            # Construct a clean JSON for the log line
+            display_msg = plain_text
+            if self.project_name:
+                display_msg = f"{self.project_name} | {plain_text}"
 
-            # Send to Seq
-            data = json.dumps(clef_event).encode("utf-8")
-            req = urllib.request.Request(self.endpoint, data=data, method="POST")
-            req.add_header("Content-Type", "application/vnd.serilog.clef")
+            clean_log = {
+                "msg": display_msg,
+                "caller": f"{record['name']}:{record['function']}:{record['line']}",
+            }
+            if extra_props:
+                clean_log.update(extra_props)
             
-            if self.api_key:
-                req.add_header("X-Seq-ApiKey", self.api_key)
+            # Construct Payload
+            payload = {
+                "streams": [
+                    {
+                        "stream": labels,
+                        "values": [
+                            [ts_ns, json.dumps(clean_log, ensure_ascii=False)]
+                        ]
+                    }
+                ]
+            }
+
+            # Send Request
+            json_data = json.dumps(payload).encode("utf-8")
+            req = urllib.request.Request(self.endpoint, data=json_data, method="POST")
+            req.add_header("Content-Type", "application/json")
             
             with urllib.request.urlopen(req) as response:
                 pass
                 
-        except Exception as e:
-            # Fail silently to avoid breaking the workflow, 
-            # or print to stderr if critical.
-            # We assume Loguru handles sink exceptions (it prints them to stderr by default).
-            sys.stderr.write(f"Seq logging error: {e}\n")
-            if isinstance(e, HTTPError) and e.code == 400:
-                 sys.stderr.write(f"Payload was: {json.dumps(clef_event, indent=2)}\n")
+        except Exception:
+            # Fail silently to avoid breaking the workflow
+            pass
 
 def install(snakemake_config):
     """
     Install the monitor plugin configuration.
     
-    Priority of config loading:
-    1. SNAKEMAKE_MONITOR_CONF (Environment Variable)
-    2. --config monitor_conf=... (Command Line Args)
-    3. --config analysisyaml=... (Command Line Args - User specific)
-    4. ./config/config.yaml (Standard Snakemake config)
-    5. ./monitor_config.yaml (Plugin default)
+    It searches for 'monitor_config.yaml' to configure the Loki sink.
     """
 
-    # Helper: Parse CLI args manually because Snakemake config isn't ready yet during plugin init
+    # Helper: Parse CLI args manually for config override
     def _get_cli_config_value(key_name):
         try:
             if "--config" in sys.argv:
                 idx = sys.argv.index("--config")
-                # Iterate over args after --config until next flag
                 for arg in sys.argv[idx+1:]:
-                    if arg.startswith("-"): 
-                        break 
+                    if arg.startswith("-"): break 
                     if "=" in arg:
                         k, v = arg.split("=", 1)
-                        if k == key_name:
-                            return v
+                        if k == key_name: return v
         except Exception:
             pass
         return None
 
     # 1. Determine config path candidates
-    # We look for specific config overrides first, then the workflow's main config, then defaults
     possible_paths = [
-        snakemake_config.get("monitor_conf"),          # From function arg (usually empty init)
-        os.environ.get("SNAKEMAKE_MONITOR_CONF"),      # From Env Var
-        _get_cli_config_value("monitor_conf"),         # CLI: monitor_conf=...
-        _get_cli_config_value("analysisyaml"),         # CLI: analysisyaml=... (Your specific workflow config)
-        "config/config.yaml",                          # Standard config location
-        "monitor_config.yaml",                         # Legacy default
+        snakemake_config.get("monitor_conf"),
+        os.environ.get("SNAKEMAKE_MONITOR_CONF"),
+        _get_cli_config_value("monitor_conf"),
+        "monitor_config.yaml",
+        "config/monitor_config.yaml",
     ]
 
-    # 2. Find the first valid existing file and check for required keys
+    # 2. Find and Load Config
     config = {}
     loaded_path = None
     
@@ -157,64 +178,34 @@ def install(snakemake_config):
         if path and os.path.exists(path):
             try:
                 with open(path, "r", encoding="utf-8") as f:
-                    # Load the yaml
                     loaded_config = yaml.safe_load(f) or {}
-                    
-                    # We check if this config file actually contains the sequence url.
-                    # This prevents loading a generic config.yaml that doesn't have our settings,
-                    # and stopping the search prematurely.
-                    if "seq_url" in loaded_config or "seq_server_url" in loaded_config:
+                    if "loki_url" in loaded_config:
                         config = loaded_config
                         loaded_path = path
                         break
             except Exception as e:
-                logger.warning(f"Failed to load config from {path}: {e}")
+                logger.debug(f"Failed to load config from {path}: {e}")
 
     if loaded_path:
-        logger.info(f"Loaded monitor config from: {loaded_path}")
-    else:
-        # If no config with seq_url was found, we still might want to load the project_id 
-        # from analysisyaml if available, even if seq_url is missing (though seq_url is needed for logging)
-        # But for now, we'll just proceed with empty config if nothing matched.
-        pass
+        logger.debug(f"Loaded monitor config from: {loaded_path}")
 
-    # 3. Extract Settings (File > Snakemake Config)
-    seq_url = (
-        config.get("seq_url") or 
-        config.get("seq_server_url") or 
-        snakemake_config.get("seq_url") or 
-        snakemake_config.get("seq_server_url")
-    )
+    # 3. Extract Settings
+    loki_url = config.get("loki_url") or snakemake_config.get("loki_url")
+    project_name = config.get("project_name") or snakemake_config.get("project_name")
     
-    api_key = config.get("api_key") or snakemake_config.get("api_key")
-    
-    # Smart Project Naming: Look for project_name OR project_id
-    base_project_name = (
-        config.get("project_name") or 
-        config.get("project_id") or 
-        snakemake_config.get("project_name") or 
-        "SnakemakeWorkflow"
-    )
-    
-    timestamp_suffix = datetime.now().strftime("%Y-%m-%d_%H-%M")
-    project_name = f"{base_project_name}_{timestamp_suffix}"
-
-    # 4. Bind to Loguru (Seq Sink)
-    if seq_url:
+    # 4. Configure Loki Sink
+    if loki_url:
         try:
-            handler = SeqHandler(seq_url, api_key, project_name)
+            handler = LokiHandler(loki_url, project_name)
             logger.add(
                 handler.write,
                 serialize=True, # Pass JSON string to handler
                 enqueue=True,   # Async logging
-                level="INFO",   # Adjust level as needed
-                format="{message}" # Format doesn't matter much for serialize=True, but strictly generic
+                level="INFO"
             )
-            logger.success(f"Seq logging enabled: {seq_url} (Project: {project_name})")
+            logger.info(f"Analysis logs will be pushed to Loki server: [bold underline]{handler.endpoint}[/bold underline]")
         except Exception as e:
-            logger.error(f"Failed to initialize Seq sink: {e}")
-    else:
-        logger.debug("Seq URL not found. Remote logging disabled.")
+            logger.error(f"Failed to initialize Loki sink: {e}")
 
 @dataclass
 class LogHandlerSettings(LogHandlerSettingsBase):
@@ -245,11 +236,9 @@ class LogHandlerSettings(LogHandlerSettingsBase):
 
 def show_splash_screen():
     """Display a startup animation."""
-    # Check if splash screen has already been shown in this process tree
     if os.environ.get("SNAKEMAKE_RICH_LOGURU_SPLASH_SHOWN"):
         return
 
-    # Only show animation if outputting to terminal
     try:
         if not sys.stderr.isatty():
             return
@@ -258,7 +247,6 @@ def show_splash_screen():
 
     console = Console(file=sys.stderr)
     
-    # Animation: Simulated System Boot with more flair
     steps = [
         ("📡 Initializing Core Systems...", 0.8),
         ("🔌 Loading Logger Plugins...", 0.6),
@@ -267,9 +255,6 @@ def show_splash_screen():
         ("🧬 Scanning Workflow DAG...", 0.8),
     ]
 
-    # Use a more colorful and slower progress bar
-    from rich.progress import SpinnerColumn, BarColumn, TextColumn, TimeElapsedColumn
-    
     console.print()
     console.rule("[bold cyan]🚀 Snakemake Runtime Sequence[/bold cyan]", style="dim blue")
     console.print()
@@ -278,23 +263,20 @@ def show_splash_screen():
         SpinnerColumn("dots12", style="bold magenta"),
         TextColumn("[bold blue]{task.description}"),
         BarColumn(
-            bar_width=40, # Fixed width for a more compact look
+            bar_width=40,
             style="dim cyan", 
             complete_style="bold green", 
             finished_style="bold green"
         ),
         TextColumn("[bold cyan]{task.percentage:>3.0f}%"),
-        TimeElapsedColumn(),
         console=console,
         transient=True,
-        expand=False # Disable full width expansion
+        expand=False
     ) as progress:
         task = progress.add_task("Booting...", total=100)
         
-        # Simulate boot steps with slower, more variable timing
         for desc, delay in steps:
             progress.update(task, description=desc)
-            # Animate the bar filling up for this step
             chunk_size = 100 / len(steps)
             steps_in_chunk = 20
             for _ in range(steps_in_chunk):
@@ -304,14 +286,10 @@ def show_splash_screen():
         progress.update(task, description="[bold green]System Ready[/bold green]", completed=100)
         time.sleep(0.5)
 
-    # --- ASCII Art Banner ---
-    # Using 'slant' font for a dynamic look
     f = pyfiglet.Figlet(font='slant')
     ascii_art = f.renderText('Snakemake')
     logo = Text(ascii_art, style="bold cyan")
 
-    # --- System Info Grid ---
-    # Fetch Info
     user = getpass.getuser()
     host = socket.gethostname()
     py_ver = platform.python_version()
@@ -322,18 +300,16 @@ def show_splash_screen():
     except ImportError:
         sm_ver = "unknown"
 
-    # Create a grid for the info
     grid = Table(show_header=False, expand=True, box=None, padding=(0, 2))
-    grid.add_column(justify="right", style="bold cyan")  # Labels Left
-    grid.add_column(justify="left", style="white")       # Values Left
-    grid.add_column(justify="right", style="bold magenta") # Labels Right
-    grid.add_column(justify="left", style="white")       # Values Right
+    grid.add_column(justify="right", style="bold cyan")
+    grid.add_column(justify="left", style="white")
+    grid.add_column(justify="right", style="bold magenta")
+    grid.add_column(justify="left", style="white")
     
     grid.add_row("User:", user, "Snakemake:", f"v{sm_ver}")
     grid.add_row("Host:", host, "Python:", f"v{py_ver}")
     grid.add_row("System:", platform.system(), "Time:", datetime.now().strftime("%H:%M:%S"))
 
-    # --- Main Dashboard Panel ---
     dashboard = Panel(
         grid,
         title="[bold green]✔ Workflow Engine Online[/bold green]",
@@ -341,10 +317,9 @@ def show_splash_screen():
         border_style="blue",
         box=box.ROUNDED,
         padding=(1, 2),
-        width=80,  # Fixed width for a grand appearance
+        width=80,
     )
     
-    # Print Centered
     console.print()
     console.print(Align.center(logo))
     console.print(Align.center(dashboard))
@@ -352,26 +327,21 @@ def show_splash_screen():
     console.rule("[bold dim blue]Initialized & Ready[/bold dim blue]", style="dim blue")
     console.print()
     
-    # Mark as shown in environment variables so child processes don't show it again
     os.environ["SNAKEMAKE_RICH_LOGURU_SPLASH_SHOWN"] = "1"
 
 class LogHandler(LogHandlerBase):
     def __post_init__(self) -> None:
-        # Ensure logging.Handler is initialized (fixes missing 'filters' attribute)
         logging.Handler.__init__(self)
 
-        # Initialize log directory
         self.log_dir = Path(self.settings.log_dir)
         self.log_dir.mkdir(parents=True, exist_ok=True)
 
-        # Generate log file path
         timestamp = datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
         self.log_file_path = self.log_dir / f"{self.settings.log_file_prefix}_{timestamp}.log"
 
-        # Reset loguru configuration
         logger.remove()
 
-        # 1. Add File Handler (Loguru) - Detailed structural logs
+        # 1. File Handler
         logger.add(
             self.log_file_path,
             rotation=self.settings.max_file_size,
@@ -379,11 +349,10 @@ class LogHandler(LogHandlerBase):
             level="DEBUG",
             backtrace=True,
             diagnose=True,
-            enqueue=True  # Thread-safe
+            enqueue=True
         )
 
-        # 2. Add Console Handler (Rich) - Beautiful output
-        # We use a custom format for RichHandler to let it handle the styling
+        # 2. Console Handler (Rich)
         logger.add(
             RichHandler(
                 show_time=True,
@@ -400,27 +369,13 @@ class LogHandler(LogHandlerBase):
 
         self._capture_startup_info()
         
-        # Auto-configure Seq if monitor_config.yaml exists
-        # passing empty dict since we can't access snakemake config here directly
+        # Configure Loki
         install({})
 
     def _capture_startup_info(self):
-        """Capture environment info at startup."""
-        try:
-            width = shutil.get_terminal_size().columns
-        except Exception:
-            width = 80
-
-        # Estimate prefix length (Time + Level + spacing) ~ 25 chars for RichHandler
-        # Adjusting the message to be centered in the remaining space
         msg = f"{self.settings.log_file_prefix} Pipeline Initialized"
-        # prefix_len = 25
-        # padding = max(0, (width - prefix_len - len(msg)) // 2)
-        # centered_msg = " " * padding + msg
-
         logger.info(f"[bold green]{msg}[/bold green]")
 
-        # Collect detailed info
         timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         system_info = f"{platform.system()} {platform.release()}"
         python_version = platform.python_version()
@@ -436,7 +391,6 @@ class LogHandler(LogHandlerBase):
         cwd = os.getcwd()
         cmd_args = " ".join(sys.argv)
 
-        # Log details (Plain text for clean file logs)
         logger.info(f"Start Time: {timestamp}")
         logger.info(f"System: {system_info}")
         logger.info(f"User: {user} | Host: {host}")
@@ -448,33 +402,18 @@ class LogHandler(LogHandlerBase):
         logger.info("-" * 60)
 
     def emit(self, record):
-        """
-        Hook for Snakemake's logging.
-        Snakemake passes a standard logging.LogRecord object here.
-        """
-        # Get the corresponding loguru level
         try:
             level = logger.level(record.levelname).name
         except ValueError:
             level = record.levelname
 
-        # Find caller info to pass to loguru so it looks like it came from the original source
-        # Note: 'opt(depth=...)' allows us to adjust the stack depth if needed,
-        # but since we are emitting a pre-made record, we mostly care about the message.
-
-        # We use the 'opt' method to force the exception traceback if present
         rec_opt = logger.opt(exception=record.exc_info, depth=6)
 
-        # Skip records with None message (common in some Snakemake internal logging)
         if record.msg is None or record.msg == "":
             return
 
-        # Construct the message.
-        # Snakemake sometimes sends already formatted messages, or raw args.
         msg = record.getMessage()
 
-        # --- Beautification Logic ---
-        # Add rich markup to common Snakemake messages for better visibility
         if "Rule:" in msg:
             msg = msg.replace("Rule:", "[bold cyan]Rule:[/bold cyan]")
         if "Jobid:" in msg:
@@ -485,21 +424,15 @@ class LogHandler(LogHandlerBase):
             msg = "[bold yellow]Select jobs to execute...[/bold yellow]"
         if "Execute" in msg and "jobs..." in msg:
              msg = f"[bold yellow]{msg}[/bold yellow]"
-        # ----------------------------
 
-        # Log it!
         rec_opt.log(level, msg)
 
     @property
     def writes_to_stream(self) -> bool:
-        # We handle stream output via Rich (stdout/stderr)
         return True
 
     @property
     def writes_to_file(self) -> bool:
-        # We handle file output via Loguru internally, but Snakemake forbids a plugin
-        # from declaring itself as BOTH stream and file handler.
-        # We declare as stream (to handle console), and handle file writing as a side effect.
         return False
 
     @property
@@ -518,5 +451,4 @@ class LogHandler(LogHandlerBase):
     def needs_rulegraph(self) -> bool:
         return False
 
-# Trigger splash screen on module import (earliest possible time)
 show_splash_screen()

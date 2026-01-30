@@ -3,9 +3,9 @@
 # Place this file in your workflow's root directory.
 
 # Seq Server Configuration
-seq_server_url: "http://192.168.5.10:5341" # Replace with your Seq server URL
+loki_url: "http://localhost:3100" # Replace with your Seq server URL
 # Project Metadata
-project_name: "XXX2025" # Used to filter logs in Seq
+project_name: "XXX20269999" # Used to filter logs in Seq
 
 # Log Level Settings (Optional, handled by plugin logic but good to track)
 # console_level: "INFO"
