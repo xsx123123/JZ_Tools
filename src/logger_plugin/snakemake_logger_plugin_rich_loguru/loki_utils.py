@@ -51,7 +51,8 @@ def format_payload_for_loki(raw_log: Dict[str, Any], estimated_total_jobs: int =
     # Case C: "Job stats" table (Total detection)
     # Snakemake prints a table with a 'total' row at the start
     # We remove the restrictive if-condition to catch 'total' lines even if they are sent separately
-    match_total = re.search(r"^total\s+(\d+)", msg, re.MULTILINE) or re.search(r"total\s+(\d+)", msg)
+    # Improved regex to handle indentation at start of line
+    match_total = re.search(r"^\s*total\s+(\d+)", msg, re.MULTILINE) or re.search(r"total\s+(\d+)", msg)
     if match_total:
          # To avoid false positives (like 'total time'), we check if real_total is still 0 
          # or if we are reasonably sure this is a job count.
@@ -94,8 +95,8 @@ def format_payload_for_loki(raw_log: Dict[str, Any], estimated_total_jobs: int =
     # --- 3. Payload Construction ---
     log_content = raw_log.copy()
     log_content["progress_percent"] = round(progress, 2)
-    # Add debug info about how we calculated it (Optional, useful for verifying)
-    # log_content["_progress_debug"] = f"{state['current']}/{denominator} (RealTotal: {state['real_total']})"
+    # Add debug info about how we calculated it
+    log_content["progress_details"] = f"{state['current']}/{denominator} (RealTotal: {state['real_total']})"
     
     if "msg" not in log_content:
         log_content["msg"] = msg

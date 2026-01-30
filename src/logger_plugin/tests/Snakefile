@@ -32,9 +32,8 @@ rule process_data:
         line_count=$(wc -l < {input})
         echo "Total lines: $line_count" > {output}
         tr 'a-z' 'A-Z' < {input} >> {output}
+        echo "✅ 处理完成: {output}"  # 把原run_after的打印整合到shell里
         """
-    run_after:
-        print(f"✅ 处理完成: {output[0]}")
 
 # --------------------------
 # 4. 步骤3：合并所有处理结果
@@ -49,9 +48,8 @@ rule merge_results:
         """
         cat {input} > {output}
         echo -e "\n==== 所有样本合并完成 ====" >> {output}
+        echo "✅ 最终结果已生成: {output}"  # 把原run_after的打印整合到shell里
         """
-    run_after:
-        print(f"✅ 最终结果已生成: {output[0]}")
 
 # --------------------------
 # 顶层规则：定义流程的最终目标（Snakemake会自动推导依赖链）
