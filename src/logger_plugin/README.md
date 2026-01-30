@@ -149,23 +149,47 @@ count_over_time({job="snakemake"} | json | level="ERROR" [1h])
 
 **实时监控分析进度 (Progress Bar)：**
 
-若要在 Grafana 面板中展示实时的任务完成进度条，可以使用以下 LogQL 查询。该查询通过解析日志中的 JSON 提取进度值，并利用正则从消息文本中获取项目名称：
+若要在 Grafana 面板中展示实时的任务完成进度条，推荐使用以下配置。该配置兼顾了查询性能与显示逻辑，能够自动隐藏非活跃项目和已完成项目。
+
+#### 1. 查询语句 (LogQL)
+使用 **Bar Gauge** 面板，输入以下精简后的 LogQL：
 
 ```logql
 max by (project) (
   last_over_time(
-    {job="snakemake"}                        # 筛选任务 (根据实际标签调整)
-    | json                                   # 1. 解析 JSON (获取 msg 和 progress_percent)
-    | line_format "{{.msg}}"                 # 2. 【关键优化】把日志行清洗为纯文本，去掉 JSON 格式
-    | regexp "(?P<project>[^|]+?) \\|"       # 3. 使用正则提取项目名 (Project Name)
-    | unwrap progress_percent                # 4. 提取进度数值
-    | __error__="" 
-    [2m]                                     # 5. 【核心】取最近 2 分钟内的最新状态
+    (
+      {service_name="snakemake"}
+      |= "progress_percent"          # 🚀 性能核心：先过滤文本，防止大数据量下的 500 错误
+      | json
+      | line_format "{{.msg}}"
+      | regexp "^(?P<project>[^\\s|]+)"
+      | unwrap progress_percent
+      | __error__=""
+    )[1m]                            # ⏱️ 时效控制：仅查看最近 1 分钟内活跃的数据
   )
-)
+) > 0.5 < 100                        # 🧹 净化逻辑：大于 0.5 (过滤死任务) 且 小于 100 (隐藏已完成)
 ```
+> **注意**：使用 `< 100` 可以让任务在完成后瞬间从面板消失。如果你希望任务完成后在面板停留 1 分钟再消失，请改为 `<= 100`。
 
-> **提示**：建议在 Grafana 中使用 **Bar Gauge** 可视化面板，并将 Unit 设置为 `Misc -> Percent (0-100)` 以获得最佳展示效果。
+#### 2. 查询面板设置 (Query Options)
+为了确保标签生效并能自动隐藏旧数据，请务必进行以下设置：
+- **Legend (图例)**: `{{project}}`
+- **Type (类型)**: `Instant` (瞬时查询) —— **关键设置！**
+- **Format**: 如果有此选项，选择 `Time series`。
+
+#### 3. 转换设置 (Transformations) 🛠️
+如果面板显示 "Value #A" 而不是项目名，请添加以下转换：
+- **功能**: `Prepare time series` (准备时间序列)
+- **设置**: `Format` 选择 `Multi-frame time series`
+- **作用**: 强制将表格数据转换为带标签的时间序列，使 Legend 设置生效。
+
+#### 4. 面板属性设置 (Panel Options)
+- **Standard options > Display name**: [保持为空]（利用 Transformation 自动提取项目名）
+- **Standard options > Min**: `0`
+- **Standard options > Max**: `100`
+- **Value options > Calculation**: `Last` (默认值)
+
+> **提示**：建议将 Unit 设置为 `Misc -> Percent (0-100)`。
 
 ## 📅 后续更新计划
 
