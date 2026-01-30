@@ -28,9 +28,10 @@ pip install snakemake-logger-plugin-rich-loguru
 
 该插件支持通过多种方式加载配置，优先级如下：
 
-1.  **Snakemake 配置文件** (`config.yaml` 或 `--config` 参数)
-2.  **环境变量** (`SNAKEMAKE_MONITOR_CONF`)
-3.  **独立配置文件** (`monitor_config.yaml`，默认查找当前目录)
+1.  **命令行指定的 Analysis 配置** (`--config analysisyaml=...`)
+2.  **Snakemake 配置文件** (`config.yaml` 或 `--config` 参数)
+3.  **环境变量** (`SNAKEMAKE_MONITOR_CONF`)
+4.  **独立配置文件** (`monitor_config.yaml`，默认查找当前目录)
 
 ### 配置参数
 
@@ -39,7 +40,26 @@ pip install snakemake-logger-plugin-rich-loguru
 | `loki_url` | Loki 推送 API 地址 | `http://192.168.1.100:3100/loki/api/v1/push` |
 | `project_name` | 项目名称 (作为标签和消息前缀) | `GenomicsPipeline` |
 
-### 方式一：集成到 Snakemake 主配置（推荐）
+### 方式一：通过 Analysis Config 文件（新增，推荐用于动态场景）
+
+如果您的流程通过 `--config analysisyaml=path/to/analysis.yaml` 指定了额外的分析配置文件，插件会自动读取该文件中的 `loki_url` 和 `project_name`。
+
+**命令示例：**
+```bash
+snakemake --logger rich-loguru --config analysisyaml=/data/project/config.yaml ...
+```
+
+**配置文件内容 (`/data/project/config.yaml`)：**
+```yaml
+# 其他分析参数...
+input_dir: "/data/raw"
+
+# 监控配置
+loki_url: "http://loki-server:3100/loki/api/v1/push"
+project_name: "Batch_20260130"
+```
+
+### 方式二：集成到 Snakemake 主配置
 
 直接在您的 `config.yaml` 中添加监控配置：
 

@@ -163,6 +163,7 @@ def install(snakemake_config):
 
     # 1. Determine config path candidates
     possible_paths = [
+        _get_cli_config_value("analysisyaml"),
         snakemake_config.get("monitor_conf"),
         os.environ.get("SNAKEMAKE_MONITOR_CONF"),
         _get_cli_config_value("monitor_conf"),
