@@ -4,7 +4,7 @@ build-backend = "poetry.core.masonry.api"
 
 [tool.poetry]
 name = "snakemake-logger-plugin-rich-loguru"
-version = "0.1.4"
+version = "0.1.5"
 description = "A Snakemake logger plugin using Loguru and Rich for beautiful console and file logging."
 authors = ["ZHANGJIAN <zhangjian199567@outlook.com>"]
 readme = "README.md"

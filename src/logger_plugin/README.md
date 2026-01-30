@@ -143,6 +143,26 @@ if __name__ == "__main__":
 count_over_time({job="snakemake"} | json | level="ERROR" [1h])
 ```
 
+**实时监控分析进度 (Progress Bar)：**
+
+若要在 Grafana 面板中展示实时的任务完成进度条，可以使用以下 LogQL 查询。该查询通过解析日志中的 JSON 提取进度值，并利用正则从消息文本中获取项目名称：
+
+```logql
+max by (project) (
+  last_over_time(
+    {job="snakemake"}                        # 筛选任务 (根据实际标签调整)
+    | json                                   # 1. 解析 JSON (获取 msg 和 progress_percent)
+    | line_format "{{.msg}}"                 # 2. 【关键优化】把日志行清洗为纯文本，去掉 JSON 格式
+    | regexp "(?P<project>[^|]+?) \\|"       # 3. 使用正则提取项目名 (Project Name)
+    | unwrap progress_percent                # 4. 提取进度数值
+    | __error__="" 
+    [2m]                                     # 5. 【核心】取最近 2 分钟内的最新状态
+  )
+)
+```
+
+> **提示**：建议在 Grafana 中使用 **Bar Gauge** 可视化面板，并将 Unit 设置为 `Misc -> Percent (0-100)` 以获得最佳展示效果。
+
 ## 📅 后续更新计划
 
 为了满足更广泛的监控需求，本项目计划在后续版本中引入 **多平台推送扩展 (Multi-platform Push Extensions)**，支持将关键任务状态推送到更多协作与告警平台：

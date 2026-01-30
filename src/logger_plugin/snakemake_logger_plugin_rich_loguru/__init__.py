@@ -33,6 +33,7 @@ import pyfiglet
 
 # Export utilities for external analysis scripts
 from .utils import setup_analysis_logging, get_logger, initialize_analysis_logger, get_analysis_logger, get_analysis_log_file_path
+from .loki_utils import format_payload_for_loki
 
 class LokiHandler:
     """
@@ -46,6 +47,7 @@ class LokiHandler:
             self.endpoint = loki_url
             
         self.project_name = project_name
+        self.total_jobs = 1000 # Default estimate, can be updated if we parse job counts
 
     def _process_message(self, message):
         """
@@ -83,50 +85,34 @@ class LokiHandler:
     def write(self, message):
         """
         Loguru calls this method with the serialized JSON string (since serialize=True).
-        We construct the Loki payload and send it via HTTP POST.
+        We construct the Loki payload using the utility function and send it.
         """
         try:
             # message is a JSON string containing the full record
             data = json.loads(message)
             record = data["record"]
             
-            # Timestamp: Loki requires nanoseconds as a string
-            ts_ns = str(int(record["time"]["timestamp"] * 1e9))
-
-            # Process Message
+            # Process Message to get clean text and extracted Snakemake properties
             plain_text, extra_props = self._process_message(record["message"])
 
-            # Prepare Labels
-            labels = {
-                "job": "snakemake",
-                "level": record["level"]["name"].lower()
-            }
-            if self.project_name:
-                labels["project"] = self.project_name
-            
-            # Construct a clean JSON for the log line
+            # Construct the raw log dictionary expected by format_payload_for_loki
+            # We prefix the message with the project name if available, to ensure 
+            # the utility extracts the project_id correctly (Format: "Project | Msg")
             display_msg = plain_text
             if self.project_name:
+                # Ensure the format matches what format_payload_for_loki expects for extraction
                 display_msg = f"{self.project_name} | {plain_text}"
 
-            clean_log = {
+            raw_log = {
                 "msg": display_msg,
                 "caller": f"{record['name']}:{record['function']}:{record['line']}",
+                "level": record["level"]["name"].lower()
             }
             if extra_props:
-                clean_log.update(extra_props)
-            
-            # Construct Payload
-            payload = {
-                "streams": [
-                    {
-                        "stream": labels,
-                        "values": [
-                            [ts_ns, json.dumps(clean_log, ensure_ascii=False)]
-                        ]
-                    }
-                ]
-            }
+                raw_log.update(extra_props)
+
+            # Use the utility to format the payload
+            payload = format_payload_for_loki(raw_log, self.total_jobs)
 
             # Send Request
             json_data = json.dumps(payload).encode("utf-8")
