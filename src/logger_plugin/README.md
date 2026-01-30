@@ -11,8 +11,12 @@
     - 将流程日志实时以结构化 JSON 格式推送到 Loki 服务器。
     - **智能日志清洗**：自动去除终端的高亮颜色代码（Rich Markup），确保 Loki 中展示纯净文本。
     - **自动结构化解析**：自动从日志中提取 `Snakemake_Rule` (规则名)、`Snakemake_JobId` (任务ID)、`Event_Type` (事件类型) 和 `Shell_Command` 等字段，便于精确查询。
+    - **鲁棒的进度监控**：
+        - 支持自动解析 Snakemake 任务统计表（Job stats）以获取总任务数，即使日志存在缩进或分块也能准确识别。
+        - 实时追踪任务完成事件（`Finished jobid`），支持多种 Snakemake 输出格式。
+        - **透明化进度详情**：每个日志包中包含 `progress_percent`（百分比）和 `progress_details`（如 `5/149`），方便在监控面板中实时查看具体的任务完成情况。
+    - **Dry-run 智能保护**：自动识别 Snakemake 的 `-n/--dry-run` 模式。在测试运行期间自动禁用 Loki 推送，防止测试数据污染远程监控面板，并减少无效的网络开销。
     - **项目隔离**：日志消息自动添加 `ProjectName |` 前缀，标签中包含 `project` 字段，轻松区分不同项目。
-    - **按需推送**：仅当配置了有效的 Loki URL 时才启用推送。
 - **非阻塞架构**：日志发送由 Loguru 的异步 Sink 处理，确保在高并发任务下不阻塞 Snakemake 主进程。
 - **零配置开销**：支持自动读取配置文件，或直接通过 Snakemake 命令行参数控制。
 

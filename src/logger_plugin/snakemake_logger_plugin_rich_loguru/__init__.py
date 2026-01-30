@@ -134,6 +134,18 @@ def install(snakemake_config):
     
     It searches for 'monitor_config.yaml' to configure the Loki sink.
     """
+    
+    # 0. Check for Dry-run
+    # If this is a dry-run, we should skip Loki logging to avoid "0 progress" confusion
+    is_dry_run = False
+    for arg in sys.argv:
+        if arg in ["-n", "--dry-run", "--dryrun"]:
+            is_dry_run = True
+            break
+            
+    if is_dry_run:
+        logger.info("[bold yellow]Dry-run detected: Loki logging is disabled.[/bold yellow]")
+        return
 
     # Helper: Parse CLI args manually for config override
     def _get_cli_config_value(key_name):

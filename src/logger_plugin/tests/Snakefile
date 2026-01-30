@@ -1,59 +1,88 @@
-# --------------------------
-# 1. 定义全局变量（批量处理的样本）
-# --------------------------
-SAMPLES = ["sample1", "sample2"]  # 可直接修改样本数量
+# ==========================================================
+# 1. 全局配置
+# ==========================================================
+SAMPLES = ["sample1", "sample2", "sample3"]  # 你可以随意增加样本名
 
-# --------------------------
-# 2. 步骤1：生成模拟输入文件（替代真实原始数据）
-# --------------------------
-rule generate_input:
-    output:
-        "input/{sample}.txt"  # wildcard {sample} 对应批量样本
-    run:
-        # 生成包含随机字符串的文本文件
-        from pathlib import Path
-        Path("input").mkdir(exist_ok=True)
-        with open(output[0], "w") as f:
-            for i in range(5):
-                f.write(f"Line {i+1} for {wildcards.sample}\n")
-        print(f"✅ 生成输入文件: {output[0]}")
-
-# --------------------------
-# 3. 步骤2：处理文件（转大写+统计行数）
-# --------------------------
-rule process_data:
-    input:
-        "input/{sample}.txt"  # 依赖步骤1的输出
-    output:
-        "processed/{sample}_processed.txt"
-    shell:
-        """
-        # 1. 转大写 2. 开头追加行数统计
-        line_count=$(wc -l < {input})
-        echo "Total lines: $line_count" > {output}
-        tr 'a-z' 'A-Z' < {input} >> {output}
-        echo "✅ 处理完成: {output}"  # 把原run_after的打印整合到shell里
-        """
-
-# --------------------------
-# 4. 步骤3：合并所有处理结果
-# --------------------------
-rule merge_results:
-    input:
-        # 自动批量匹配所有处理后的文件
-        expand("processed/{sample}_processed.txt", sample=SAMPLES)
-    output:
-        "final_summary.txt"
-    shell:
-        """
-        cat {input} > {output}
-        echo -e "\n==== 所有样本合并完成 ====" >> {output}
-        echo "✅ 最终结果已生成: {output}"  # 把原run_after的打印整合到shell里
-        """
-
-# --------------------------
-# 顶层规则：定义流程的最终目标（Snakemake会自动推导依赖链）
-# --------------------------
+# ==========================================================
+# 2. 目标规则 (建议放在最上方)
+# ==========================================================
 rule all:
+    """
+    工作流的终点：Snakemake 会从这里开始反推所有依赖关系
+    """
     input:
-        "final_summary.txt"  # 流程最终要得到的文件
+        "merge_done.flag"
+
+# ==========================================================
+# 3. 步骤 1：模拟生成输入数据
+# ==========================================================
+rule generate_input:
+    """模拟生成单个样本的输入数据"""
+    output:
+        # 标记为临时文件，整条流水线跑完后会自动删除
+        temp("gen_done_{sample}.flag")
+    run:
+        sample = wildcards.sample
+        print(f"\n{'='*50}")
+        print(f"✅ 步骤1：生成样本 [{sample}] 的模拟输入数据")
+        print(f"   虚拟输入路径：input/{sample}.txt")
+        print(f"   输入内容预览：")
+        for i in range(3):
+            print(f"     Line {i+1} for {sample}")
+        print(f"✅ 样本 [{sample}] 输入模拟完成")
+        print(f"{'='*50}\n")
+        
+        from pathlib import Path
+        Path(output[0]).touch()
+
+# ==========================================================
+# 4. 步骤 2：模拟处理单个样本
+# ==========================================================
+rule process_data:
+    """模拟处理单个样本：转大写+行数统计"""
+    input:
+        "gen_done_{sample}.flag"
+    output:
+        # 标记为临时文件
+        temp("proc_done_{sample}.flag")
+    run:
+        sample = wildcards.sample
+        print(f"\n{'='*50}")
+        print(f"✅ 步骤2：开始处理样本 [{sample}]")
+        print(f"   操作：所有内容转大写预览：")
+        for i in range(3):
+            print(f"     LINE {i+1} FOR {sample}")
+        print(f"✅ 样本 [{sample}] 处理模拟完成")
+        print(f"{'='*50}\n")
+        
+        from pathlib import Path
+        Path(output[0]).touch()
+
+# ==========================================================
+# 5. 步骤 3：模拟合并所有样本结果
+# ==========================================================
+rule merge_results:
+    """模拟合并所有样本的处理结果"""
+    input:
+        # 使用 expand 自动生成基于 SAMPLES 列表的具体路径
+        # 注意：这里不需要加 temp()，Snakemake 会根据 output 里的定义识别它们是临时的
+        expand("proc_done_{sample}.flag", sample=SAMPLES)
+    output:
+        # 最终标志也可以设为临时，或者去掉 temp 保持在磁盘上
+        temp("merge_done.flag")
+    run:
+        print(f"\n{'='*50}")
+        print(f"🚀 步骤3：开始合并所有样本结果")
+        print(f"   待合并样本：{', '.join(SAMPLES)}")
+        
+        for sample in SAMPLES:
+            print(f"\n     ---- 【{sample}】处理结果重现 ----")
+            for i in range(3):
+                print(f"     LINE {i+1} FOR {sample}")
+                
+        print(f"\n🎉 所有样本合并完成！")
+        print(f"✅ 流程模拟结束。")
+        print(f"{'='*50}\n")
+        
+        from pathlib import Path
+        Path(output[0]).touch()
