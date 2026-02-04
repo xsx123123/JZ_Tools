@@ -9,8 +9,8 @@ data_delivery:
   - 02.mapping/qualimap_report/*/
   - 02.mapping/samtools_flagstat/*_bam_flagstat.tsv
   - 02.mapping/samtools_stats/*_bam_stats.tsv
-  - 02.mapping/bamCoverage/*.bw
   - 02.mapping_report/multiqc_mapping_report.html
+  # - 02.mapping/bamCoverage/*.bw
   include_qc_summary: true
   output_dir: ./mapping_delivery
   threads: 4
