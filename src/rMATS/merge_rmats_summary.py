@@ -58,7 +58,7 @@ def process_robust_details(name, path, fdr, psi, min_reads):
                 df['Diff_num'] = pd.to_numeric(df['IncLevelDifference'], errors='coerce')
                 mask = (df['FDR_num'] < fdr) & (df['Diff_num'].abs() > psi) & (total_reads >= min_reads)
                 filtered = df[mask].copy()
-                stats[et] = {'is_pair': True, 'up': (filtered['Diff_num'] > 0).sum(), 'down': (filtered['Diff_num'] < 0).sum()}
+                stats[et] = {'is_pair': True, 'up': (filtered['Diff_num'] > 0).sum(), 'down': (filtered['Diff_num'] < 0).sum(), 'total': len(filtered)}
             else:
                 mask = (total_reads >= min_reads)
                 filtered = df[mask].copy()
@@ -80,23 +80,40 @@ def main():
     logger.info(f"深度扫描中... 发现 {len(target_dirs)} 个目录")
     
     final_list = []
+    summary_data = [] 
+    
     for path in target_dirs:
         name = os.path.basename(path)
         if name in ['tmp', 'split_dot_rmats']: name = os.path.basename(os.path.dirname(path))
         df_res, stats = process_robust_details(name, path, args.fdr, args.psi, args.min_reads)
+        
         if df_res is not None:
             final_list.append(df_res)
-            console.print(f"\n[bold magenta]▶ {name}[/bold magenta]")
-            for et, s in stats.items():
-                if s.get('is_pair'):
-                    count = s['up'] + s['down']
-                    if count > 0: console.print(f"  [magenta]├─ {et:5}[/magenta]: {count:4} (Up:{s['up']}, Down:{s['down']})")
-                elif s.get('total', 0) > 0:
-                    console.print(f"  [magenta]├─ {et:5}[/magenta]: {s['total']:4} detected")
+            
+        console.print(f"\n[bold magenta]▶ {name}[/bold magenta]")
+        for et, s in stats.items():
+            if s.get('is_pair'):
+                count = s['up'] + s['down']
+                summary_data.append({'Comparison': name, 'EventType': et, 'Total': count, 'Up': s['up'], 'Down': s['down']})
+                if count > 0: console.print(f"  [magenta]├─ {et:5}[/magenta]: {count:4} (Up:{s['up']}, Down:{s['down']})")
+            elif s.get('total', 0) >= 0: 
+                summary_data.append({'Comparison': name, 'EventType': et, 'Total': s.get('total', 0), 'Up': 0, 'Down': 0})
+                if s.get('total', 0) > 0:
+                    console.print(f"  [magenta]├─ {et:5}[/magenta]: {s.get('total'):4} detected")
 
-    if final_list:
-        pd.concat(final_list, axis=0, ignore_index=True, sort=False).to_csv(args.output, sep='\t', index=False)
-        console.print(f"\n[bold white on magenta] DONE [/bold white on magenta] 汇总完毕: [underline]{os.path.abspath(args.output)}[/underline]\n")
+    # --- 核心逻辑分支：根据模式控制输出 ---
+    if args.mode == 'summary':
+        if summary_data:
+            df_summary = pd.DataFrame(summary_data)
+            df_summary.to_csv(args.output, sep='\t', index=False)
+            console.print(f"\n[bold white on magenta] DONE [/bold white on magenta] 汇总完毕 (Summary Mode): [underline]{os.path.abspath(args.output)}[/underline]\n")
+        else:
+            logger.warning("没有可汇总的数据。")
+            
+    elif args.mode == 'details':
+        if final_list:
+            pd.concat(final_list, axis=0, ignore_index=True, sort=False).to_csv(args.output, sep='\t', index=False)
+            console.print(f"\n[bold white on magenta] DONE [/bold white on magenta] 汇总完毕 (Details Mode): [underline]{os.path.abspath(args.output)}[/underline]\n")
 
 if __name__ == "__main__":
     main()
