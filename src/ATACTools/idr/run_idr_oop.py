@@ -7,7 +7,7 @@ import argparse
 from pathlib import Path
 from concurrent.futures import ProcessPoolExecutor, as_completed
 
-# 引入美化与日志神器
+# Import logging and UI enhancement tools
 from loguru import logger
 from rich.console import Console
 from rich.progress import (
@@ -18,22 +18,22 @@ from rich.progress import (
 console = Console()
 
 class IDRBatchRunner:
-    """封装 IDR 批量运行、合并及原始 Peak 提取的终极核心类"""
+    """Ultimate core class for encapsulating IDR batch execution, merging, and original peak extraction"""
     
     def __init__(self, args):
         self.inputs = [Path(f) for f in args.inputs]
         self.out_dir = Path(args.outdir)
         self.threads = args.threads
         
-        # 1. 初始化工作空间并配置日志
+        # 1. Initialize workspace and configure logging
         self.out_dir.mkdir(parents=True, exist_ok=True)
         self.log_file = self._setup_logger()
         
-        # 2. 运行环境依赖全面检查 (预判拦截)
+        # 2. Comprehensive check of runtime environment dependencies
         self._check_dependencies()
 
     def _setup_logger(self):
-        """配置并返回日志文件路径"""
+        """Configure and return the log file path"""
         logger.remove()
         logger.add(
             sys.stderr, 
@@ -50,21 +50,21 @@ class IDRBatchRunner:
         return log_file
 
     def _check_dependencies(self):
-        """检查所有必需的外部软件 (idr, bedtools, awk, sort)"""
+        """Check all required external software (idr, bedtools, awk, sort)"""
         missing_tools = []
         for tool in ["idr", "bedtools", "awk", "sort"]:
             if shutil.which(tool) is None:
                 missing_tools.append(tool)
                 
         if missing_tools:
-            console.print(f"\n[bold red]❌ 致命错误：当前环境中缺失以下核心工具：{', '.join(missing_tools)}[/bold red]")
-            console.print("[yellow]💡 排查建议：请确保激活了正确的 conda 环境，或安装缺失的工具。[/yellow]\n")
+            console.print(f"\n[bold red]❌ Fatal Error: Missing the following core tools in the current environment: {', '.join(missing_tools)}[/bold red]")
+            console.print("[yellow]💡 Troubleshooting Suggestion: Please ensure the correct conda environment is activated or install the missing tools.[/yellow]\n")
             sys.exit(1)
         else:
-            logger.info("✅ 依赖检查通过：已就绪所有必需的分析套件。")
+            logger.info("✅ Dependency check passed: All required analysis suites are ready.")
 
     def _run_single_idr(self, pair):
-        """独立的工作节点：处理单个两两比对任务"""
+        """Independent worker node: process a single pairwise comparison task"""
         file1, file2 = pair
         name1 = file1.name.replace("_peaks.narrowPeak", "").replace(".narrowPeak", "")
         name2 = file2.name.replace("_peaks.narrowPeak", "").replace(".narrowPeak", "")
@@ -81,75 +81,75 @@ class IDRBatchRunner:
             "--log-output-file", f"{out_prefix}.idr.log"
         ]
         
-        logger.debug(f"准备执行 IDR: {' '.join(cmd)}")
+        logger.debug(f"Preparing to execute IDR: {' '.join(cmd)}")
         
         try:
             subprocess.run(cmd, capture_output=True, text=True, check=True)
-            logger.debug(f"[{name1} vs {name2}] 比对成功。")
+            logger.debug(f"[{name1} vs {name2}] Comparison successful.")
             return True, name1, name2
         except subprocess.CalledProcessError as e:
-            logger.error(f"[{name1} vs {name2}] 比对失败！STDERR:\n{e.stderr}")
+            logger.error(f"[{name1} vs {name2}] Comparison failed! STDERR:\n{e.stderr}")
             return False, name1, name2
 
     def _merge_consensus_peaks(self):
-        """将所有合格的 IDR 结果合并为最终的高置信度 Consensus Peaks"""
+        """Merge all qualified IDR results into final high-confidence Consensus Peaks"""
         final_bed = self.out_dir / "Final_Consensus_Peaks.bed"
-        logger.info("🧬 阶段二：开始提取高置信度 Peak (IDR < 0.05) 并融合物理坐标...")
+        logger.info("🧬 Stage 2: Starting to extract high-confidence peaks (IDR >= 1.30, p < 0.05) and merge coordinates...")
 
-        # 拼接 Bash 管道命令，提取 IDR >= 1.30 (即 p < 0.05) 的区域并合并
+        # Construct bash pipe command to extract IDR >= 1.30 (p < 0.05) regions and merge
         cmd = 'cat ' + str(self.out_dir) + '/*.idr | awk \'$12 >= 1.30 {print $1"\\t"$2"\\t"$3}\' | sort -k1,1 -k2,2n | bedtools merge > ' + str(final_bed)
         
         try:
             subprocess.run(cmd, shell=True, check=True, executable='/bin/bash')
             
-            # 统计生成的 Peak 数量
+            # Count the number of generated peaks
             wc_result = subprocess.run(f"wc -l {final_bed}", shell=True, capture_output=True, text=True)
             peak_count = wc_result.stdout.strip().split()[0]
-            logger.info(f"✅ 合并完成！共提取到 {peak_count} 个高置信度共识 Peak。")
+            logger.info(f"✅ Merging complete! Extracted {peak_count} high-confidence consensus peaks in total.")
             
-            # 核心串联：合并成功后，立刻去提取各样本的原始详细 Peak 数据
+            # Core linkage: After successful merging, immediately extract original detailed peak data for each sample
             self._extract_original_peaks(final_bed)
             
         except subprocess.CalledProcessError:
-            logger.error("❌ 合并 Peak 时发生错误！请检查 idr 结果文件格式。")
-            console.print("[bold red]❌ Peak 合并失败，流水线中止。[/bold red]")
+            logger.error("❌ Error occurred while merging peaks! Please check the IDR result file format.")
+            console.print("[bold red]❌ Peak merging failed, pipeline aborted.[/bold red]")
 
     def _extract_original_peaks(self, final_bed):
-        """利用最终的 BED 文件去原样本中捞取保留统计信息的 Peak 行"""
-        logger.info("🎯 阶段三：开始利用共识 Peak 回捞各样本的原始高质量窄峰数据...")
+        """Use the final BED file to retrieve peak rows from original samples, retaining statistical information"""
+        logger.info("🎯 Stage 3: Starting to retrieve original high-quality narrow peak data for each sample using consensus peaks...")
         
         success_count = 0
         for input_file in self.inputs:
             stem_name = input_file.name.replace(".narrowPeak", "")
             out_file = self.out_dir / f"{stem_name}.idr.narrowPeak"
             
-            # 使用 bedtools intersect 获取交集原始行，-u 防止跨越区间导致的重复行
+            # Use bedtools intersect to get intersecting original rows, -u prevents duplicate rows from spanning intervals
             cmd = f"bedtools intersect -a {input_file} -b {final_bed} -wa -u > {out_file}"
-            logger.debug(f"提取命令: {cmd}")
+            logger.debug(f"Extraction command: {cmd}")
             
             try:
                 subprocess.run(cmd, shell=True, check=True, executable='/bin/bash')
                 success_count += 1
             except subprocess.CalledProcessError:
-                logger.error(f"❌ 提取 {input_file.name} 的原始数据失败！")
+                logger.error(f"❌ Failed to extract original data for {input_file.name}!")
 
         if success_count == len(self.inputs):
-            logger.info(f"✅ 所有 {len(self.inputs)} 个样本的高质量 Peak 均已成功回捞！")
-            console.print(f"\n[bold green]🎉 流水线圆满收官！所有结果已安全存放在：{self.out_dir.absolute()}[/bold green]\n")
+            logger.info(f"✅ High-quality peaks for all {len(self.inputs)} samples have been successfully retrieved!")
+            console.print(f"\n[bold green]🎉 Pipeline completed successfully! All results are safely stored in: {self.out_dir.absolute()}[/bold green]\n")
         else:
-            logger.warning(f"⚠️ 提取完成，但有 {len(self.inputs) - success_count} 个文件处理失败。")
+            logger.warning(f"⚠️ Extraction completed, but {len(self.inputs) - success_count} files failed to process.")
 
     def execute(self):
-        """执行主调度逻辑"""
-        logger.info(f"🚀 阶段一：启动批量 IDR 任务，接收到 {len(self.inputs)} 个样本")
+        """Execute main scheduling logic"""
+        logger.info(f"🚀 Stage 1: Starting batch IDR tasks, {len(self.inputs)} samples received")
         
         pairs = list(itertools.combinations(self.inputs, 2))
         total_tasks = len(pairs)
-        logger.info(f"📊 共有 {total_tasks} 个比对任务，启用 {self.threads} 个并发进程...")
+        logger.info(f"📊 Total of {total_tasks} comparison tasks, starting {self.threads} concurrent processes...")
 
         success_count = 0
 
-        # 渲染进度条
+        # Render progress bar
         with Progress(
             SpinnerColumn(),
             TextColumn("[progress.description]{task.description}"),
@@ -161,7 +161,7 @@ class IDRBatchRunner:
             transient=False
         ) as progress:
             
-            task_id = progress.add_task("[cyan]IDR 并行计算中...", total=total_tasks)
+            task_id = progress.add_task("[cyan]IDR parallel computing...", total=total_tasks)
             
             with ProcessPoolExecutor(max_workers=self.threads) as executor:
                 future_to_pair = {executor.submit(self._run_single_idr, pair): pair for pair in pairs}
@@ -172,23 +172,23 @@ class IDRBatchRunner:
                         success_count += 1
                     progress.advance(task_id)
 
-        # 判定阶段一是否全部成功，决定是否放行后续流程
+        # Determine if Stage 1 was completely successful to decide whether to proceed with subsequent steps
         if success_count == total_tasks:
-            logger.info("✨ 并发比对全部成功完成！自动进入后续合并与提取阶段...")
+            logger.info("✨ All concurrent comparisons completed successfully! Automatically entering subsequent merging and extraction stages...")
             self._merge_consensus_peaks()
         else:
-            logger.warning(f"⚠️ 由于有任务失败 ({success_count}/{total_tasks})，已自动阻断后续合并步骤。请查看日志排查。")
+            logger.warning(f"⚠️ Due to task failures ({success_count}/{total_tasks}), subsequent merging steps have been automatically blocked. Please check the logs for troubleshooting.")
 
 def main():
-    parser = argparse.ArgumentParser(description="🧬 端到端全自动：多进程 IDR 分析、合并及数据回捞工具")
-    parser.add_argument("-i", "--inputs", nargs='+', required=True, help="输入的 narrowPeak 文件列表 (至少2个)")
-    parser.add_argument("-o", "--outdir", default="idr_results", help="输出结果目录 (默认: idr_results)")
-    parser.add_argument("-t", "--threads", type=int, default=1, help="并发运行的进程数 (建议设置为 CPU 核心数的一半)")
+    parser = argparse.ArgumentParser(description="🧬 End-to-end fully automated: Multi-process IDR analysis, merging, and data retrieval tool")
+    parser.add_argument("-i", "--inputs", nargs='+', required=True, help="Input narrowPeak file list (at least 2)")
+    parser.add_argument("-o", "--outdir", default="idr_results", help="Output directory (default: idr_results)")
+    parser.add_argument("-t", "--threads", type=int, default=1, help="Number of concurrent processes (suggested: half of CPU cores)")
     
     args = parser.parse_args()
 
     if len(args.inputs) < 2:
-        console.print("[bold red]❌ 错误: 至少需要输入 2 个 narrowPeak 文件！[/bold red]")
+        console.print("[bold red]❌ Error: At least 2 narrowPeak files are required![/bold red]")
         sys.exit(1)
 
     runner = IDRBatchRunner(args)
