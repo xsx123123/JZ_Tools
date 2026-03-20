@@ -1,36 +1,24 @@
 # Snakemake Logger 增强插件：Rich-Loguru
 
-这是一个基于 Loguru 和 Rich 开发的 Snakemake 日志插件，旨在为生物信息学流程提供极度舒适的终端输出、结构化的本地记录，以及基于 Grafana Loki 的远程可视化监控。
+这是一个基于 Loguru 和 Rich 开发的 Snakemake 日志插件，旨在为生物信息学流程提供极度舒适的终端输出、结构化的本地记录，以及基于 **Grafana Loki** 的远程可视化监控。
 
 ## 🌟 核心特性
 
-- 华丽的终端输出：利用 Rich 库优化 Snakemake 运行状态，支持进度条展示和规则高亮。
-- 结构化本地日志：Loguru 驱动，支持自动滚动、多级别记录（JSON 或文本）。
-- Grafana Loki 深度整合：支持将分析流程实时推送到 Web 端，通过 Grafana 仪表盘监控任务进度。
-- 金融级加密传输：远程日志支持 AES-256-GCM 端到端加密，确保敏感路径和样本信息不泄露。
-- 异步非阻塞架构：日志发送由独立线程（Async Worker）处理，在高并发生信任务下依然保持零性能损耗。
-- 统一分析环境：提供简单的 API，让你的 Python 脚本、Rust 工具与 Snakemake 共享同一套日志配置。
-
-## 🏗 技术架构
-
-```mermaid
-graph TD
-    A[Snakemake 流程] --> B[Rich-Loguru 插件]
-    B --> C{内存队列缓冲区}
-    subgraph "异步处理后台线程"
-    C --> D[AES-256-GCM 加密层]
-    D --> E[批量数据处理器]
-    E --> F[HTTPS 安全传输]
-    end
-    F --> G[Grafana Loki 数据源]
-    G --> H[网页端 Grafana Dashboard]
-```
-
-### 核心组件说明：
-
-- **队列缓冲区**：即使集群网络波动，日志也会暂存在内存中，不会阻塞 Snakemake 任务执行。
-- **加密层**：在数据离开内网前完成加密，保护科研数据安全。
-- **远程观测**：不仅是日志，更是监控。支持在网页端查看任务耗时分布、错误率统计。
+- **华丽的终端输出**：利用 Rich 库优化 Snakemake 运行状态，支持进度条展示和规则高亮。
+- **沉浸式启动体验**：内置系统自检风格的启动过场动画与状态面板，提供专业的 CLI 交互感。
+- **结构化本地日志**：Loguru 驱动，支持自动滚动、多级别记录（JSON 或文本）。
+- **Grafana Loki 远程监控深度整合**：
+    - 将流程日志实时以结构化 JSON 格式推送到 Loki 服务器。
+    - **智能日志清洗**：自动去除终端的高亮颜色代码（Rich Markup），确保 Loki 中展示纯净文本。
+    - **自动结构化解析**：自动从日志中提取 `Snakemake_Rule` (规则名)、`Snakemake_JobId` (任务ID)、`Event_Type` (事件类型) 和 `Shell_Command` 等字段，便于精确查询。
+    - **鲁棒的进度监控**：
+        - 支持自动解析 Snakemake 任务统计表（Job stats）以获取总任务数，即使日志存在缩进或分块也能准确识别。
+        - 实时追踪任务完成事件（`Finished jobid`），支持多种 Snakemake 输出格式。
+        - **透明化进度详情**：每个日志包中包含 `progress_percent`（百分比）和 `progress_details`（如 `5/149`），方便在监控面板中实时查看具体的任务完成情况。
+    - **Dry-run 智能保护**：自动识别 Snakemake 的 `-n/--dry-run` 模式。在测试运行期间自动禁用 Loki 推送，防止测试数据污染远程监控面板，并减少无效的网络开销。
+    - **项目隔离**：日志消息自动添加 `ProjectName |` 前缀，标签中包含 `project` 字段，轻松区分不同项目。
+- **非阻塞架构**：日志发送由 Loguru 的异步 Sink 处理，确保在高并发任务下不阻塞 Snakemake 主进程。
+- **零配置开销**：支持自动读取配置文件，或直接通过 Snakemake 命令行参数控制。
 
 ## 🚀 安装指南
 
@@ -38,60 +26,179 @@ graph TD
 pip install snakemake-logger-plugin-rich-loguru
 ```
 
-## 📊 远程监控配置 (Grafana Loki)
+（请根据实际包名调整安装命令，如果是本地开发，请使用 `pip install -e .`）
 
-在你的配置文件（如 logging_config.json）中开启远程模块：
+## 📊 远程监控配置 (Loki)
 
-```json
-{
-  "remote_logging": {
-    "enabled": true,
-    "provider": "loki",
-    "server_url": "https://your-loki-server:3100/loki/api/v1/push",
-    "encryption": {
-      "algorithm": "AES-256-GCM",
-      "key_env_var": "LOG_ENCRYPTION_KEY"
-    },
-    "labels": {
-      "project": "Lettuce_Genomics_PhD",
-      "user": "jzhang",
-      "cluster": "HAU_HPC"
-    },
-    "batch_size": 20,
-    "flush_interval_seconds": 5
-  }
-}
+该插件支持通过多种方式加载配置，优先级如下：
+
+1.  **命令行指定的 Analysis 配置** (`--config analysisyaml=...`)
+2.  **Snakemake 配置文件** (`config.yaml` 或 `--config` 参数)
+3.  **环境变量** (`SNAKEMAKE_MONITOR_CONF`)
+4.  **独立配置文件** (`monitor_config.yaml`，默认查找当前目录)
+
+### 配置参数
+
+| 参数名 | 描述 | 示例 |
+| :--- | :--- | :--- |
+| `loki_url` | Loki 推送 API 地址 | `http://192.168.1.100:3100/loki/api/v1/push` |
+| `project_name` | 项目名称 (作为标签和消息前缀) | `GenomicsPipeline` |
+
+### 方式一：通过 Analysis Config 文件（新增，推荐用于动态场景）
+
+如果您的流程通过 `--config analysisyaml=path/to/analysis.yaml` 指定了额外的分析配置文件，插件会自动读取该文件中的 `loki_url` 和 `project_name`。
+
+**命令示例：**
+```bash
+snakemake --logger rich-loguru --config analysisyaml=/data/project/config.yaml ...
 ```
 
-### 网页端可视化效果：
+**配置文件内容 (`/data/project/config.yaml`)：**
+```yaml
+# 其他分析参数...
+input_dir: "/data/raw"
 
-- **实时流**：在 Grafana Explore 页面通过 {project="Lettuce_Genomics_PhD"} 查看实时日志。
-- **自动报警**：当检测到日志中出现 "Error" 或 "Rule Failed" 时，自动推送到钉钉/微信。
-- **耗时分析**：统计每个 Rule 的运行时间，帮助寻找流程瓶颈。
+# 监控配置
+loki_url: "http://loki-server:3100/loki/api/v1/push"
+project_name: "Batch_20260130"
+```
+
+### 方式二：集成到 Snakemake 主配置
+
+直接在您的 `config.yaml` 中添加监控配置：
+
+```yaml
+# config.yaml
+samples: "samples.tsv"
+
+# === 监控配置 ===
+loki_url: "http://192.168.1.100:3100/loki/api/v1/push"
+project_name: "My_Analysis_Project"
+```
+
+在运行 Snakemake 时，确保显式加载插件：
+
+```bash
+snakemake --logger rich-loguru --configfile config.yaml ...
+```
+
+### 方式二：使用独立配置文件 (monitor_config.yaml)
+
+在工作流根目录下创建 `monitor_config.yaml`：
+
+```yaml
+loki_url: "http://localhost:3100/loki/api/v1/push"
+project_name: "Debug_Run"
+```
+
+插件会在启动时自动检测并加载该文件。
 
 ## 🛠 使用方法
 
-### 在 Snakemake 命令行中使用
+### 基础运行
+
+只需指定 logger 插件即可：
 
 ```bash
-snakemake --logger rich-loguru --configfile logging_config.json
+snakemake --logger rich-loguru --cores 4
 ```
 
-### 在流程内部脚本中使用
+### 进阶：在 Python 脚本中使用
 
-为了保持日志风格统一，你可以在 Python 脚本中这样调用：
+您的 `scripts/` 目录下的 Python 脚本也可以复用该日志配置，将分析日志也推送到 Loki。
 
 ```python
-from snakemake_logger_plugin_rich_loguru import initialize_analysis_logger
+# scripts/analysis.py
+from snakemake_logger_plugin_rich_loguru import get_logger, install
 
-# 初始化（会自动识别 Snakemake 的配置）
-logger = initialize_analysis_logger(project_name="ATAC-seq-Filter")
+# 如果是独立脚本运行（非 Snakemake 规则内），可以手动初始化
+# install({"loki_url": "...", "project_name": "..."})
 
-logger.info("正在处理 BAM 文件...")
-logger.error("检测到异常序列！")
+logger = get_logger()
+
+def analyze_data():
+    logger.info("开始处理样本...", extra={"sample_id": "S1"})
+    try:
+        # ... 业务逻辑 ...
+        logger.success("样本 S1 处理完成")
+    except Exception as e:
+        logger.exception("处理失败")
+
+if __name__ == "__main__":
+    analyze_data()
 ```
 
-## 🔒 安全与性能
+## 📈 Grafana 中的查询示例
 
-- **低开销**：日志处理线程优先级低于计算任务，确保不抢占生物信息比对/分析所需的 CPU 资源。
-- **零信任**：即使监控平台被攻破，没有密钥也无法还原加密的日志内容。
+在 Grafana 的 Explore 页面中，您可以选择 Loki 数据源并使用 LogQL 进行查询：
+
+**筛选特定项目的日志：**
+```logql
+{job="snakemake", project="My_Analysis_Project"}
+```
+
+**查找特定规则的日志（利用自动提取的字段）：**
+```logql
+{job="snakemake"} | json | Snakemake_Rule="short_read_qc_r1"
+```
+
+**统计特定任务的耗时或错误：**
+```logql
+count_over_time({job="snakemake"} | json | level="ERROR" [1h])
+```
+
+**实时监控分析进度 (Progress Bar)：**
+
+若要在 Grafana 面板中展示实时的任务完成进度条，推荐使用以下配置。该配置兼顾了查询性能与显示逻辑，能够自动隐藏非活跃项目和已完成项目。
+
+#### 1. 查询语句 (LogQL)
+使用 **Bar Gauge** 面板，输入以下精简后的 LogQL：
+
+```logql
+max by (project) (
+  last_over_time(
+    (
+      {service_name="snakemake"}
+      |= "progress_percent"          # 🚀 性能核心：先过滤文本，防止大数据量下的 500 错误
+      | json
+      | line_format "{{.msg}}"
+      | regexp "^(?P<project>[^\\s|]+)"
+      | unwrap progress_percent
+      | __error__=""
+    )[1m]                            # ⏱️ 时效控制：仅查看最近 1 分钟内活跃的数据
+  )
+) > 0.5 < 100                        # 🧹 净化逻辑：大于 0.5 (过滤死任务) 且 小于 100 (隐藏已完成)
+```
+> **注意**：使用 `< 100` 可以让任务在完成后瞬间从面板消失。如果你希望任务完成后在面板停留 1 分钟再消失，请改为 `<= 100`。
+
+#### 2. 查询面板设置 (Query Options)
+为了确保标签生效并能自动隐藏旧数据，请务必进行以下设置：
+- **Legend (图例)**: `{{project}}`
+- **Type (类型)**: `Instant` (瞬时查询) —— **关键设置！**
+- **Format**: 如果有此选项，选择 `Time series`。
+
+#### 3. 转换设置 (Transformations) 🛠️
+如果面板显示 "Value #A" 而不是项目名，请添加以下转换：
+- **功能**: `Prepare time series` (准备时间序列)
+- **设置**: `Format` 选择 `Multi-frame time series`
+- **作用**: 强制将表格数据转换为带标签的时间序列，使 Legend 设置生效。
+
+#### 4. 面板属性设置 (Panel Options)
+- **Standard options > Display name**: [保持为空]（利用 Transformation 自动提取项目名）
+- **Standard options > Min**: `0`
+- **Standard options > Max**: `100`
+- **Value options > Calculation**: `Last` (默认值)
+
+> **提示**：建议将 Unit 设置为 `Misc -> Percent (0-100)`。
+
+## 📅 后续更新计划
+
+为了满足更广泛的监控需求，本项目计划在后续版本中引入 **多平台推送扩展 (Multi-platform Push Extensions)**，支持将关键任务状态推送到更多协作与告警平台：
+
+- [ ] **企业级即时通讯**：支持 钉钉 (DingTalk)、飞书 (Lark)、企业微信 (WeChat Work) 的 Webhook 机器人通知。
+- [ ] **多端推送服务**：集成 Bark (iOS)、PushDeer、Server酱 等移动端推送工具。
+- [ ] **标准协议支持**：支持通过 SMTP 发送关键错误邮件告警。
+- [ ] **日志存储优化**：提供对 ELK (Elasticsearch, Logstash, Kibana) 的支持。
+- [ ] **交互式监控**：开发简单的 Web Dashboard 实时预览多个 Snakemake 实例的状态。
+
+欢迎通过 Issue 提交您的功能需求或贡献代码！

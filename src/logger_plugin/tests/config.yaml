@@ -1,0 +1,12 @@
+# monitor_config.yaml Template
+# ----------------------------
+# Place this file in your workflow's root directory.
+
+# Seq Server Configuration
+loki_url: "http://122.205.67.97:3100" # Replace with your Seq server URL
+# Project Metadata
+project_name: "20278089EXDF" # Used to filter logs in Seq
+
+# Log Level Settings (Optional, handled by plugin logic but good to track)
+# console_level: "INFO"
+# file_level: "DEBUG"

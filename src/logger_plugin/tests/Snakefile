@@ -1,3 +1,88 @@
+# ==========================================================
+# 1. 全局配置
+# ==========================================================
+SAMPLES = ["sample1", "sample2", "sample3"]  # 你可以随意增加样本名
+
+# ==========================================================
+# 2. 目标规则 (建议放在最上方)
+# ==========================================================
 rule all:
-   run:
-      print("Hello from Snakemake!"),
+    """
+    工作流的终点：Snakemake 会从这里开始反推所有依赖关系
+    """
+    input:
+        "merge_done.flag"
+
+# ==========================================================
+# 3. 步骤 1：模拟生成输入数据
+# ==========================================================
+rule generate_input:
+    """模拟生成单个样本的输入数据"""
+    output:
+        # 标记为临时文件，整条流水线跑完后会自动删除
+        temp("gen_done_{sample}.flag")
+    run:
+        sample = wildcards.sample
+        print(f"\n{'='*50}")
+        print(f"✅ 步骤1：生成样本 [{sample}] 的模拟输入数据")
+        print(f"   虚拟输入路径：input/{sample}.txt")
+        print(f"   输入内容预览：")
+        for i in range(3):
+            print(f"     Line {i+1} for {sample}")
+        print(f"✅ 样本 [{sample}] 输入模拟完成")
+        print(f"{'='*50}\n")
+        
+        from pathlib import Path
+        Path(output[0]).touch()
+
+# ==========================================================
+# 4. 步骤 2：模拟处理单个样本
+# ==========================================================
+rule process_data:
+    """模拟处理单个样本：转大写+行数统计"""
+    input:
+        "gen_done_{sample}.flag"
+    output:
+        # 标记为临时文件
+        temp("proc_done_{sample}.flag")
+    run:
+        sample = wildcards.sample
+        print(f"\n{'='*50}")
+        print(f"✅ 步骤2：开始处理样本 [{sample}]")
+        print(f"   操作：所有内容转大写预览：")
+        for i in range(3):
+            print(f"     LINE {i+1} FOR {sample}")
+        print(f"✅ 样本 [{sample}] 处理模拟完成")
+        print(f"{'='*50}\n")
+        
+        from pathlib import Path
+        Path(output[0]).touch()
+
+# ==========================================================
+# 5. 步骤 3：模拟合并所有样本结果
+# ==========================================================
+rule merge_results:
+    """模拟合并所有样本的处理结果"""
+    input:
+        # 使用 expand 自动生成基于 SAMPLES 列表的具体路径
+        # 注意：这里不需要加 temp()，Snakemake 会根据 output 里的定义识别它们是临时的
+        expand("proc_done_{sample}.flag", sample=SAMPLES)
+    output:
+        # 最终标志也可以设为临时，或者去掉 temp 保持在磁盘上
+        temp("merge_done.flag")
+    run:
+        print(f"\n{'='*50}")
+        print(f"🚀 步骤3：开始合并所有样本结果")
+        print(f"   待合并样本：{', '.join(SAMPLES)}")
+        
+        for sample in SAMPLES:
+            print(f"\n     ---- 【{sample}】处理结果重现 ----")
+            for i in range(3):
+                print(f"     LINE {i+1} FOR {sample}")
+                
+        print(f"\n🎉 所有样本合并完成！")
+        print(f"✅ 流程模拟结束。")
+        print(f"{'='*50}\n")
+        
+        from pathlib import Path
+        Path(output[0]).touch()
