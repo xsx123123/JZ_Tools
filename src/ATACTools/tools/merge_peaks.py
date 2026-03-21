@@ -49,7 +49,8 @@ def main():
     with console.status("[bold green]正在将数据加载到内存中 (这可能需要几秒钟)...[/bold green]"):
         try:
             df_anno = pd.read_csv(args.anno, sep='\t')
-            df_counts = pd.read_csv(args.counts, sep='\t')
+            # featureCounts output has a comment line at the top starting with #
+            df_counts = pd.read_csv(args.counts, sep='\t', comment='#')
             logger.success(f"成功读取文件: 注释表 ({len(df_anno)}行), 计数表 ({len(df_counts)}行)")
         except FileNotFoundError as e:
             logger.error(f"找不到文件: {e.filename}")
@@ -64,11 +65,13 @@ def main():
 
     # 3. 合并数据
     with console.status("[bold blue]正在根据基因组坐标合并数据...[/bold blue]"):
+        # featureCounts usually uses 'Chr', 'Start', 'End' (matching HOMER)
+        # We merge on these coordinates. 
+        # Note: pd.merge will add suffixes if column names are identical.
         df_merged = pd.merge(
             df_anno,
             df_counts,
-            left_on=['Chr', 'Start', 'End'],
-            right_on=['chrom', 'start', 'end'],
+            on=['Chr', 'Start', 'End'],
             how='inner'
         )
 
@@ -76,16 +79,16 @@ def main():
         if df_merged.empty:
             logger.warning("合并结果为空！这通常是因为起始坐标相差 1bp。")
             logger.info("正在尝试自动修正坐标 (Start + 1) 并重新合并...")
-            df_counts['start'] = df_counts['start'] + 1
+            # Create a copy to avoid SettingWithCopyWarning if needed, 
+            # but here we just modify and retry merge
+            df_counts_retry = df_counts.copy()
+            df_counts_retry['Start'] = df_counts_retry['Start'] + 1
             df_merged = pd.merge(
                 df_anno,
-                df_counts,
-                left_on=['Chr', 'Start', 'End'],
-                right_on=['chrom', 'start', 'end'],
+                df_counts_retry,
+                on=['Chr', 'Start', 'End'],
                 how='inner'
             )
-
-        df_merged.drop(columns=['chrom', 'start', 'end'], inplace=True)
 
     # 4. 保存结果
     with console.status("[bold magenta]正在保存合并后的文件...[/bold magenta]"):
