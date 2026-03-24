@@ -8,7 +8,6 @@ data_delivery:
   - 04.variant/gatk/*/*.final.pass.vcf.idx
   - 04.variant/gatk/*/*.raw_variants.vcf
   - 04.variant/gatk/*/*.raw_variants.vcf.idx
-  - 04.variant/gatk_MarkDuplicates/*.rg.dedup.metrics.txt
   - 04.variant/gatk_bcftools_stats_pass/*/
   - 04.variant/gatk_bcftools_stats_raw/*/
   - 04.variant/multiqc_gatk_bcftools_stats_pass/
