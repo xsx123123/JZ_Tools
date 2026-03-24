@@ -7,7 +7,6 @@ import glob
 import argparse
 from pathlib import Path
 
-# 第三方库
 from loguru import logger
 from rich.console import Console
 from rich.table import Table
