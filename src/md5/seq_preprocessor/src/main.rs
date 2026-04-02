@@ -162,8 +162,9 @@ fn main() -> Result<()> {
 
     // --- (PE) 两个独立的、更简单的正则表达式 ---
     let re_illumina = Regex::new(r"^(.*?)_S\d+_L\d+_([Rr][12])_\d+\.f(ast)?q\.gz$").unwrap();
-    // --- 修复：使用非贪婪匹配，并支持 .clean 等中间后缀 ---
-    let re_generic = Regex::new(r"^(.*?)[\._]([Rr][12]|[12])(\.[^.]+)?\.f(ast)?q\.gz$").unwrap();
+    // --- 修复：改进正则以更好地支持各种中间后缀 (clean, trimmed, filtered, qc, val, processed, etc.)
+    // 匹配模式: sample_R1.clean.fastq.gz, sample_R1.trimmed.fq.gz, sample_1.filtered.fastq.gz, etc.
+    let re_generic = Regex::new(r"^(.+?)[\._]([Rr][12]|[12])(?:\.[a-zA-Z0-9_-]+)?\.f(ast)?q\.gz$").unwrap();
     // --- 新增：(PE) 用于匹配带 .raw 的文件格式，如 L1MKK1806607-a1.R1.raw.fastq.gz ---
     let re_with_raw = Regex::new(r"^(.+)\.([Rr][12])\.raw\.f(ast)?q\.gz$").unwrap();
     // --- 新增：(SE) 用于匹配 Long-read 的正则表达式 ---
@@ -324,7 +325,9 @@ fn main() -> Result<()> {
         if cli.library_type == LibraryType::Auto || cli.library_type == LibraryType::ShortRead {
             error_message.push_str("  1. PE 模式 (Illumina): <样本名>_S..._L..._R[12]_...fq.gz\n");
             error_message.push_str("  2. PE 模式 (with .raw): <样本名>.<R1/R2>.raw.fq.gz (如: L1MKK1806607-a1.R1.raw.fastq.gz)\n");
-            error_message.push_str("  3. PE 模式 (Generic): <样本名>[._][R12|12][.clean].fq.gz (如: sample_R1.clean.fastq.gz)\n");
+            error_message.push_str("  3. PE 模式 (Generic): <样本名>[._][R12|12][.suffix].fq.gz\n");
+            error_message.push_str("     支持的后缀: .clean, .trimmed, .trim, .filtered, .filter, .qc, .val, .processed\n");
+            error_message.push_str("     例如: sample_R1.clean.fastq.gz, sample_1.trimmed.fq.gz\n");
             error_message.push_str("  4. PE 模式 (SRA): [SED]RR#######[._][12].fq.gz (e.g., SRR######_1.fq.gz)\n");
         }
         if cli.library_type == LibraryType::Auto || cli.library_type == LibraryType::LongRead {
