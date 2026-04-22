@@ -19,3 +19,13 @@ awk -F'\t' 'BEGIN{OFS="\t"} $3=="transcript" {
 # chr1	11822	11823	ENST00000832837.1
 # chr1	11823	11824	ENST00000832836.1
 # chr1	11823	11824	ENST00000832832.1
+
+awk -F'\t' 'BEGIN{OFS="\t"} $3=="gene" {
+  split($9, a, "gene_id \"");
+  split(a[2], b, "\"");
+  tid = b[1] ? b[1] : "NA";
+  if($7=="+") 
+    print $1, $4-1, $4, tid, 0, $7;
+  else 
+    print $1, $5-1, $5, tid, 0, $7;
+}' gencode.vM38.annotation.gtf | sort -k1,1 -k2,2n | cut -f 1,2,3,4 > gencode.vM38.annotation.tss.bed
