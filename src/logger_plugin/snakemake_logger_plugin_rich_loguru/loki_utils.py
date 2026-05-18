@@ -8,6 +8,7 @@ def format_payload_for_loki(
     raw_log: Dict[str, Any],
     state: Dict[str, Any],
     estimated_total_jobs: int = 1000,
+    project_name: str = "unknown_project"
 ) -> Dict[str, Any]:
     """
     Format a Snakemake log dictionary into a Loki-compatible JSON payload.
@@ -23,6 +24,7 @@ def format_payload_for_loki(
         state: Mutable state dict with keys 'current', 'real_total', 'finished_ids'.
                Must be managed by the caller (e.g. LokiHandler instance).
         estimated_total_jobs: Fallback total if no real total is detected.
+        project_name: Explicit project name to use in Loki labels.
     """
     msg = raw_log.get("msg", "")
 
@@ -80,8 +82,9 @@ def format_payload_for_loki(
         progress = 100.0
 
     # --- 2. Project ID Logic ---
-    project_id = "unknown_project"
-    if "|" in msg:
+    # Use provided project_name as priority, then fallback to parsing
+    project_id = project_name
+    if project_id == "unknown_project" and "|" in msg:
         parts = msg.split("|", 1)
         candidate = parts[0].strip()
         if candidate and len(candidate) < 50:

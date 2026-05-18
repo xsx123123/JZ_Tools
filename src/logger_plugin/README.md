@@ -19,9 +19,8 @@
     - **项目隔离**：日志消息自动添加 `ProjectName |` 前缀，标签中包含 `project` 字段，轻松区分不同项目。
     - **异步非阻塞推送**：Loki 日志发送采用后台线程 + 5 秒超时机制，即使服务端不可达也不会阻塞 Snakemake 主流程。
     - **多实例状态隔离**：每个 Snakemake 流程拥有独立的进度追踪状态，彻底解决多项目并行运行时的进度串扰问题。
-- **非阻塞架构**：日志发送由 Loguru 的异步 Sink 处理，确保在高并发任务下不阻塞 Snakemake 主进程。
-- **零配置开销**：支持自动读取配置文件，或直接通过 Snakemake 命令行参数控制。
-- **友好的兼容性**：精确管理 loguru handler，不再暴力清空所有预设的日志配置，保护用户及其他库的日志输出。
+- **多平台推送告警**：新增对 **钉钉 (DingTalk)** 和 **飞书 (Feishu)** Webhook 的支持。在流程顺利完成或发生致命错误时，自动向您的即时通讯软件发送图文告警。
+- **高性能异步架构**：Loki 推送机制升级为 **生产者-消费者模型 (Queue + Worker Thread)**，有效处理高频日志，防止在高并发任务下产生大量瞬时线程，极大提升系统稳定性。
 
 ## 🚀 安装指南
 
@@ -30,6 +29,36 @@ pip install snakemake-logger-plugin-rich-loguru
 ```
 
 （请根据实际包名调整安装命令，如果是本地开发，请使用 `pip install -e .`）
+
+## 📢 即时通讯告警配置 (IM Webhooks)
+
+插件支持在工作流结束（成功或失败）时发送即时通讯通知。
+
+### 配置参数
+
+| 参数名 | 环境变量 | 描述 |
+| :--- | :--- | :--- |
+| `notification_url` | `SNAKEMAKE_NOTIFICATION_URL` | Webhook 地址 |
+| `notification_platform` | `SNAKEMAKE_NOTIFICATION_PLATFORM` | 平台类型 (`dingtalk` 或 `feishu`) |
+
+### 使用方式
+
+您可以通过环境变量快速启用：
+
+```bash
+export SNAKEMAKE_NOTIFICATION_URL="https://oapi.dingtalk.com/robot/send?access_token=..."
+export SNAKEMAKE_NOTIFICATION_PLATFORM="dingtalk"
+snakemake --logger rich-loguru ...
+```
+
+或在 `monitor_config.yaml` 中配置：
+
+```yaml
+loki_url: "http://loki:3100/loki/api/v1/push"
+project_name: "RNA-Seq_Analysis"
+notification_url: "https://open.feishu.cn/open-apis/bot/v2/hook/..."
+notification_platform: "feishu"
+```
 
 ## 📊 远程监控配置 (Loki)
 
@@ -195,6 +224,12 @@ max by (project) (
 > **提示**：建议将 Unit 设置为 `Misc -> Percent (0-100)`。
 
 ## 📋 版本历史
+
+### v0.1.8 (Latest)
+- **新特性**：集成 **钉钉/飞书 Webhook 通知** 功功能，支持工作流成功/失败自动告警。
+- **架构升级**：Loki 推送采用 **Queue + Worker Thread** 模式，显著降低高频率日志下的系统开销。
+- **可靠性增强**：优化 Loki 标签逻辑，确保 ProjectID 标签的唯一性与准确性。
+- **质量保证**：新增 `loki_utils` 和 `notification_utils` 的自动化单元测试。
 
 ### v0.1.7
 - **性能优化**：启动动画默认关闭（去除 `time.sleep` 硬阻塞），Snakemake 启动速度提升 4-5 秒；可通过环境变量 `SNAKEMAKE_RICH_LOGURU_SPLASH=1` 手动开启。

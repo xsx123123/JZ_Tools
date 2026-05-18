@@ -52,7 +52,10 @@ from .utils import (
     get_analysis_log_file_path,
 )
 from .loki_utils import format_payload_for_loki
+from .notification_utils import send_webhook_notification
 
+
+import queue
 
 class LokiHandler:
     """
@@ -75,6 +78,11 @@ class LokiHandler:
             "real_total": 0,
             "finished_ids": set(),
         }
+
+        # Initialize queue and worker thread
+        self.queue = queue.Queue()
+        self.worker = threading.Thread(target=self._worker, daemon=True)
+        self.worker.start()
 
     def _process_message(self, message):
         """
@@ -112,9 +120,24 @@ class LokiHandler:
 
         return plain_text, properties
 
+    def _worker(self):
+        """
+        Background worker that processes the queue.
+        """
+        while True:
+            try:
+                message = self.queue.get()
+                if message is None:
+                    break
+                self._send(message)
+            except Exception as e:
+                print(f"[Loki] Worker error: {e}", file=sys.stderr)
+            finally:
+                self.queue.task_done()
+
     def _send(self, message):
         """
-        Actual network send logic, executed in a background thread.
+        Actual network send logic.
         """
         try:
             # message is a JSON string containing the full record
@@ -137,28 +160,33 @@ class LokiHandler:
                 raw_log.update(extra_props)
 
             # P1: Pass instance state to avoid cross-process contamination
-            payload = format_payload_for_loki(raw_log, self._state, self.total_jobs)
+            payload = format_payload_for_loki(
+                raw_log, 
+                self._state, 
+                self.total_jobs, 
+                project_name=self.project_name or "unknown_project"
+            )
 
             # Send Request
             json_data = json.dumps(payload).encode("utf-8")
             req = urllib.request.Request(self.endpoint, data=json_data, method="POST")
             req.add_header("Content-Type", "application/json")
 
-            # P1: Explicit timeout to prevent blocking the logging queue
+            # P1: Explicit timeout to prevent blocking
             with urllib.request.urlopen(req, timeout=5) as response:
                 pass
 
         except Exception as e:
-            # P1: Avoid completely silent failures; write to stderr to aid debugging
+            # P1: Avoid completely silent failures
             print(f"[Loki] Push failed: {e}", file=sys.stderr)
 
     def write(self, message):
         """
-        Loguru calls this method with the serialized JSON string (since serialize=True).
-        We fire a daemon thread so network I/O never blocks the logging queue.
+        Loguru calls this method with the serialized JSON string.
+        We put it into the queue for async processing.
         """
-        t = threading.Thread(target=self._send, args=(message,), daemon=True)
-        t.start()
+        self.queue.put(message)
+
 
 
 def install(snakemake_config):
@@ -245,6 +273,8 @@ def install(snakemake_config):
             )
         except Exception as e:
             logger.error(f"Failed to initialize Loki sink: {e}")
+    
+    return config
 
 
 @dataclass
@@ -278,6 +308,22 @@ class LogHandlerSettings(LogHandlerSettingsBase):
         metadata={
             "help": "Logging style ('default', 'minimal', 'detailed', 'plain')",
             "env_var": False,
+            "required": False,
+        },
+    )
+    notification_url: Optional[str] = field(
+        default=None,
+        metadata={
+            "help": "Webhook URL for notifications (DingTalk, Feishu, etc.)",
+            "env_var": "SNAKEMAKE_NOTIFICATION_URL",
+            "required": False,
+        },
+    )
+    notification_platform: Optional[str] = field(
+        default="dingtalk",
+        metadata={
+            "help": "Platform for notifications ('dingtalk', 'feishu')",
+            "env_var": "SNAKEMAKE_NOTIFICATION_PLATFORM",
             "required": False,
         },
     )
@@ -488,8 +534,17 @@ class LogHandler(LogHandlerBase):
 
         self._capture_startup_info()
 
-        # Configure Loki
-        install({})
+        # P0: Notification state
+        self._notified = False
+
+        # Configure Loki and get extra config
+        extra_config = install({})
+        
+        # Override notification settings from config file if not set via CLI/ENV
+        if not self.settings.notification_url and "notification_url" in extra_config:
+            self.settings.notification_url = extra_config["notification_url"]
+        if self.settings.notification_platform == "dingtalk" and "notification_platform" in extra_config:
+            self.settings.notification_platform = extra_config["notification_platform"]
 
     def _capture_startup_info(self):
         msg = f"{self.settings.log_file_prefix} Pipeline Initialized"
@@ -575,6 +630,28 @@ class LogHandler(LogHandlerBase):
             msg = msg.replace("output:", "[bold green]output:[/bold green]")
         if "input:" in msg:
             msg = msg.replace("input:", "[bold blue]input:[/bold blue]")
+
+        # --- Notification Logic ---
+        if self.settings.notification_url and not self._notified:
+            title = f"Snakemake: {self.settings.log_file_prefix}"
+            if "Complete log(s):" in msg or "Nothing to be done" in msg:
+                send_webhook_notification(
+                    self.settings.notification_url,
+                    f"✅ **Workflow Success**\n\nProject: {self.settings.log_file_prefix}\nTime: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n{msg}",
+                    title=title,
+                    platform=self.settings.notification_platform
+                )
+                self._notified = True
+            elif "WorkflowError" in msg or (level in ["ERROR", "CRITICAL"] and "Finished jobid:" not in msg):
+                # Avoid notifying for every minor error if possible, but major ones should trigger it
+                # Snakemake often logs WorkflowError for fatal issues
+                send_webhook_notification(
+                    self.settings.notification_url,
+                    f"❌ **Workflow Failed**\n\nProject: {self.settings.log_file_prefix}\nTime: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n{msg}",
+                    title=title,
+                    platform=self.settings.notification_platform
+                )
+                self._notified = True
 
         # Combine icon and message
         # Since RichHandler already prints the Level, we just prepend the icon to the message
