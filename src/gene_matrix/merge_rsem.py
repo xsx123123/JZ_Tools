@@ -145,6 +145,9 @@ def core_merge_logic(
             combined = pd.concat(df_list, axis=1)
             # 关键：移除版本号后，如果出现同名基因，执行加和处理
             combined = combined.groupby(level=combined.index.names).sum()
+            # Counts 矩阵四舍五入为整数（RSEM expected_count 为概率分配，含小数）
+            if label == "Counts":
+                combined = combined.round()
             combined.to_csv(out_path, sep="\t")
             logger.success(f"✅ {label} 矩阵已保存: {out_path}")
 
