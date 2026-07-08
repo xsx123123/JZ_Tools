@@ -17,3 +17,7 @@ target
 ./incremental
 */Compile_release
 __pycache__
+__pycache__/
+*.py[cod]
+*.egg-info/
+kegg_annotations/
