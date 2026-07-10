@@ -2,7 +2,7 @@ from snakemake_interface_logger_plugins.base import LogHandlerBase
 from snakemake_interface_logger_plugins.settings import LogHandlerSettingsBase
 
 from dataclasses import dataclass, field
-from typing import Optional
+from typing import Optional, Dict, Any
 import sys
 import os
 import yaml
@@ -14,11 +14,12 @@ import platform
 from datetime import datetime
 from pathlib import Path
 import logging
-import shutil
 import getpass
 import socket
 import time
 import threading
+import queue
+import atexit
 
 # Import loguru and rich
 from loguru import logger
@@ -43,6 +44,60 @@ class CompactRichHandler(RichHandler):
         return Text.styled(level_name, f"logging.level.{level_name.lower()}")
 
 
+# -----------------------------------------------------------------------------
+# Shared configuration keys and environment mapping
+# -----------------------------------------------------------------------------
+
+MONITOR_CONFIG_KEYS = {
+    "loki_url",
+    "project_name",
+    "omichub_monitor_url",
+    "omichub_monitor_token",
+    "omichub_task_id",
+    "omichub_flow_id",
+    "omichub_user_id",
+    "omichub_monitor_sign_requests",
+    "omichub_monitor_signing_key",
+    "omichub_monitor_encrypt_payload",
+    "omichub_monitor_encryption_key",
+    "omichub_monitor_tls_verify",
+    "omichub_monitor_timeout",
+    "omichub_monitor_queue_size",
+    "omichub_monitor_retry_count",
+    "omichub_monitor_retry_backoff",
+    "notification_url",
+    "notification_platform",
+}
+
+SENSITIVE_KEYS = {
+    "omichub_monitor_token",
+    "omichub_monitor_signing_key",
+    "omichub_monitor_encryption_key",
+    "notification_url",
+}
+
+ENV_VAR_MAP = {
+    "loki_url": "SNAKEMAKE_LOKI_URL",
+    "project_name": "SNAKEMAKE_PROJECT_NAME",
+    "omichub_monitor_url": "SNAKEMAKE_OMICHUB_MONITOR_URL",
+    "omichub_monitor_token": "SNAKEMAKE_OMICHUB_MONITOR_TOKEN",
+    "omichub_task_id": "SNAKEMAKE_OMICHUB_TASK_ID",
+    "omichub_flow_id": "SNAKEMAKE_OMICHUB_FLOW_ID",
+    "omichub_user_id": "SNAKEMAKE_OMICHUB_USER_ID",
+    "omichub_monitor_sign_requests": "SNAKEMAKE_OMICHUB_MONITOR_SIGN_REQUESTS",
+    "omichub_monitor_signing_key": "SNAKEMAKE_OMICHUB_MONITOR_SIGNING_KEY",
+    "omichub_monitor_encrypt_payload": "SNAKEMAKE_OMICHUB_MONITOR_ENCRYPT_PAYLOAD",
+    "omichub_monitor_encryption_key": "SNAKEMAKE_OMICHUB_MONITOR_ENCRYPTION_KEY",
+    "omichub_monitor_tls_verify": "SNAKEMAKE_OMICHUB_MONITOR_TLS_VERIFY",
+    "omichub_monitor_timeout": "SNAKEMAKE_OMICHUB_MONITOR_TIMEOUT",
+    "omichub_monitor_queue_size": "SNAKEMAKE_OMICHUB_MONITOR_QUEUE_SIZE",
+    "omichub_monitor_retry_count": "SNAKEMAKE_OMICHUB_MONITOR_RETRY_COUNT",
+    "omichub_monitor_retry_backoff": "SNAKEMAKE_OMICHUB_MONITOR_RETRY_BACKOFF",
+    "notification_url": "SNAKEMAKE_NOTIFICATION_URL",
+    "notification_platform": "SNAKEMAKE_NOTIFICATION_PLATFORM",
+}
+
+
 # Export utilities for external analysis scripts
 from .utils import (
     setup_analysis_logging,
@@ -50,12 +105,13 @@ from .utils import (
     initialize_analysis_logger,
     get_analysis_logger,
     get_analysis_log_file_path,
+    extract_snakemake_event,
+    SnakemakeProgressTracker,
 )
 from .loki_utils import format_payload_for_loki
 from .notification_utils import send_webhook_notification
+from .omichub_utils import OmicHubMonitorHandler
 
-
-import queue
 
 class LokiHandler:
     """
@@ -73,52 +129,14 @@ class LokiHandler:
         self.total_jobs = 1000  # Default estimate
 
         # P1: State lives on the instance to avoid cross-process contamination
-        self._state = {
-            "current": 0,
-            "real_total": 0,
-            "finished_ids": set(),
-        }
+        self._tracker = SnakemakeProgressTracker(estimated_total_jobs=self.total_jobs)
 
         # Initialize queue and worker thread
         self.queue = queue.Queue()
         self.worker = threading.Thread(target=self._worker, daemon=True)
         self.worker.start()
-
-    def _process_message(self, message):
-        """
-        Extract clean text and properties from a message.
-        """
-        # 1. Strip Markup
-        try:
-            plain_text = Text.from_markup(message).plain
-        except Exception:
-            plain_text = message
-
-        properties = {}
-
-        # 2. Extract Data (Simple Parsing)
-        # Pattern 1: Rule: <name>, Jobid: <id>
-        match1 = re.search(r"Rule:\s+(.+?),\s+Jobid:\s+(\d+)", plain_text)
-        if match1:
-            properties["Snakemake_Rule"] = match1.group(1)
-            properties["Snakemake_JobId"] = int(match1.group(2))
-
-        # Pattern 2: Finished jobid: <id> (Rule: <name>) or Finished jobid <id>
-        match2 = re.search(
-            r"Finished jobid[:\s]\s*(\d+)(?:\s+\(Rule:\s+(.+?)\))?", plain_text
-        )
-        if match2:
-            properties["Snakemake_JobId"] = int(match2.group(1))
-            if match2.group(2):
-                properties["Snakemake_Rule"] = match2.group(2)
-            properties["Event_Type"] = "JobFinished"
-
-        # Pattern 3: Shell command
-        if plain_text.startswith("Shell command: "):
-            properties["Shell_Command"] = plain_text.replace("Shell command: ", "").strip()
-            properties["Event_Type"] = "ShellCommand"
-
-        return plain_text, properties
+        self._closed = False
+        atexit.register(self.close)
 
     def _worker(self):
         """
@@ -145,7 +163,7 @@ class LokiHandler:
             record = data["record"]
 
             # Process Message to get clean text and extracted Snakemake properties
-            plain_text, extra_props = self._process_message(record["message"])
+            plain_text, extra_props = extract_snakemake_event(record["message"])
 
             display_msg = plain_text
             if self.project_name:
@@ -157,13 +175,21 @@ class LokiHandler:
                 "level": record["level"]["name"].lower(),
             }
             if extra_props:
-                raw_log.update(extra_props)
+                # Loki labels already use Snakemake_* keys; keep backward-compatible mapping
+                for key, value in extra_props.items():
+                    if key == "rule":
+                        raw_log["Snakemake_Rule"] = value
+                    elif key == "job_id":
+                        raw_log["Snakemake_JobId"] = value
+                    elif key == "event_type":
+                        raw_log["Event_Type"] = value
+                    elif key == "shell_command":
+                        raw_log["Shell_Command"] = value
 
-            # P1: Pass instance state to avoid cross-process contamination
+            # P1: Pass instance tracker to avoid cross-process contamination
             payload = format_payload_for_loki(
-                raw_log, 
-                self._state, 
-                self.total_jobs, 
+                raw_log,
+                tracker=self._tracker,
                 project_name=self.project_name or "unknown_project"
             )
 
@@ -185,95 +211,298 @@ class LokiHandler:
         Loguru calls this method with the serialized JSON string.
         We put it into the queue for async processing.
         """
+        if self._closed:
+            return
         self.queue.put(message)
 
+    def close(self):
+        """Flush pending logs and stop the worker thread."""
+        if self._closed:
+            return
+        self._closed = True
+        try:
+            self.queue.put(None, timeout=1.0)
+        except queue.Full:
+            pass
+        self.queue.join()
+        self.worker.join(timeout=5.0)
+        try:
+            atexit.unregister(self.close)
+        except Exception:
+            pass
+
+    def __del__(self):
+        self.close()
+
+
+# -----------------------------------------------------------------------------
+# Configuration loading helpers
+# -----------------------------------------------------------------------------
+
+def _is_dry_run() -> bool:
+    for arg in sys.argv:
+        if arg in ("-n", "--dry-run", "dry-run", "--dryrun"):
+            return True
+    return False
+
+
+def _get_cli_config_value(key_name: str) -> Optional[str]:
+    """Parse --config key=value style CLI arguments."""
+    try:
+        if "--config" in sys.argv:
+            idx = sys.argv.index("--config")
+            for arg in sys.argv[idx + 1 :]:
+                if arg.startswith("-"):
+                    break
+                if "=" in arg:
+                    k, v = arg.split("=", 1)
+                    if k == key_name:
+                        return v
+    except Exception:
+        pass
+    return None
+
+
+def _load_yaml_config(path: str) -> Optional[Dict[str, Any]]:
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            return yaml.safe_load(f) or {}
+    except Exception as e:
+        logger.debug(f"Failed to load config from {path}: {e}")
+    return None
+
+
+def load_monitor_config(snakemake_config: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Locate and load the monitor configuration file.
+
+    Priority:
+      1. --config monitor_conf=...
+      2. --config analysisyaml=...
+      3. Snakemake config dict (monitor_conf / loki_url / omichub_*)
+      4. Environment variable SNAKEMAKE_MONITOR_CONF
+      5. Current directory monitor_config.yaml
+      6. Current directory config/monitor_config.yaml
+    """
+    possible_paths = [
+        _get_cli_config_value("monitor_conf"),
+        _get_cli_config_value("analysisyaml"),
+        snakemake_config.get("monitor_conf"),
+        os.environ.get("SNAKEMAKE_MONITOR_CONF"),
+        snakemake_config.get("analysisyaml"),
+        "monitor_config.yaml",
+        "config/monitor_config.yaml",
+    ]
+
+    config: Dict[str, Any] = {}
+    loaded_path = None
+
+    for path in possible_paths:
+        if path and os.path.exists(path):
+            loaded_config = _load_yaml_config(path)
+            if loaded_config is not None and MONITOR_CONFIG_KEYS.intersection(loaded_config):
+                config = loaded_config
+                loaded_path = path
+                break
+
+    if loaded_path:
+        logger.debug(f"Loaded monitor config from: {loaded_path}")
+
+    # Merge explicit snakemake config values as overrides
+    for key in MONITOR_CONFIG_KEYS:
+        if key in snakemake_config:
+            config[key] = snakemake_config[key]
+
+    return config
+
+
+def merge_env_config(config: Dict[str, Any]) -> Dict[str, Any]:
+    """Overlay environment variable fallbacks for monitor settings."""
+    merged = dict(config)
+    for key, env_name in ENV_VAR_MAP.items():
+        value = os.environ.get(env_name)
+        if value is not None and key not in merged:
+            # Try to coerce booleans/numbers for known fields
+            lower = value.lower()
+            if lower in ("true", "1", "yes"):
+                merged[key] = True
+            elif lower in ("false", "0", "no"):
+                merged[key] = False
+            else:
+                try:
+                    if key in {
+                        "omichub_monitor_timeout",
+                        "omichub_monitor_queue_size",
+                        "omichub_monitor_retry_count",
+                        "omichub_monitor_retry_backoff",
+                    }:
+                        if "." in value:
+                            merged[key] = float(value)
+                        else:
+                            merged[key] = int(value)
+                    else:
+                        merged[key] = value
+                except ValueError:
+                    merged[key] = value
+    return merged
+
+
+def resolve_env_placeholders(config: Dict[str, Any]) -> Dict[str, Any]:
+    """Resolve ${ENV_NAME} placeholders inside config values."""
+    resolved = dict(config)
+    pattern = re.compile(r"\$\{([A-Za-z_][A-Za-z0-9_]*)\}")
+
+    for key, value in resolved.items():
+        if not isinstance(value, str):
+            continue
+        match = pattern.fullmatch(value)
+        if match:
+            env_name = match.group(1)
+            env_value = os.environ.get(env_name)
+            if env_value is not None:
+                resolved[key] = env_value
+            elif key in SENSITIVE_KEYS:
+                # Do not send raw placeholder as a secret
+                logger.warning(
+                    f"Environment variable {env_name} for {key} is not set; "
+                    "leaving config value empty."
+                )
+                resolved[key] = ""
+            else:
+                resolved[key] = value
+    return resolved
+
+
+def mask_sensitive_config(config: Dict[str, Any]) -> Dict[str, Any]:
+    """Return a copy of config with sensitive values masked for safe logging."""
+    safe = {}
+    for key, value in config.items():
+        if key in SENSITIVE_KEYS and value:
+            safe[key] = "***"
+        else:
+            safe[key] = value
+    return safe
+
+
+def setup_loki_if_enabled(config: Dict[str, Any]):
+    """Add the Loki sink if loki_url is configured."""
+    loki_url = config.get("loki_url")
+    project_name = config.get("project_name")
+    if not loki_url:
+        return None
+
+    try:
+        handler = LokiHandler(loki_url, project_name)
+        logger.add(
+            handler.write,
+            serialize=True,
+            enqueue=True,
+            level="INFO",
+        )
+        logger.info(
+            f"Analysis logs will be pushed to Loki server: [bold underline]{handler.endpoint}[/bold underline]"
+        )
+        return handler
+    except Exception as e:
+        logger.error(f"Failed to initialize Loki sink: {e}")
+    return None
+
+
+def setup_omichub_monitor_if_enabled(config: Dict[str, Any]):
+    """Add the OmicHub native monitor sink if omichub_monitor_url is configured."""
+    monitor_url = config.get("omichub_monitor_url")
+    if not monitor_url:
+        return None
+
+    token = config.get("omichub_monitor_token") or None
+    if not token:
+        logger.warning(
+            "OmicHub monitor URL is configured but no token was provided. "
+            "Requests may be rejected by the server."
+        )
+
+    project_name = config.get("project_name")
+    task_id = config.get("omichub_task_id")
+    flow_id = config.get("omichub_flow_id")
+    user_id = config.get("omichub_user_id")
+
+    sign_requests = config.get("omichub_monitor_sign_requests", False)
+    signing_key = config.get("omichub_monitor_signing_key") or None
+    if sign_requests and not signing_key and token:
+        # First phase fallback: use token as signing key
+        signing_key = token
+
+    encrypt_payload = config.get("omichub_monitor_encrypt_payload", False)
+    encryption_key = config.get("omichub_monitor_encryption_key") or None
+
+    tls_verify = config.get("omichub_monitor_tls_verify", True)
+    timeout = config.get("omichub_monitor_timeout", 5.0)
+    queue_size = config.get("omichub_monitor_queue_size", 10000)
+    retry_count = config.get("omichub_monitor_retry_count", 3)
+    retry_backoff = config.get("omichub_monitor_retry_backoff", 0.5)
+
+    if not tls_verify and monitor_url.startswith("https"):
+        logger.warning(
+            "OmicHub monitor TLS verification is disabled. "
+            "This should only be used in local development."
+        )
+
+    try:
+        handler = OmicHubMonitorHandler(
+            monitor_url=monitor_url,
+            token=token,
+            project_name=project_name,
+            task_id=task_id,
+            flow_id=flow_id,
+            user_id=user_id,
+            sign_requests=sign_requests,
+            signing_key=signing_key,
+            encrypt_payload=encrypt_payload,
+            encryption_key=encryption_key,
+            tls_verify=tls_verify,
+            timeout=timeout,
+            queue_size=queue_size,
+            retry_count=retry_count,
+            retry_backoff=retry_backoff,
+        )
+        logger.add(
+            handler.write,
+            serialize=True,
+            enqueue=True,
+            level="INFO",
+        )
+        logger.info(
+            f"Workflow events will be pushed to OmicHub monitor: [bold underline]{monitor_url}[/bold underline]"
+        )
+        return handler
+    except Exception as e:
+        logger.error(f"Failed to initialize OmicHub monitor sink: {e}")
+    return None
 
 
 def install(snakemake_config):
     """
     Install the monitor plugin configuration.
 
-    It searches for 'monitor_config.yaml' to configure the Loki sink.
+    It searches for 'monitor_config.yaml' to configure the Loki and/or OmicHub sinks.
     """
-
-    # 0. Check for Dry-run
-    is_dry_run = False
-    for arg in sys.argv:
-        if arg in ["-n", "--dry-run", "--dryrun"]:
-            is_dry_run = True
-            break
-
-    if is_dry_run:
+    if _is_dry_run():
         logger.info(
-            "[bold yellow]Dry-run detected: Loki logging is disabled.[/bold yellow]"
+            "[bold yellow]Dry-run detected: remote monitoring is disabled.[/bold yellow]"
         )
-        return
+        return {}
 
-    # Helper: Parse CLI args manually for config override
-    def _get_cli_config_value(key_name):
-        try:
-            if "--config" in sys.argv:
-                idx = sys.argv.index("--config")
-                for arg in sys.argv[idx + 1 :]:
-                    if arg.startswith("-"):
-                        break
-                    if "=" in arg:
-                        k, v = arg.split("=", 1)
-                        if k == key_name:
-                            return v
-        except Exception:
-            pass
-        return None
+    config = load_monitor_config(snakemake_config or {})
+    config = merge_env_config(config)
+    config = resolve_env_placeholders(config)
 
-    # 1. Determine config path candidates
-    possible_paths = [
-        _get_cli_config_value("analysisyaml"),
-        snakemake_config.get("monitor_conf"),
-        os.environ.get("SNAKEMAKE_MONITOR_CONF"),
-        _get_cli_config_value("monitor_conf"),
-        "monitor_config.yaml",
-        "config/monitor_config.yaml",
-    ]
+    if config:
+        safe_config = mask_sensitive_config(config)
+        logger.debug(f"Active monitor config: {safe_config}")
 
-    # 2. Find and Load Config
-    config = {}
-    loaded_path = None
+    setup_loki_if_enabled(config)
+    setup_omichub_monitor_if_enabled(config)
 
-    for path in possible_paths:
-        if path and os.path.exists(path):
-            try:
-                with open(path, "r", encoding="utf-8") as f:
-                    loaded_config = yaml.safe_load(f) or {}
-                    if "loki_url" in loaded_config:
-                        config = loaded_config
-                        loaded_path = path
-                        break
-            except Exception as e:
-                logger.debug(f"Failed to load config from {path}: {e}")
-
-    if loaded_path:
-        logger.debug(f"Loaded monitor config from: {loaded_path}")
-
-    # 3. Extract Settings
-    loki_url = config.get("loki_url") or snakemake_config.get("loki_url")
-    project_name = config.get("project_name") or snakemake_config.get("project_name")
-
-    # 4. Configure Loki Sink
-    if loki_url:
-        try:
-            handler = LokiHandler(loki_url, project_name)
-            logger.add(
-                handler.write,
-                serialize=True,  # Pass JSON string to handler
-                enqueue=True,  # Async logging
-                level="INFO",
-            )
-            logger.info(
-                f"Analysis logs will be pushed to Loki server: [bold underline]{handler.endpoint}[/bold underline]"
-            )
-        except Exception as e:
-            logger.error(f"Failed to initialize Loki sink: {e}")
-    
     return config
 
 
@@ -537,7 +766,7 @@ class LogHandler(LogHandlerBase):
         # P0: Notification state
         self._notified = False
 
-        # Configure Loki and get extra config
+        # Configure Loki / OmicHub and get extra config
         extra_config = install({})
         
         # Override notification settings from config file if not set via CLI/ENV

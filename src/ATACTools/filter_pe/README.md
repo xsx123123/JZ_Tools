@@ -118,6 +118,43 @@ rule RustFilterPE:
         """
 ```
 
+## 📡 Workflow Monitoring with OmicHub
+
+When this workflow is orchestrated by Snakemake, you can enable real-time monitoring on the OmicHub platform using the `snakemake-logger-plugin-rich-loguru` logger plugin (version ≥ 0.2.0).
+
+Create a `monitor_config.yaml` next to your Snakemake invocation directory:
+
+```yaml
+# Loki-compatible endpoint (Phase 1)
+loki_url: "http://web:8000/api/v1/workflow-monitor"
+project_name: "<task_id>"
+
+# Native OmicHub event endpoint (recommended)
+omichub_monitor_url: "https://omichub.example.edu/api/v1/workflow-monitor/events"
+omichub_monitor_token: "${OMICHUB_WORKFLOW_MONITOR_TOKEN}"
+omichub_task_id: "<task_id>"
+omichub_flow_id: "atac_seq"
+omichub_user_id: "<user_id>"
+
+# Security hardening (production)
+omichub_monitor_sign_requests: true
+omichub_monitor_signing_key: "${OMICHUB_WORKFLOW_MONITOR_SIGNING_KEY}"
+omichub_monitor_encrypt_payload: false
+omichub_monitor_encryption_key: "${OMICHUB_WORKFLOW_MONITOR_ENCRYPTION_KEY}"
+```
+
+Run Snakemake with the rich-loguru logger and the monitor config:
+
+```bash
+snakemake \
+  -s Snakefile \
+  --cores 8 \
+  --logger rich-loguru \
+  --config monitor_conf=monitor_config.yaml
+```
+
+For production deployments, always use `https://` for `omichub_monitor_url`. If the log content contains sensitive sample paths or commands and the transport path is not fully trusted, enable `omichub_monitor_encrypt_payload: true` for AES-256-GCM payload-level encryption.
+
 ---
 
 # ATAC-seq Paired-End Filter (Rust 版)
@@ -197,6 +234,43 @@ samtools sort -n -@ 8 input.bam -o input.namesorted.bam
 samtools sort -@ 8 clean.namesorted.bam -o final.clean.bam
 samtools index final.clean.bam
 ```
+
+## 📡 使用 OmicHub 监控工作流
+
+当本工作流通过 Snakemake 编排时，可以使用 `snakemake-logger-plugin-rich-loguru` 日志插件（版本 ≥ 0.2.0）在 OmicHub 平台启用实时监控。
+
+在 Snakemake 运行目录下创建 `monitor_config.yaml`：
+
+```yaml
+# Loki 兼容端点（第一期兼容方案）
+loki_url: "http://web:8000/api/v1/workflow-monitor"
+project_name: "<task_id>"
+
+# OmicHub 原生事件端点（推荐）
+omichub_monitor_url: "https://omichub.example.edu/api/v1/workflow-monitor/events"
+omichub_monitor_token: "${OMICHUB_WORKFLOW_MONITOR_TOKEN}"
+omichub_task_id: "<task_id>"
+omichub_flow_id: "atac_seq"
+omichub_user_id: "<user_id>"
+
+# 生产环境安全加固
+omichub_monitor_sign_requests: true
+omichub_monitor_signing_key: "${OMICHUB_WORKFLOW_MONITOR_SIGNING_KEY}"
+omichub_monitor_encrypt_payload: false
+omichub_monitor_encryption_key: "${OMICHUB_WORKFLOW_MONITOR_ENCRYPTION_KEY}"
+```
+
+使用 rich-loguru logger 并传入监控配置运行 Snakemake：
+
+```bash
+snakemake \
+  -s Snakefile \
+  --cores 8 \
+  --logger rich-loguru \
+  --config monitor_conf=monitor_config.yaml
+```
+
+生产环境务必将 `omichub_monitor_url` 配置为 `https://`。如果日志中可能包含敏感样本路径或命令，且不完全信任传输链路，可启用 `omichub_monitor_encrypt_payload: true` 进行 AES-256-GCM payload 级加密。
 
 ## 📝 License
 

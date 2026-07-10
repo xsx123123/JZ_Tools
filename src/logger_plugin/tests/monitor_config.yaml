@@ -1,0 +1,9 @@
+omichub_monitor_url: "http://127.0.0.1:18080/api/v1/workflow-monitor/events"
+omichub_monitor_token: "test-token-for-integration"
+omichub_task_id: "integration-task-001"
+omichub_flow_id: "logger_plugin_test"
+omichub_user_id: "integration-user"
+omichub_monitor_sign_requests: true
+omichub_monitor_signing_key: "test-sign-key"
+omichub_monitor_encrypt_payload: false
+project_name: "integration-task-001"

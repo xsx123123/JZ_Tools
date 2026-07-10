@@ -1,6 +1,6 @@
 # Snakemake Logger 增强插件：Rich-Loguru
 
-这是一个基于 Loguru 和 Rich 开发的 Snakemake 日志插件，旨在为生物信息学流程提供极度舒适的终端输出、结构化的本地记录，以及基于 **Grafana Loki** 的远程可视化监控。
+这是一个基于 Loguru 和 Rich 开发的 Snakemake 日志插件，旨在为生物信息学流程提供极度舒适的终端输出、结构化的本地记录，以及基于 **Grafana Loki** 和 **OmicHub** 的远程可视化监控。
 
 ## 🌟 核心特性
 
@@ -19,6 +19,10 @@
     - **项目隔离**：日志消息自动添加 `ProjectName |` 前缀，标签中包含 `project` 字段，轻松区分不同项目。
     - **异步非阻塞推送**：Loki 日志发送采用后台线程 + 5 秒超时机制，即使服务端不可达也不会阻塞 Snakemake 主流程。
     - **多实例状态隔离**：每个 Snakemake 流程拥有独立的进度追踪状态，彻底解决多项目并行运行时的进度串扰问题。
+- **OmicHub 原生监控集成**：
+    - 推送结构化原生事件 `omichub.workflow_event.v1`，包含 `task_id`、`flow_id`、`user_id`、`progress_percent` 等业务字段。
+    - 支持 Bearer Token 鉴权、HMAC-SHA256 签名、AES-256-GCM payload 加密。
+    - 支持有界队列、重试/退避、退出 flush，服务端不可达时不阻塞主流程。
 - **多平台推送告警**：新增对 **钉钉 (DingTalk)** 和 **飞书 (Feishu)** Webhook 的支持。在流程顺利完成或发生致命错误时，自动向您的即时通讯软件发送图文告警。
 - **高性能异步架构**：Loki 推送机制升级为 **生产者-消费者模型 (Queue + Worker Thread)**，有效处理高频日志，防止在高并发任务下产生大量瞬时线程，极大提升系统稳定性。
 
@@ -125,6 +129,106 @@ project_name: "Debug_Run"
 
 插件会在启动时自动检测并加载该文件。
 
+## 📡 OmicHub 平台监控
+
+从 **v0.2.0** 开始，插件新增对 **OmicHub** 平台的原生工作流监控推送能力，同时保留原有 Loki/Grafana 兼容能力。OmicHub 模式相比 Loki 兼容模式具有以下优势：
+
+- 原生事件结构（`omichub.workflow_event.v1`），便于平台直接解析任务状态。
+- 支持 `task_id` / `flow_id` / `user_id` 等业务字段，实现精准的任务归属与权限校验。
+- 支持 Bearer Token 鉴权、HMAC-SHA256 签名、AES-256-GCM payload 加密。
+
+### 配置参数
+
+| 参数名 | 环境变量 | 描述 |
+| :--- | :--- | :--- |
+| `omichub_monitor_url` | `SNAKEMAKE_OMICHUB_MONITOR_URL` | OmicHub 原生事件接收端点 |
+| `omichub_monitor_token` | `SNAKEMAKE_OMICHUB_MONITOR_TOKEN` | Bearer Token 鉴权凭据 |
+| `omichub_task_id` | `SNAKEMAKE_OMICHUB_TASK_ID` | 任务 ID（建议等于 `project_name`） |
+| `omichub_flow_id` | `SNAKEMAKE_OMICHUB_FLOW_ID` | 流程 ID，如 `rna_seq`、`atac_seq` |
+| `omichub_user_id` | `SNAKEMAKE_OMICHUB_USER_ID` | 任务归属用户 ID |
+| `omichub_monitor_sign_requests` | `SNAKEMAKE_OMICHUB_MONITOR_SIGN_REQUESTS` | 是否启用 HMAC 签名（默认 `false`） |
+| `omichub_monitor_signing_key` | `SNAKEMAKE_OMICHUB_MONITOR_SIGNING_KEY` | HMAC 签名密钥 |
+| `omichub_monitor_encrypt_payload` | `SNAKEMAKE_OMICHUB_MONITOR_ENCRYPT_PAYLOAD` | 是否启用 AES-256-GCM 加密（默认 `false`） |
+| `omichub_monitor_encryption_key` | `SNAKEMAKE_OMICHUB_MONITOR_ENCRYPTION_KEY` | Base64 编码的 32 字节 AES 密钥 |
+| `omichub_monitor_tls_verify` | `SNAKEMAKE_OMICHUB_MONITOR_TLS_VERIFY` | 是否校验 HTTPS 证书（默认 `true`） |
+| `omichub_monitor_timeout` | `SNAKEMAKE_OMICHUB_MONITOR_TIMEOUT` | 单次请求超时秒数（默认 `5`） |
+| `omichub_monitor_queue_size` | `SNAKEMAKE_OMICHUB_MONITOR_QUEUE_SIZE` | 事件队列大小（默认 `10000`） |
+| `omichub_monitor_retry_count` | `SNAKEMAKE_OMICHUB_MONITOR_RETRY_COUNT` | 网络错误/5xx 重试次数（默认 `3`） |
+| `omichub_monitor_retry_backoff` | `SNAKEMAKE_OMICHUB_MONITOR_RETRY_BACKOFF` | 重试退避基数秒（默认 `0.5`） |
+
+### 配置文件示例
+
+在工作流根目录下创建 `monitor_config.yaml`：
+
+```yaml
+# Loki 兼容端点（第一期兼容方案，可选）
+loki_url: "http://web:8000/api/v1/workflow-monitor"
+project_name: "<task_id>"
+
+# OmicHub 原生事件端点（推荐）
+omichub_monitor_url: "https://omichub.example.edu/api/v1/workflow-monitor/events"
+omichub_monitor_token: "${OMICHUB_WORKFLOW_MONITOR_TOKEN}"
+omichub_task_id: "<task_id>"
+omichub_flow_id: "rna_seq"
+omichub_user_id: "<user_id>"
+
+# 生产环境安全加固
+omichub_monitor_sign_requests: true
+omichub_monitor_signing_key: "${OMICHUB_WORKFLOW_MONITOR_SIGNING_KEY}"
+omichub_monitor_encrypt_payload: false
+omichub_monitor_encryption_key: "${OMICHUB_WORKFLOW_MONITOR_ENCRYPTION_KEY}"
+```
+
+### 运行方式
+
+```bash
+snakemake \
+  -s Snakefile \
+  --cores 8 \
+  --logger rich-loguru \
+  --config monitor_conf=monitor_config.yaml
+```
+
+> 注意：Snakemake 实际接受的 logger 名称是 `rich-loguru`（带连字符），与 `pyproject.toml` 中 entry point 名称 `rich_loguru`（下划线）不同。
+
+### 安全等级建议
+
+- **等级 A（内网开发）**：HTTP + Bearer Token。
+- **等级 B（生产推荐）**：HTTPS + Bearer Token + HMAC 签名。
+- **等级 C（高敏感）**：HTTPS + Bearer Token + HMAC 签名 + AES-256-GCM payload 加密。
+
+### 事件 Payload 示例
+
+OmicHub 原生事件包含 Snakemake 运行状态与进度信息：
+
+```json
+{
+  "schema_version": "omichub.workflow_event.v1",
+  "task_id": "<task_id>",
+  "flow_id": "rna_seq",
+  "user_id": "<user_id>",
+  "project_name": "<task_id>",
+  "timestamp": "2026-07-10T12:00:00Z",
+  "level": "info",
+  "source": "snakemake",
+  "message": "Finished jobid: 12 (Rule: trim_fastq)",
+  "snakemake": {
+    "rule": "trim_fastq",
+    "job_id": 12,
+    "event_type": "JobFinished",
+    "shell_command": null,
+    "progress_percent": 42.5,
+    "progress_details": "17/40"
+  },
+  "runtime": {
+    "host": "worker-host",
+    "pid": 12345,
+    "cwd": "/data/...",
+    "command": "snakemake -s ..."
+  }
+}
+```
+
 ## 🛠 使用方法
 
 ### 基础运行
@@ -224,6 +328,18 @@ max by (project) (
 > **提示**：建议将 Unit 设置为 `Misc -> Percent (0-100)`。
 
 ## 📋 版本历史
+
+### v0.2.1
+- **Bugfix**：将 Loki/OmicHub 后台 worker 线程改为 `daemon=True`，修复 Snakemake 任务完成后进程偶发挂起的问题。
+- **测试**：新增 `tests/mock_omichub_server.py` 与 `tests/monitor_config.yaml`，提供本地 OmicHub 集成测试能力。
+
+### v0.2.0
+- **新特性**：新增 **OmicHub 原生工作流监控推送**能力，支持 Bearer Token、HMAC-SHA256 签名、AES-256-GCM payload 加密。
+- **架构升级**：抽取公共事件解析器 `extract_snakemake_event()` 与公共进度追踪器 `SnakemakeProgressTracker`，Loki 与 OmicHub 共用同一套进度计算逻辑。
+- **配置增强**：支持仅含 `omichub_monitor_url` 的配置文件、`${ENV}` 占位符解析、`SNAKEMAKE_OMICHUB_*` 环境变量兜底，以及敏感字段自动脱敏。
+- **可靠性增强**：OmicHub handler 采用有界队列、可配置重试/退避、5 秒超时、`atexit` 退出 flush。
+- **依赖更新**：新增 `cryptography ^42.0.0`、`pyyaml ^6.0.3`。
+- **测试**：新增 `test_omichub_utils.py`、`test_security_utils.py`。
 
 ### v0.1.8 (Latest)
 - **新特性**：集成 **钉钉/飞书 Webhook 通知** 功功能，支持工作流成功/失败自动告警。

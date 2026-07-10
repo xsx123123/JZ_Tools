@@ -8,7 +8,127 @@ import logging
 from rich.logging import RichHandler
 from pathlib import Path
 from datetime import datetime
+import re
 import sys
+from typing import Dict, Any, Optional, Tuple
+
+
+# -----------------------------------------------------------------------------
+# Snakemake event parsing and progress tracking (shared by Loki and OmicHub)
+# -----------------------------------------------------------------------------
+
+class SnakemakeProgressTracker:
+    """
+    Track workflow progress across log messages.
+
+    State is intentionally isolated per instance so that multiple handlers
+    do not accidentally share mutable state across threads/processes.
+    """
+
+    def __init__(self, estimated_total_jobs: int = 1000):
+        self.estimated_total_jobs = estimated_total_jobs
+        self._state = {
+            "current": 0,
+            "real_total": 0,
+            "finished_ids": set(),
+        }
+
+    def update(self, raw_log: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Update progress state based on a raw log dict and return progress info.
+
+        Returns a dict with keys:
+            progress_percent, progress_details, current, total
+        """
+        msg = raw_log.get("msg", "")
+        state = self._state
+
+        # Case A: Precise "X of Y steps" log
+        match_progress = re.search(r"(\d+)\s+of\s+(\d+)\s+steps", msg)
+        if match_progress:
+            state["current"] = int(match_progress.group(1))
+            state["real_total"] = int(match_progress.group(2))
+
+        # Case B: "Finished jobid" event
+        elif raw_log.get("Event_Type") == "JobFinished" or re.search(
+            r"Finished jobid[:\s]\s*(\d+)", msg
+        ):
+            job_id_match = re.search(r"Finished jobid[:\s]\s*(\d+)", msg)
+            if job_id_match:
+                job_id = job_id_match.group(1)
+                if job_id not in state["finished_ids"]:
+                    state["finished_ids"].add(job_id)
+                    state["current"] += 1
+            else:
+                state["current"] += 1
+
+        # Case C: "Job stats" table total detection
+        match_total = re.search(r"^\s*total\s+(\d+)\s*$", msg, re.MULTILINE)
+        if match_total:
+            found_total = int(match_total.group(1))
+            if found_total > 0 and state["real_total"] == 0:
+                state["real_total"] = found_total
+
+        # Case D: Completion / Nothing to be done
+        if "Complete log(s):" in msg or "Nothing to be done" in msg:
+            if state["real_total"] > 0:
+                state["current"] = state["real_total"]
+            else:
+                state["current"] = self.estimated_total_jobs
+                state["real_total"] = self.estimated_total_jobs
+
+        denominator = state["real_total"] if state["real_total"] > 0 else self.estimated_total_jobs
+        denominator = max(denominator, 1)
+        progress = (state["current"] / denominator) * 100.0
+        progress = min(progress, 100.0)
+
+        return {
+            "progress_percent": round(progress, 2),
+            "progress_details": f"{state['current']}/{denominator}",
+            "current": state["current"],
+            "total": denominator,
+            "real_total": state["real_total"],
+        }
+
+
+def extract_snakemake_event(message: str) -> Tuple[str, Dict[str, Any]]:
+    """
+    Extract clean text and Snakemake properties from a log message.
+
+    Returns a tuple of (plain_text, properties) where properties may contain:
+        rule, job_id, event_type, shell_command
+    """
+    from rich.text import Text
+
+    try:
+        plain_text = Text.from_markup(message).plain
+    except Exception:
+        plain_text = message
+
+    properties: Dict[str, Any] = {}
+
+    # Pattern 1: Rule: <name>, Jobid: <id>
+    match1 = re.search(r"Rule:\s+(.+?),\s+Jobid:\s+(\d+)", plain_text)
+    if match1:
+        properties["rule"] = match1.group(1)
+        properties["job_id"] = int(match1.group(2))
+
+    # Pattern 2: Finished jobid: <id> (Rule: <name>)
+    match2 = re.search(
+        r"Finished jobid[:\s]\s*(\d+)(?:\s+\(Rule:\s+(.+?)\))?", plain_text
+    )
+    if match2:
+        properties["job_id"] = int(match2.group(1))
+        if match2.group(2):
+            properties["rule"] = match2.group(2)
+        properties["event_type"] = "JobFinished"
+
+    # Pattern 3: Shell command
+    if plain_text.startswith("Shell command: "):
+        properties["shell_command"] = plain_text.replace("Shell command: ", "").strip()
+        properties["event_type"] = "ShellCommand"
+
+    return plain_text, properties
 
 
 def setup_analysis_logging(
