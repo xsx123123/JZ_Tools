@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 name = "kegg-pull"
 version = "0.1.0"
 description = "Offline KEGG organism annotation downloader and GMT builder"
-readme = "KEGG_离线注释数据库下载指南.md"
+readme = "docs/KEGG_离线注释数据库下载指南.md"
 requires-python = ">=3.10"
 dependencies = [
     "loguru>=0.7",

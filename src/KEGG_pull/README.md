@@ -20,21 +20,23 @@
 src/KEGG_pull/
 ├── README.md
 ├── pyproject.toml
-├── download_kegg_annotations.py          # 兼容旧入口，转发到 kegg_pull.cli
-├── KEGG_离线注释数据库下载指南.md
-├── KEGG_database_download_spec.md
+├── docs/
+│   ├── KEGG_database_download_spec.md          # 英文技术实现文档
+│   └── KEGG_离线注释数据库下载指南.md            # 中文使用指南
+├── scripts/
+│   └── download_kegg_annotations.py            # 兼容旧入口，转发到 kegg_pull.cli
 └── kegg_pull/
     ├── __init__.py
-    ├── __main__.py                       # python -m kegg_pull
-    ├── cli.py                            # rich/rich-argparse CLI
-    ├── core.py                           # 下载、解析、转换核心逻辑
+    ├── __main__.py                             # python -m kegg_pull
+    ├── cli.py                                  # rich/rich-argparse CLI
+    ├── core.py                                 # 下载、解析、转换核心逻辑
     ├── config/
-    │   ├── default.yaml                  # 默认网络、日志配置
-    │   └── software.yaml                 # 软件名称、版本、logo 信息
+    │   ├── default.yaml                        # 默认网络、日志配置
+    │   └── software.yaml                       # 软件名称、版本、logo 信息
     └── utils/
-        ├── configuration.py              # YAML 配置加载
-        ├── logo.py                       # rich logo
-        └── log_utils.py                  # loguru + rich logging
+        ├── configuration.py                    # YAML 配置加载
+        ├── logo.py                             # rich logo
+        └── log_utils.py                        # loguru + rich logging
 ```
 
 ## 安装
@@ -106,7 +108,7 @@ kegg-pull ath --skip-download -o kegg_annotations
 旧脚本入口仍然可用：
 
 ```bash
-python3 src/KEGG_pull/download_kegg_annotations.py ath -o kegg_annotations
+python3 src/KEGG_pull/scripts/download_kegg_annotations.py ath -o kegg_annotations
 ```
 
 包模块入口也可用：
