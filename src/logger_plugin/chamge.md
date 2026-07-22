@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.3.0
+
+### Changed
+
+- 适配 **Rich 15.0.0**：`RichHandler._level_width` 属性在 rich 15 中已移除，改用 `CompactRichHandler`（重写 `get_level_text()`）实现紧凑级别输出，消除 3 处无效的内部属性赋值。
+- `log_config()` 使用 `Console.capture()` 上下文管理器替代 `Console(file=io.StringIO())`，更符合 rich 15 惯用 API。
+- `pyproject.toml` 依赖从 `rich = "^13.0.0"` 升级至 `rich = "^15.0.0"`。
+
+### Removed
+
+- 移除未使用的 `from rich.progress import Progress, SpinnerColumn, BarColumn, TextColumn` 导入。
+
 ## 0.2.1
 
 ### Fixed

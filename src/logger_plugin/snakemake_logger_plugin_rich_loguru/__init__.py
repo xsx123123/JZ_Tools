@@ -27,7 +27,6 @@ from rich.logging import RichHandler
 from rich.console import Console
 from rich.panel import Panel
 from rich.text import Text
-from rich.progress import Progress, SpinnerColumn, BarColumn, TextColumn
 from rich.table import Table
 from rich.align import Align
 from rich import box
@@ -699,14 +698,12 @@ class LogHandler(LogHandlerBase):
         style = getattr(self.settings, "style", "default")
         
         if style == "minimal":
-            rich_handler = RichHandler(
+            rich_handler = CompactRichHandler(
                 show_time=False,
                 show_path=False,
                 markup=True,
                 rich_tracebacks=True,
             )
-            # Use internal attribute to set level width to 0 for tighter spacing
-            rich_handler._level_width = 0
             
             hid = logger.add(
                 rich_handler,
@@ -715,7 +712,7 @@ class LogHandler(LogHandlerBase):
                 enqueue=True,
             )
         elif style == "detailed":
-            rich_handler = RichHandler(
+            rich_handler = CompactRichHandler(
                 show_time=True,
                 omit_repeated_times=False,
                 show_path=True,
@@ -723,7 +720,6 @@ class LogHandler(LogHandlerBase):
                 rich_tracebacks=True,
                 log_time_format="[%X]",
             )
-            rich_handler._level_width = 0
 
             hid = logger.add(
                 rich_handler,
@@ -740,7 +736,7 @@ class LogHandler(LogHandlerBase):
                 colorize=True
             )
         else:  # default style
-            rich_handler = RichHandler(
+            rich_handler = CompactRichHandler(
                 show_time=True,
                 omit_repeated_times=False,
                 show_path=False,
@@ -748,7 +744,6 @@ class LogHandler(LogHandlerBase):
                 rich_tracebacks=True,
                 log_time_format="[%X]",
             )
-            rich_handler._level_width = 0
 
             hid = logger.add(
                 rich_handler,

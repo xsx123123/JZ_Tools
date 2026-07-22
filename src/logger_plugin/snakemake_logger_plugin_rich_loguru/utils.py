@@ -273,19 +273,18 @@ def log_config(config_dict: dict, title="Configuration"):
     """Log a dictionary as a clean configuration block."""
     from rich.table import Table
     from rich.console import Console
-    import io
-    
+
     table = Table(title=title, show_header=True, header_style="bold magenta", box=None)
     table.add_column("Parameter", style="dim")
     table.add_column("Value", style="bold")
-    
+
     for k, v in config_dict.items():
         table.add_row(str(k), str(v))
-    
-    # Capture rich table output
-    console = Console(file=io.StringIO(), force_terminal=True, width=80)
-    console.print(table)
-    logger.info("\n" + console.file.getvalue())
+
+    console = Console(force_terminal=True, width=80)
+    with console.capture() as capture:
+        console.print(table)
+    logger.info("\n" + capture.get())
 
 
 def get_logger():
