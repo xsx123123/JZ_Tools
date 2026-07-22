@@ -1,38 +1,48 @@
 use anyhow::{Context, Result};
+use chrono::Local;
+use clap::builder::styling::{AnsiColor, Effects, Styles};
 use clap::Parser;
-use indicatif::{ParallelProgressIterator, ProgressBar, ProgressStyle};
-use log::{error, info, warn, LevelFilter};
+use indicatif::{MultiProgress, ParallelProgressIterator, ProgressBar, ProgressStyle};
+use nu_ansi_term::{Color, Style};
 use rayon::prelude::*;
 use serde::Deserialize;
 use std::fs::{self, File};
-use std::io::{self, BufReader, Read};
+use std::io::{self, BufReader, Read, Write as _};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::time::Duration;
 use std::sync::Arc;
-use tui_banner::{Banner, Style};
+use std::time::Duration;
+use tracing::{error, info, warn, Event, Subscriber};
+use tracing_subscriber::fmt::format::{FormatEvent, FormatFields, Writer};
+use tracing_subscriber::fmt::FmtContext;
+use tracing_subscriber::registry::LookupSpan;
+use tracing_subscriber::{fmt, layer::SubscriberExt, EnvFilter, Layer};
 
-// --- 数据结构 ---
+// --- Shared types ---
 
-/// 用于从 JSON 文件中反序列化数据的结构体
+#[derive(Debug, Clone, clap::ValueEnum)]
+enum LogFormat {
+    Text,
+    Json,
+}
+
+// --- Data structures ---
+
 #[derive(Deserialize, Debug)]
 struct RenamingReportEntry {
     sample_name: String,
     #[serde(rename = "library_type")]
     _library_type: String,
 
-    // PE Fields (必须是 Option，因为 SE 样本没有这些字段)
     new_r1_path_relative: Option<String>,
     md5_r1: Option<String>,
     new_r2_path_relative: Option<String>,
     md5_r2: Option<String>,
 
-    // SE Fields (必须是 Option，因为 PE 样本没有这些字段)
     new_se_path_relative: Option<String>,
     md5_se: Option<String>,
 }
 
-/// 用于在程序内部处理的验证任务
 #[derive(Debug, Clone)]
 struct VerificationTask {
     file_to_check: PathBuf,
@@ -40,7 +50,6 @@ struct VerificationTask {
     sample_name: String,
 }
 
-/// 存储单个文件验证结果的结构体
 #[derive(Debug)]
 struct VerificationResult {
     timestamp: String,
@@ -52,83 +61,319 @@ struct VerificationResult {
     message: String,
 }
 
-// --- 命令行参数 ---
+// --- CLI ---
 
-/// 基于 JSON 报告，使用多线程并发验证文件 MD5 校验和。
+const HELP_STYLES: Styles = Styles::styled()
+    .header(AnsiColor::Green.on_default().effects(Effects::BOLD))
+    .usage(AnsiColor::Cyan.on_default().effects(Effects::BOLD))
+    .literal(AnsiColor::Blue.on_default().effects(Effects::BOLD))
+    .placeholder(AnsiColor::Cyan.on_default())
+    .error(AnsiColor::Red.on_default().effects(Effects::BOLD))
+    .valid(AnsiColor::Green.on_default())
+    .invalid(AnsiColor::Yellow.on_default());
+
+const HELP_LOGO: &str = "\n\
+\x1b[1;37m    ███╗   ███╗██████╗ ██████╗     ██╗   ██╗██╗███████╗██╗████████╗███████╗██████╗ \x1b[0m\n\
+\x1b[1;37m    ████╗ ████║██╔══██╗╚════██╗    ██║   ██║██║██╔════╝██║╚══██╔══╝██╔════╝██╔══██╗\x1b[0m\n\
+\x1b[1;37m    ██╔████╔██║██║  ██║ █████╔╝    ██║   ██║██║█████╗  ██║   ██║   █████╗  ██████╔╝\x1b[0m\n\
+\x1b[1;37m    ██║╚██╔╝██║██║  ██║ ╚═══██╗    ╚██╗ ██╔╝██║██╔══╝  ██║   ██║   ██╔══╝  ██╔══██╗\x1b[0m\n\
+\x1b[1;37m    ██║ ╚═╝ ██║██████╔╝██████╔╝     ╚████╔╝ ██║██║     ██║   ██║   ███████╗██║  ██║\x1b[0m\n\
+\x1b[1;37m    ╚═╝     ╚═╝╚═════╝ ╚═════╝       ╚═══╝  ╚═╝╚═╝     ╚═╝   ╚═╝   ╚══════╝╚═╝  ╚═╝\x1b[0m\n\
+\x1b[36m              MD5 Checksum Verifier  │  Multi-threaded\x1b[0m\n";
+
+/// Verify file MD5 checksums concurrently based on a JSON report.
 #[derive(Parser, Debug)]
-#[command(author, version, about, long_about = None)]
+#[command(
+    author,
+    version,
+    about,
+    long_about = None,
+    color = clap::ColorChoice::Always,
+    styles = HELP_STYLES,
+    before_help = HELP_LOGO,
+    help_template = r#"{before-help}
+{about-with-newline}
+{usage-heading} {usage}
+
+{all-args}
+"#
+)]
 struct Cli {
-    /// 由 seq_preprocessor 生成的 JSON 报告文件。
+    /// JSON report produced by seq_preprocessor.
     #[arg(short, long)]
     input: PathBuf,
 
-    /// 包含已整理数据的根目录 (JSON 报告中相对路径的基准路径)。
+    /// Root directory containing the organized data (base for relative paths in the JSON report).
     #[arg(short, long, default_value = ".")]
     base_dir: PathBuf,
 
-    /// 用于并发验证的线程数 (0 表示使用 Rayon 的默认值)。
+    /// Number of threads for concurrent verification (0 uses Rayon's default).
     #[arg(short, long, default_value_t = 0)]
     threads: usize,
 
-    /// 生成 TSV 格式验证报告的输出文件路径。
+    /// Output path for the TSV verification report.
     #[arg(short, long)]
     output: Option<PathBuf>,
 
-    /// 指定日志文件的路径。
-    #[arg(long, default_value = "verifier.log")]
-    log_file: PathBuf,
+    /// Log file path. If not provided, a timestamped log file is created automatically.
+    #[arg(long, value_name = "FILE")]
+    log_file: Option<PathBuf>,
 
-    /// 优化的缓冲区大小 (字节)。
-    #[arg(long, default_value_t = 1024 * 1024)] // 1MB default
+    /// Console log level.
+    #[arg(long, default_value = "info")]
+    log_level: String,
+
+    /// Console log format.
+    #[arg(long, default_value = "text")]
+    log_format: LogFormat,
+
+    /// Read buffer size in bytes.
+    #[arg(long, default_value_t = 1024 * 1024)]
     buffer_size: usize,
 }
 
-// --- 核心功能函数 ---
+// --- Logging infrastructure ---
 
-/// 配置日志记录器
-fn setup_logger(log_path: &Path) -> Result<()> {
+static GLOBAL_MP: std::sync::LazyLock<MultiProgress> =
+    std::sync::LazyLock::new(MultiProgress::new);
+static BARS_ACTIVE: AtomicBool = AtomicBool::new(false);
+
+struct MpWriter {
+    buf: Vec<u8>,
+}
+
+impl io::Write for MpWriter {
+    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+        self.buf.extend_from_slice(buf);
+        Ok(buf.len())
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        if !self.buf.is_empty() {
+            let s = String::from_utf8_lossy(&self.buf);
+            let s = s.trim_end_matches('\n');
+            if !s.is_empty() {
+                if BARS_ACTIVE.load(Ordering::Relaxed) {
+                    let _ = GLOBAL_MP.println(s);
+                } else {
+                    eprintln!("{}", s);
+                }
+            }
+            self.buf.clear();
+        }
+        Ok(())
+    }
+}
+
+impl Drop for MpWriter {
+    fn drop(&mut self) {
+        let _ = self.flush();
+    }
+}
+
+struct ColoredFormatter;
+
+/// Truncate a string to a maximum character count without splitting multi-byte chars.
+fn truncate_to_width(s: &str, width: usize) -> String {
+    s.chars().take(width).collect()
+}
+
+impl<S, N> FormatEvent<S, N> for ColoredFormatter
+where
+    S: Subscriber + for<'a> LookupSpan<'a>,
+    N: for<'a> FormatFields<'a> + 'static,
+{
+    fn format_event(
+        &self,
+        ctx: &FmtContext<'_, S, N>,
+        mut writer: Writer<'_>,
+        event: &Event<'_>,
+    ) -> std::fmt::Result {
+        let use_color = writer.has_ansi_escapes();
+
+        let now = Local::now().format("%H:%M:%S");
+        if use_color {
+            write!(
+                writer,
+                "{} ",
+                Style::new()
+                    .fg(Color::Purple)
+                    .dimmed()
+                    .paint(format!("[{}]", now))
+            )?;
+        } else {
+            write!(writer, "[{}] ", now)?;
+        }
+
+        let level = event.metadata().level();
+        let level_text = format!("{:<5}", level);
+        if use_color {
+            let level_style = match *level {
+                tracing::Level::TRACE => Style::new().fg(Color::Fixed(8)).dimmed(),
+                tracing::Level::DEBUG => Style::new().fg(Color::Cyan).bold(),
+                tracing::Level::INFO => Style::new().fg(Color::Green).bold(),
+                tracing::Level::WARN => Style::new().fg(Color::Yellow).bold(),
+                tracing::Level::ERROR => Style::new().fg(Color::Red).bold(),
+            };
+            write!(writer, "{} ", level_style.paint(level_text))?;
+        } else {
+            write!(writer, "{} ", level_text)?;
+        }
+
+        let target = event.metadata().target();
+        let target_short = target
+            .rsplit_once("::")
+            .map(|(_, name)| name)
+            .unwrap_or(target);
+        let target_display = truncate_to_width(target_short, 12);
+        let pad = 12usize.saturating_sub(target_display.len());
+        let left = pad / 2;
+        let right = pad - left;
+        let target_centered = format!(
+            "[{}{}{}]",
+            " ".repeat(left),
+            target_display,
+            " ".repeat(right)
+        );
+        if use_color {
+            write!(
+                writer,
+                "{} ",
+                Style::new()
+                    .fg(Color::Cyan)
+                    .dimmed()
+                    .paint(target_centered)
+            )?;
+        } else {
+            write!(writer, "{} ", target_centered)?;
+        }
+
+        ctx.format_fields(writer.by_ref(), event)?;
+        writeln!(writer)
+    }
+}
+
+fn setup_logging(
+    base_dir: &Path,
+    log_file_override: Option<&Path>,
+    log_level: &str,
+    log_format: &LogFormat,
+) -> Result<()> {
+    let log_path = if let Some(path) = log_file_override {
+        path.to_path_buf()
+    } else {
+        let timestamp = Local::now().format("%Y-%m-%d_%H-%M-%S");
+        let log_name = format!("json_md5_verifier_{}.log", timestamp);
+        base_dir.join(log_name)
+    };
+
     if let Some(parent_dir) = log_path.parent() {
         fs::create_dir_all(parent_dir)?;
     }
-    fern::Dispatch::new()
-        .format(|out, message, record| {
-            out.finish(format_args!(
-                "{} [{}] {}",
-                chrono::Local::now().format("%Y-%m-%d %H:%M:%S"),
-                record.level(),
-                message
-            ))
-        })
-        .level(LevelFilter::Info)
-        .chain(io::stdout())
-        .chain(fern::log_file(log_path)?)
-        .apply()?;
+    let file = File::create(&log_path)?;
+
+    // File log: plain text, RFC 3339 timestamp, includes target and thread ID for troubleshooting.
+    let file_layer = fmt::layer()
+        .with_writer(file)
+        .with_ansi(false)
+        .with_target(true)
+        .with_thread_ids(true)
+        .with_timer(fmt::time::LocalTime::rfc_3339())
+        .with_filter(EnvFilter::new("debug"));
+
+    // Console log: respect RUST_LOG env var first, otherwise use --log-level.
+    let stdout_filter = EnvFilter::try_from_default_env()
+        .or_else(|_| EnvFilter::try_new(log_level))
+        .context("Invalid --log-level value")?;
+
+    match log_format {
+        LogFormat::Json => {
+            let json_layer = fmt::layer()
+                .json()
+                .with_writer(|| MpWriter { buf: Vec::new() })
+                .with_timer(fmt::time::LocalTime::rfc_3339())
+                .flatten_event(true)
+                .with_target(false)
+                .with_filter(stdout_filter);
+
+            let subscriber = tracing_subscriber::registry()
+                .with(file_layer)
+                .with(json_layer);
+            tracing::subscriber::set_global_default(subscriber)
+                .context("Failed to set subscriber")?;
+        }
+        LogFormat::Text => {
+            let stdout_layer = fmt::layer()
+                .compact()
+                .event_format(ColoredFormatter)
+                .with_writer(|| MpWriter { buf: Vec::new() })
+                .with_filter(stdout_filter);
+
+            let subscriber = tracing_subscriber::registry()
+                .with(file_layer)
+                .with(stdout_layer);
+            tracing::subscriber::set_global_default(subscriber)
+                .context("Failed to set subscriber")?;
+        }
+    }
+
+    info!("Log file created: {}", log_path.display());
     Ok(())
 }
 
-/// 获取优化的缓冲区大小（基于文件大小）
+// --- Banner ---
+
+fn print_banner() {
+    const LINES: &[&str] = &[
+        "    ███╗   ███╗██████╗ ██████╗     ██╗   ██╗██╗███████╗██╗████████╗███████╗██████╗ ",
+        "    ████╗ ████║██╔══██╗╚════██╗    ██║   ██║██║██╔════╝██║╚══██╔══╝██╔════╝██╔══██╗",
+        "    ██╔████╔██║██║  ██║ █████╔╝    ██║   ██║██║█████╗  ██║   ██║   █████╗  ██████╔╝",
+        "    ██║╚██╔╝██║██║  ██║ ╚═══██╗    ╚██╗ ██╔╝██║██╔══╝  ██║   ██║   ██╔══╝  ██╔══██╗",
+        "    ██║ ╚═╝ ██║██████╔╝██████╔╝     ╚████╔╝ ██║██║     ██║   ██║   ███████╗██║  ██║",
+        "    ╚═╝     ╚═╝╚═════╝ ╚═════╝       ╚═══╝  ╚═╝╚═╝     ╚═╝   ╚═╝   ╚══════╝╚═╝  ╚═╝",
+    ];
+
+    const LOGO_WIDTH: usize = 72;
+    let center = |s: &str| {
+        let pad = LOGO_WIDTH.saturating_sub(s.chars().count()) / 2;
+        format!("{}{}", " ".repeat(pad), s)
+    };
+
+    println!();
+    for line in LINES {
+        println!("{}", Color::White.bold().paint(*line));
+    }
+    println!(
+        "{}",
+        Color::Cyan.paint(center("MD5 Checksum Verifier  │  Multi-threaded"))
+    );
+    println!();
+    println!("{}", Color::Cyan.paint(center("Integrity is doing the right thing, even when no one is watching.")));
+    println!();
+}
+
+// --- Core functions ---
+
 fn get_optimal_buffer_size(file_path: &Path) -> usize {
     match fs::metadata(file_path) {
         Ok(metadata) => {
             let file_size = metadata.len();
-            if file_size > 1_000_000_000 { // 1GB
-                2 * 1024 * 1024 // 2MB buffer
-            } else if file_size > 100_000_000 { // 100MB
-                1024 * 1024 // 1MB buffer
+            if file_size > 1_000_000_000 {
+                2 * 1024 * 1024
+            } else if file_size > 100_000_000 {
+                1024 * 1024
             } else {
-                64 * 1024 // 64KB buffer
+                64 * 1024
             }
         }
-        Err(_) => 1024 * 1024, // Default to 1MB if we can't get file size
+        Err(_) => 1024 * 1024,
     }
 }
 
-/// 计算文件的 MD5 值
 fn calculate_md5(filepath: &Path, buffer_size: usize) -> io::Result<String> {
     let file = File::open(filepath)?;
     let mut reader = BufReader::new(file);
 
-    // Use optimized buffer size based on file characteristics
     let optimal_buffer_size = get_optimal_buffer_size(filepath);
     let effective_buffer_size = buffer_size.max(optimal_buffer_size);
 
@@ -145,9 +390,8 @@ fn calculate_md5(filepath: &Path, buffer_size: usize) -> io::Result<String> {
     Ok(format!("{:x}", context.compute()))
 }
 
-/// 执行单个文件的验证任务
 fn verify_file_task(task: &VerificationTask, buffer_size: usize) -> VerificationResult {
-    let timestamp = chrono::Local::now().format("%Y-%m-%d %H:%M:%S").to_string();
+    let timestamp = Local::now().format("%Y-%m-%d %H:%M:%S").to_string();
     let file_path_str = task.file_to_check.to_string_lossy().to_string();
 
     if !task.file_to_check.exists() {
@@ -164,7 +408,6 @@ fn verify_file_task(task: &VerificationTask, buffer_size: usize) -> Verification
 
     match calculate_md5(&task.file_to_check, buffer_size) {
         Ok(actual_md5) => {
-            // 如果是 SRA 数据（expected_md5 为 "SRA"），直接将计算出的 MD5 值作为结果
             if task.expected_md5.eq_ignore_ascii_case("SRA") {
                 VerificationResult {
                     timestamp,
@@ -173,7 +416,7 @@ fn verify_file_task(task: &VerificationTask, buffer_size: usize) -> Verification
                     expected_md5: task.expected_md5.clone(),
                     actual_md5,
                     status: "PASS",
-                    message: "SRA MD5 calculated".to_string()
+                    message: "SRA MD5 calculated".to_string(),
                 }
             } else if actual_md5.eq_ignore_ascii_case(&task.expected_md5) {
                 VerificationResult {
@@ -183,7 +426,7 @@ fn verify_file_task(task: &VerificationTask, buffer_size: usize) -> Verification
                     expected_md5: task.expected_md5.clone(),
                     actual_md5,
                     status: "PASS",
-                    message: "MD5 match".to_string()
+                    message: "MD5 match".to_string(),
                 }
             } else {
                 VerificationResult {
@@ -193,7 +436,7 @@ fn verify_file_task(task: &VerificationTask, buffer_size: usize) -> Verification
                     expected_md5: task.expected_md5.clone(),
                     actual_md5,
                     status: "FAIL",
-                    message: "MD5 mismatch".to_string()
+                    message: "MD5 mismatch".to_string(),
                 }
             }
         }
@@ -204,32 +447,68 @@ fn verify_file_task(task: &VerificationTask, buffer_size: usize) -> Verification
             expected_md5: task.expected_md5.clone(),
             actual_md5: "N/A".to_string(),
             status: "FAIL",
-            message: format!("Read error: {}", e)
+            message: format!("Read error: {}", e),
         },
     }
 }
 
-/// 将验证结果写入 TSV 报告
 fn generate_report(results: &[VerificationResult], output_file: &Path) -> Result<()> {
-    info!("--- 正在生成验证报告至: {} ---", output_file.display());
-    let mut writer = csv::WriterBuilder::new().delimiter(b'\t').from_path(output_file)?;
-    writer.write_record(&["CheckTime", "SampleName", "FilePath", "ExpectedMD5", "ActualMD5", "Status", "Message"])?;
+    info!("Generating verification report: {}", output_file.display());
+    let mut writer = csv::WriterBuilder::new()
+        .delimiter(b'\t')
+        .from_path(output_file)?;
+    writer.write_record(&[
+        "CheckTime",
+        "SampleName",
+        "FilePath",
+        "ExpectedMD5",
+        "ActualMD5",
+        "Status",
+        "Message",
+    ])?;
     for res in results {
-        writer.write_record(&[&res.timestamp, &res.sample_name, &res.file_path, &res.expected_md5, &res.actual_md5, res.status, &res.message])?;
+        writer.write_record(&[
+            &res.timestamp,
+            &res.sample_name,
+            &res.file_path,
+            &res.expected_md5,
+            &res.actual_md5,
+            res.status,
+            &res.message,
+        ])?;
     }
     writer.flush()?;
-    info!("报告生成完成。");
+    info!("Report generated successfully");
     Ok(())
 }
 
-// --- 主函数 ---
+fn print_summary_line(label: &str, passed: usize, failed: usize, fail_word: &str) {
+    let ok = Color::Green.bold().paint(format!("{} passed", passed));
+    let bad = if failed > 0 {
+        Color::Red.bold().paint(format!("{} {}", failed, fail_word))
+    } else {
+        Color::Green.paint(format!("0 {}", fail_word))
+    };
+    let head = if failed > 0 {
+        Color::Red.bold().paint(format!("✗ {}", label))
+    } else {
+        Color::Green.bold().paint(format!("✓ {}", label))
+    };
+    eprintln!("\n{}  ·  {}  ·  {}", head, ok, bad);
+}
+
+// --- Main ---
 
 fn main() -> Result<()> {
-    let banner = Banner::new("MD5 Verifier")?.style(Style::NeonCyber).render();
-    println!("{}", banner);
-
     let cli = Cli::parse();
-    setup_logger(&cli.log_file)?;
+
+    print_banner();
+    setup_logging(
+        &cli.base_dir,
+        cli.log_file.as_deref(),
+        &cli.log_level,
+        &cli.log_format,
+    )?;
 
     if cli.threads > 0 {
         rayon::ThreadPoolBuilder::new()
@@ -238,20 +517,18 @@ fn main() -> Result<()> {
             .build_global()?;
     }
 
-    info!("--- 开始 MD5 验证流程 ---");
-    info!("正在读取并解析 JSON 报告: {}", cli.input.display());
+    info!("Starting MD5 verification pipeline");
+    info!("Reading JSON report: {}", cli.input.display());
 
     let json_content = fs::read_to_string(&cli.input)
-        .context(format!("无法读取 JSON 文件: {}", cli.input.display()))?;
+        .context(format!("Cannot read JSON file: {}", cli.input.display()))?;
     let report_entries: Vec<RenamingReportEntry> = serde_json::from_str(&json_content)
-        .context("解析 JSON 文件失败，请检查文件格式是否正确。")?;
+        .context("Failed to parse JSON file, please check the format.")?;
 
     let mut tasks = Vec::new();
 
-    // 收集验证任务
-    info!("正在从报告中收集验证任务...");
+    info!("Collecting verification tasks from report...");
     for entry in &report_entries {
-        // 检查 R1 (PE)
         if let (Some(md5_r1), Some(path_r1)) = (&entry.md5_r1, &entry.new_r1_path_relative) {
             tasks.push(VerificationTask {
                 file_to_check: cli.base_dir.join(path_r1),
@@ -260,7 +537,6 @@ fn main() -> Result<()> {
             });
         }
 
-        // 检查 R2 (PE)
         if let (Some(md5_r2), Some(path_r2)) = (&entry.md5_r2, &entry.new_r2_path_relative) {
             tasks.push(VerificationTask {
                 file_to_check: cli.base_dir.join(path_r2),
@@ -269,7 +545,6 @@ fn main() -> Result<()> {
             });
         }
 
-        // 检查 SE (Long-Read)
         if let (Some(md5_se), Some(path_se)) = (&entry.md5_se, &entry.new_se_path_relative) {
             tasks.push(VerificationTask {
                 file_to_check: cli.base_dir.join(path_se),
@@ -281,22 +556,27 @@ fn main() -> Result<()> {
 
     let num_tasks = tasks.len();
     if num_tasks == 0 {
-        warn!("JSON 报告中未包含任何有效的 MD5 记录，无需验证。");
+        warn!("No valid MD5 records found in JSON report, nothing to verify.");
         return Ok(());
     }
 
     info!(
-        "找到 {} 个文件待验证，开始使用 {} 个线程进行处理。",
+        "Found {} files to verify using {} threads",
         num_tasks,
         rayon::current_num_threads()
     );
 
     let pb = ProgressBar::new(num_tasks as u64);
-    pb.set_style(ProgressStyle::default_bar()
-        .template("{spinner:.green} [{elapsed_precise}] [{bar:40.cyan/blue}] {pos}/{len} ({percent}%) | {per_sec} | ETA: {eta}")?
-        .progress_chars("##-"));
-
+    pb.set_style(
+        ProgressStyle::default_bar()
+            .template("{spinner:.green} [{elapsed_precise}] [{bar:40.cyan/blue}] {pos}/{len} ({percent}%) | {per_sec} | ETA: {eta}")?
+            .progress_chars("##-"),
+    );
     pb.enable_steady_tick(Duration::from_millis(100));
+
+    let mp = GLOBAL_MP.clone();
+    let pb = mp.add(pb);
+    BARS_ACTIVE.store(true, Ordering::Relaxed);
 
     let has_failures = Arc::new(AtomicBool::new(false));
 
@@ -307,28 +587,34 @@ fn main() -> Result<()> {
             let result = verify_file_task(task, cli.buffer_size);
             if result.status == "FAIL" {
                 has_failures.store(true, Ordering::Relaxed);
-                error!("[FAIL] 样本: {}, 文件: {}, 原因: {}", task.sample_name, task.file_to_check.display(), result.message);
+                error!(
+                    "[FAIL] Sample: {}, File: {}, Reason: {}",
+                    task.sample_name,
+                    task.file_to_check.display(),
+                    result.message
+                );
                 if result.message == "MD5 mismatch" {
-                    error!("    - 预期: {}", result.expected_md5);
-                    error!("    - 实际:   {}", result.actual_md5);
+                    error!("    - Expected: {}", result.expected_md5);
+                    error!("    - Actual:   {}", result.actual_md5);
                 }
             }
             result
         })
         .collect();
 
+    BARS_ACTIVE.store(false, Ordering::Relaxed);
+
     if let Some(output_path) = &cli.output {
         generate_report(&results, output_path)?;
     }
 
-    info!("======================================================");
+    let passed = results.iter().filter(|r| r.status == "PASS").count();
+    let failed = results.iter().filter(|r| r.status == "FAIL").count();
+    print_summary_line("Verification finished", passed, failed, "failed");
+
     if has_failures.load(Ordering::Relaxed) {
-        error!("验证过程中发现错误。请检查日志和报告文件以获取详细信息。");
-        std::process::exit(1);
-    } else {
-        info!("所有 {} 个文件均成功通过验证！", results.len());
+        anyhow::bail!("Errors found during verification. Check log and report for details.");
     }
-    info!("======================================================");
 
     Ok(())
 }
