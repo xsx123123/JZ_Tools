@@ -1,0 +1,42 @@
+Raw Data QC & Trimming:
+  - name: fastp
+    package: fastp
+  - name: FastQC
+    package: fastqc
+  - name: MultiQC
+    package: multiqc
+  - name: Cutadapt
+    package: cutadapt
+Alignment:
+  - name: STAR
+    package: star
+  - name: HISAT2
+    package: hisat2
+  - name: Samtools
+    package: samtools
+Quantification:
+  - name: featureCounts
+    package: subread
+  - name: Salmon
+    package: salmon
+  - name: HTSeq
+    package: htseq
+Differential Analysis:
+  - name: DESeq2
+    package: bioconductor-deseq2
+  - name: edgeR
+    package: bioconductor-edger
+  - name: limma
+    package: bioconductor-limma
+Functional Enrichment:
+  - name: clusterProfiler
+    package: bioconductor-clusterprofiler
+  - name: GOseq
+    package: bioconductor-goseq
+Environment & Language:
+  - name: Snakemake
+    package: snakemake
+  - name: Python
+    package: python
+  - name: R
+    package: r-base
