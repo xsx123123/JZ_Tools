@@ -31,14 +31,39 @@ src/tanglegramplot/
 
 ## 依赖项
 
+- **R ≥ 4.1.0**（`tanglegram.R` 使用原生管道 `|>`，低于此版本会直接解析失败）。
+
 ```r
-install.packages(c("ape", "ggplot2", "dplyr", "viridis"))
+install.packages(c("ape", "ggplot2", "dplyr", "viridisLite", "optparse", "jsonlite"))
 if (!requireNamespace("BiocManager", quietly = TRUE)) install.packages("BiocManager")
 BiocManager::install("ggtree")
 
 # 可选：用于 pre.rotate() 减少连线交叉（不使用也可正常运行）
 install.packages("TangleR")
 ```
+
+注意：配色用的是 **viridisLite**（viridis 包的轻量依赖，viridis 装了就一定有），不是 viridis。
+
+## 使用前提（不满足会在画图前报错，请先逐条核对）
+
+1. **两棵树的 tip 集合完全一致**（逐字符匹配）。`my.tanglegram()` 第 0 步会做双向 `setdiff` 校验，不一致直接 `stop` 并列出"仅在左树/仅在右树"的 tip。常见原因：两棵树的序列集不同、命名不一致（ID 后缀/大小写/引号）、有一棵的 tip 被过滤过。
+2. **注释表（`%<+%` 挂接的 data.frame）必须有 `label` 列**，且树的每个 tip 都能在 `label` 列找到；`label` 不允许重复。多余的 label 不报错但会被 ggtree 忽略。
+3. **`column` 参数指定的着色列必须存在于注释表中**（如 `"family"`），否则 `geom_line`/`geom_point` 的 `aes` 映射报错。
+4. **bootstrap 值来源**：树上内部节点的**数字节点标签**（IQ-TREE/RAxML 的 `.treefile` 默认就是）。若你的树没有节点标签，bootstrap 标注会全部静默跳过（不是报错，但图上没有数字）；非数字标签（如根节点的空标签）自动跳过。
+5. **用 `pre.rotate()` 旋转过节点后，构建 ggtree 必须 `ladderize = FALSE`**，否则旋转结果被梯子化重排覆盖。
+6. 传 `cols` 自定义配色时，命名向量必须**覆盖该列全部水平**，缺水平 `scale_color_manual` 会直接报错（报信息会列出缺失水平）。
+7. shell 里以 `#` 开头的颜色值（如 `"#C0392B"`）**必须加引号**，否则 `#` 后内容被 shell 当注释吃掉。
+
+## 常见报错速查
+
+| 报错 | 原因与处置 |
+|---|---|
+| `两棵树 tip 不一致：仅在左树: ... 仅在右树: ...` | 前提 1 不满足；按列出的 tip 核对两棵树的命名。 |
+| 注释表挂接后连不上/`column` 找不到 | 前提 2/3；检查 CSV 是否有 `label` 列、列名拼写、`check.names=FALSE`。 |
+| `could not find function "mutate"/"filter"` 等 | 依赖包没装全；按上面依赖项安装（函数内已用 `dplyr::` 前缀，装好包即可，无需 `library(dplyr)`）。 |
+| `ggtree() 报警告 "Arguments in ... must be used"` | 你给 `ggtree()` 传了它不认识的参数（如旧写法 `color=`）；分支颜色由 `my.tanglegram()` 的 `t1_color/t2_color` 控制，无需在 `ggtree()` 传色。 |
+| 图上没有 bootstrap 数字 | 树上没有数字节点标签，或全部低于 `bs_cutoff`；用 `bs_cutoff = 0` 排查。 |
+| 提示找不到 TangleR | 可选依赖；装 `install.packages("TangleR")` 可减少连线交叉，不装不影响出图。 |
 
 ## 函数文档
 

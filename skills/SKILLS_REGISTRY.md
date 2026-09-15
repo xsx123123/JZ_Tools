@@ -29,6 +29,7 @@
 | rmats | rMATS event merger | `src/rMATS/merge_rmats_summary.py` | 可执行型 | 0.9.0 | 待验证 | 无 | 合并已有 rMATS 事件表。 |
 | scrna-seq | scrna-seq | `src/scRNA-seq/infercnv/` | 可执行型 | 0.9.0 | 待验证 | inferCNV 与 AnnoProbe 资源 | 供给说明见 `scrna-seq/references/provisioning.md`。 |
 | software-manager | Conda environment software inventory | `src/software_manager/` | 可执行型 | 0.9.0 | 待验证 | 无 | 解析 Conda/Pip 环境声明。 |
+| tanglegram | Tanglegram 双树缠绕图 | `src/tanglegramplot/tanglegram.R` | 可执行型 | 0.9.0 | 待验证 | 无 | 两棵同 tip 集合的树 + 注释表，标注 bootstrap、分支与连线着色。 |
 | tissue-specific-genes | tissue-specific-genes | `src/Tissue-specific-genes/` | 可执行型 | 0.9.0 | 待验证 | 无 | TPM、Tau 与扩展 Tau 筛选。 |
 | wgcna | wgcna | `src/wgcna/` | 可执行型 | 0.9.0 | 待验证 | 无 | 基于已有 WGCNA RDS 筛选 hub genes。 |
 
@@ -49,4 +50,5 @@
 
 | 日期 | 变更 | 涉及技能 |
 |---|---|---|
+| 2026-09-15 | 新增 `tanglegram` 技能（src/tanglegramplot 魔改函数 + optparse CLI wrapper），并回写台账。 | tanglegram |
 | 2026-08-03 | 建立首版汇总台账，登记当前已转换的 24 个技能，并记录尚未 skill 化模块。 | 全部已登记技能 |
