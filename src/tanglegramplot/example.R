@@ -92,18 +92,15 @@ p <- my.tanglegram(tree1, tree2,
                    t1_color = "#C0392B",       # 左树（TnpA）分支颜色：红
                    t2_color = "#2980B9",       # 右树（TnpD）分支颜色：蓝
                    bs_cutoff = 70) +           # 仅标注 bootstrap >= 70 的节点
-  theme_tree2() +
-  scale_x_continuous(breaks = seq(0, 10, by = 0.5)) +
+  theme_tree() +
+  geom_treescale(x = 0, y = 1, width = 0.5, fontsize = 3, linesize = 0.5) +
   theme(legend.position = "bottom",
         legend.title    = element_text(size = 10),
         legend.text     = element_text(size = 9))
 
 # 图例只显示点、不显示线段
 p <- p + guides(color = guide_legend(
-  override.aes = list(linetype = 0,  # 去掉图例中的线段
-                      shape    = 16, # 实心圆点
-                      size     = 4,  # 图例里点的大小
-                      alpha    = 1))) +
+  override.aes = list(linetype = 0, shape = 16, size = 4, alpha = 1))) +
   theme(legend.position = "bottom")
 
 # ========== 10. 保存 ==========

@@ -15,7 +15,7 @@ target
 ./examples
 ./deps
 ./incremental
-*/Compile_release
+Compile_release/
 __pycache__
 __pycache__/
 *.py[cod]
