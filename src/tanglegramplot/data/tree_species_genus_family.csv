@@ -1,0 +1,49 @@
+label,species,genus,family,family_cn,chinese_name,group
+Boleracea_02-12_v1.0,Brassica oleracea,Brassica,Brassicaceae,十字花科,甘蓝,双子叶
+Fragaria_Royal_Royce_v1.0,Fragaria × ananassa,Fragaria,Rosaceae,蔷薇科,栽培草莓,双子叶
+IRGSP-1.0,Oryza sativa,Oryza,Poaceae,禾本科,水稻,单子叶
+Tifrunner_gnm2.J5K5,Arachis hypogaea,Arachis,Fabaceae,豆科,花生,双子叶
+Malus_GDDH13_v1.1,Malus × domestica,Malus,Rosaceae,蔷薇科,苹果,双子叶
+TAIR10,Arabidopsis thaliana,Arabidopsis,Brassicaceae,十字花科,拟南芥,双子叶
+Citrus_sinensis_DVS_A1.0,Citrus sinensis,Citrus,Rutaceae,芸香科,甜橙,双子叶
+Pyrus_communis_drPyrComm1.1,Pyrus communis,Pyrus,Rosaceae,蔷薇科,西洋梨,双子叶
+Vitis_vinifera_ASM3070453v1,Vitis vinifera,Vitis,Vitaceae,葡萄科,葡萄,双子叶
+Prunus_dulcis_ALMONDv2,Prunus dulcis,Prunus,Rosaceae,蔷薇科,扁桃,双子叶
+Cajanus_cajan_V1.0,Cajanus cajan,Cajanus,Fabaceae,豆科,木豆,双子叶
+Vigna_radiata_Vradiata_ver6,Vigna radiata,Vigna,Fabaceae,豆科,绿豆,双子叶
+Glycine_max_v2.1,Glycine max,Glycine,Fabaceae,豆科,大豆,双子叶
+Neltuma_alba_ASM479914v2,Neltuma alba,Neltuma,Fabaceae,豆科,白牧豆树,双子叶
+Amaranthus_tricolor_ASM2621246v1,Amaranthus tricolor,Amaranthus,Amaranthaceae,苋科,三色苋,双子叶
+Miscanthus_floridulus_ASM1932011v1,Miscanthus floridulus,Miscanthus,Poaceae,禾本科,五节芒,单子叶
+Zm-B73-REFERENCE-NAM-5.0,Zea mays,Zea,Poaceae,禾本科,玉米,单子叶
+Oryza_brachyantha_ObraRS2,Oryza brachyantha,Oryza,Poaceae,禾本科,短花药野生稻,单子叶
+Sorghum_bicolor_NCBIv3,Sorghum bicolor,Sorghum,Poaceae,禾本科,高粱,单子叶
+Triticum_aestivum_IWGSC_CS_RefSeq_v2.1,Triticum aestivum,Triticum,Poaceae,禾本科,普通小麦,单子叶
+Triticum_dicoccoides_WEW_v2.0,Triticum dicoccoides,Triticum,Poaceae,禾本科,野生二粒小麦,单子叶
+Bidens_hawaiensis_p1.1,Bidens hawaiensis,Bidens,Asteraceae,菊科,夏威夷鬼针草,双子叶
+HanXRQr2.0-SUNRISE,Helianthus annuus,Helianthus,Asteraceae,菊科,向日葵,双子叶
+Erigeron_canadensis_v1,Erigeron canadensis,Erigeron,Asteraceae,菊科,小蓬草,双子叶
+Cichorium_intybus_ASM2352571v1,Cichorium intybus,Cichorium,Asteraceae,菊科,菊苣,双子叶
+Taraxacum_mongolicum_TM5,Taraxacum mongolicum,Taraxacum,Asteraceae,菊科,蒙古蒲公英,双子叶
+Lettuce,Lactuca sativa,Lactuca,Asteraceae,菊科,莴苣/生菜,双子叶
+Taraxacum_kok-saghyz_GWHAAAA00000000,Taraxacum kok-saghyz,Taraxacum,Asteraceae,菊科,橡胶草,双子叶
+Ptaeda2.0,Pinus taeda,Pinus,Pinaceae,松科,火炬松,裸子植物
+Annona_glabra,Annona glabra,Annona,Annonaceae,番荔枝科,圆滑番荔枝,木兰类
+Annona_cherimola,Annona cherimola,Annona,Annonaceae,番荔枝科,毛叶番荔枝,木兰类
+Aristolochia_contorta,Aristolochia contorta,Aristolochia,Aristolochiaceae,马兜铃科,北马兜铃,木兰类
+Cinnamomum_burmannii,Cinnamomum burmannii,Cinnamomum,Lauraceae,樟科,阴香,木兰类
+Cinnamomum_camphora,Cinnamomum camphora,Cinnamomum,Lauraceae,樟科,樟/香樟,木兰类
+Cinnamomum_kanehirae,Cinnamomum kanehirae,Cinnamomum,Lauraceae,樟科,牛樟,木兰类
+Lindera_glauca,Lindera glauca,Lindera,Lauraceae,樟科,山胡椒,木兰类
+Lindera_megaphylla,Lindera megaphylla,Lindera,Lauraceae,樟科,黑壳楠,木兰类
+Litsea_cubeba,Litsea cubeba,Litsea,Lauraceae,樟科,山鸡椒/木姜子,木兰类
+Phoebe_bournei,Phoebe bournei,Phoebe,Lauraceae,樟科,闽楠,木兰类
+Persea_americana,Persea americana,Persea,Lauraceae,樟科,牛油果/鳄梨,木兰类
+Liriodendron_chinense,Liriodendron chinense,Liriodendron,Magnoliaceae,木兰科,鹅掌楸,木兰类
+Magnolia_biondii,Magnolia biondii,Magnolia,Magnoliaceae,木兰科,望春花,木兰类
+Magnolia_obovata,Magnolia obovata,Magnolia,Magnoliaceae,木兰科,日本厚朴,木兰类
+Magnolia_officinalis,Magnolia officinalis,Magnolia,Magnoliaceae,木兰科,厚朴,木兰类
+Magnolia_sinica,Magnolia sinica,Magnolia,Magnoliaceae,木兰科,华盖木,木兰类
+Saururus_chinensis,Saururus chinensis,Saururus,Saururaceae,三白草科,三白草,木兰类
+Warburgia_ugandensis,Warburgia ugandensis,Warburgia,Canellaceae,白桂皮科,非洲胡椒树(暂译),木兰类
+Reference,Reference,Reference,Reference,参考序列,参考序列(TnpA),参考
