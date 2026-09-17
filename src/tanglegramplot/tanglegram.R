@@ -18,7 +18,7 @@
 #'   \code{\%<+\%} with a metadata \code{data.frame}). The two trees must
 #'   share an identical tip-label set; the function stops with an informative
 #'   message listing mismatched tips otherwise. If the trees were reordered
-#'   with \code{TangleR::pre.rotate()} (or any manual node rotation), build
+#'   with \code{tangler::pre.rotate()} (or any manual node rotation), build
 #'   the \code{ggtree} objects with \code{ladderize = FALSE} so the rotation
 #'   is preserved.
 #' @param preserve_topology Logical. If \code{TRUE} (default), the plotting
@@ -29,7 +29,7 @@
 #'   to keep the \code{ggtree} objects' existing coordinates untouched
 #'   (e.g. when they were deliberately ladderized at build time). Note that
 #'   any reordering done \emph{before} building the \code{ggtree} objects
-#'   (e.g. \code{ape::root()} or \code{TangleR::pre.rotate()}) is not affected
+#'   (e.g. \code{ape::root()} or \code{tangler::pre.rotate()}) is not affected
 #'   by this argument — skip those steps upstream if the raw input structure
 #'   is wanted. Attached metadata (via \code{\%<+\%}) is preserved for tips.
 #' @param column Character scalar. Name of the metadata column (present in
@@ -96,7 +96,7 @@
 #' \dontrun{
 #' library(ggtree); library(ggplot2)
 #'
-#' rot <- TangleR::pre.rotate(tree_A, tree_B)
+#' rot <- tangler::pre.rotate(tree_A, tree_B)
 #' t1  <- ggtree(rot[[1]], ladderize = FALSE) %<+% meta
 #' t2  <- ggtree(rot[[2]], ladderize = FALSE) %<+% meta
 #'

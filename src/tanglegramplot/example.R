@@ -19,8 +19,8 @@ tree_dir <- "data"
 save_dir <- "."
 
 # ========== 1. 读树（IQ-TREE 输出的 .treefile，节点数字为 bootstrap）==========
-TnpD_tree <- read.tree(file.path(tree_dir, "TnpD_ladderized.treefile"))
-TnpA_tree <- read.tree(file.path(tree_dir, "TnpA_ladderized.treefile"))
+TnpD_tree <- read.tree(file.path(tree_dir, "TnpD_protein_changeID.aligned.fa.treefile"))
+TnpA_tree <- read.tree(file.path(tree_dir, "TnpA_protein_changeID.aligned.fa.treefile"))
 
 # ========== 2. 去掉 tip.label 首尾可能存在的单/双引号 ==========
 TnpD_tree$tip.label <- gsub("^'|'$", "", TnpD_tree$tip.label)
@@ -63,22 +63,25 @@ family_colors <- c(
 # ========== 6-7. 定根 / 预旋转（可选）==========
 # preserve_input_topology = TRUE 时完全跳过 root() 和 pre.rotate()：
 #   - ape::root() 会按 cladewise 重排边和 tip 顺序，改变输入树的展示结构
-#   - TangleR::pre.rotate() 会主动旋转内部节点以减少连线交叉
+#   - tangler::pre.rotate() 会主动旋转内部节点以减少连线交叉
 # 两者都会让出图与输入的 .treefile 结构不一致；置 FALSE 可恢复旧行为
-preserve_input_topology <- TRUE
+preserve_input_topology <- FALSE
 
 if (preserve_input_topology) {
   message("preserve_input_topology = TRUE：跳过定根和预旋转，按输入树原结构出图")
-  TnpA_rot <- TnpA_tree
-  TnpD_rot <- TnpD_tree
+  magnolia_tips <- c("Magnolia_obovata", "Magnolia_officinalis")
+  TnpA_tree_rooted <- root(TnpA_tree, outgroup = magnolia_tips, resolve.root = TRUE)
+  TnpD_tree_rooted <- root(TnpD_tree, outgroup = magnolia_tips, resolve.root = TRUE)
+  TnpA_rot <- TnpA_tree_rooted
+  TnpD_rot <- TnpD_tree_rooted
 } else {
   magnolia_tips <- c("Magnolia_obovata", "Magnolia_officinalis")
   TnpA_tree_rooted <- root(TnpA_tree, outgroup = magnolia_tips, resolve.root = TRUE)
   TnpD_tree_rooted <- root(TnpD_tree, outgroup = magnolia_tips, resolve.root = TRUE)
 
-  # pre.rotate() 来自 TangleR 包；未安装时跳过（仅影响美观，不影响正确性）
-  if (requireNamespace("TangleR", quietly = TRUE)) {
-    rot      <- TangleR::pre.rotate(TnpA_tree_rooted, TnpD_tree_rooted)
+  # pre.rotate() 来自 tangler 包；未安装时跳过（仅影响美观，不影响正确性）
+  if (requireNamespace("tangler", quietly = TRUE)) {
+    rot      <- tangler::pre.rotate(TnpA_tree_rooted, TnpD_tree_rooted)
     TnpA_rot <- rot[[1]]
     TnpD_rot <- rot[[2]]
   } else {
@@ -102,11 +105,12 @@ p <- my.tanglegram(tree1, tree2,
                    cols     = family_colors,   # 自定义配色；不传则用 viridis::turbo
                    t2_pad   = 2,               # 两树之间的间距
                    tip_size = 2.5,             # tip 点大小
-                   t1_color = "#C0392B",       # 左树（TnpA）分支颜色：红
-                   t2_color = "#2980B9",       # 右树（TnpD）分支颜色：蓝
-                   bs_cutoff = 70) +           # 仅标注 bootstrap >= 70 的节点
+                   t1_color = "#000000",       # 左树（TnpA）分支颜色：黑
+                   t2_color = "#000000",       # 右树（TnpD）分支颜色：黑
+                   bs_cutoff = 70,            # 仅标注 bootstrap >= 70 的节点
+                   bs_size   = 3.5) +         # bootstrap 字号
   theme_tree() +
-  geom_treescale(x = 0, y = 1, width = 0.5, fontsize = 3, linesize = 0.5) +
+  geom_treescale(x = 0, y = 1, width = 0.5, fontsize = 4, linesize = 0.5) +
   theme(legend.position = "bottom",
         legend.title    = element_text(size = 10),
         legend.text     = element_text(size = 9))
