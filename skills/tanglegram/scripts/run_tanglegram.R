@@ -8,7 +8,7 @@
 #       [--column family] [--colors colors.json] [--outgroup "tip1,tip2"] \
 #       [--t2-pad 2] [--tip-size 2.5] [--t1-color "#C0392B"] [--t2-color "#2980B9"] \
 #       [--bs-cutoff 70] [--line-alpha 0.55] [--line-lwd 0.5] \
-#       [--format both] [--width 14] [--height 10] [--dpi 1000] [--no-rotate]
+#       [--format both] [--width 14] [--height 10] [--dpi 300] [--no-rotate] [--no-ladderize]
 #
 # 前置条件与常见报错处置见包内 references/usage.md。
 # =============================================================================
@@ -50,9 +50,11 @@ args <- parse_args(OptionParser(
                 help = "输出格式：pdf、png 或 both。默认 both。"),
     make_option("--width", type = "double", default = 14, help = "图宽（英寸）。默认 14。"),
     make_option("--height", type = "double", default = 10, help = "图高（英寸）。默认 10。"),
-    make_option("--dpi", type = "integer", default = 1000, help = "PNG 分辨率。默认 1000。"),
+    make_option("--dpi", type = "integer", default = 300, help = "PNG 分辨率。默认 300（4200x3000 像素，足够看图；更高分辨率渲染极慢）。"),
     make_option("--no-rotate", action = "store_true", default = FALSE,
-                help = "即使安装了 TangleR 也跳过 pre.rotate()（减少连线交叉的预旋转）。")
+                help = "即使安装了 TangleR 也跳过 pre.rotate()（减少连线交叉的预旋转）。"),
+    make_option("--no-ladderize", action = "store_true", default = FALSE,
+                help = "跳过 my.tanglegram() 内部的 preserve_topology 重建（等价于 preserve_topology=FALSE）。默认重建坐标、关闭 ggtree 的 ladderize，按传入树原结构出图。")
   )
 ))
 
@@ -245,6 +247,7 @@ gg2 <- ggtree(tree2, ladderize = FALSE) %<+% meta
 p <- my.tanglegram(gg1, gg2,
                    column    = args$column,
                    cols      = cols,
+                   preserve_topology = !isTRUE(args$no_ladderize),
                    t2_pad    = args$t2_pad,
                    tip_size  = args$tip_size,
                    t1_color  = args$t1_color,
@@ -281,6 +284,7 @@ summary <- list(
   inputs    = list(tree1 = basename(tree1_path), tree2 = basename(tree2_path),
                    metadata = basename(meta_path), column = args$column),
   parameters = list(outgroup = outgroup, pre_rotated = rotated,
+                    preserve_topology = !isTRUE(args$no_ladderize),
                     t2_pad = args$t2_pad, tip_size = args$tip_size,
                     t1_color = args$t1_color, t2_color = args$t2_color,
                     bs_cutoff = args$bs_cutoff,

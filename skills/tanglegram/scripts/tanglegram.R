@@ -21,6 +21,17 @@
 #'   with \code{TangleR::pre.rotate()} (or any manual node rotation), build
 #'   the \code{ggtree} objects with \code{ladderize = FALSE} so the rotation
 #'   is preserved.
+#' @param preserve_topology Logical. If \code{TRUE} (default), the plotting
+#'   coordinates of both trees are re-fortified from their underlying
+#'   \code{phylo} objects with \code{ladderize = FALSE}, so the rendered
+#'   topology and tip order are exactly those of the objects passed in —
+#'   \code{ggtree()}'s default ladderization is undone. Set to \code{FALSE}
+#'   to keep the \code{ggtree} objects' existing coordinates untouched
+#'   (e.g. when they were deliberately ladderized at build time). Note that
+#'   any reordering done \emph{before} building the \code{ggtree} objects
+#'   (e.g. \code{ape::root()} or \code{TangleR::pre.rotate()}) is not affected
+#'   by this argument — skip those steps upstream if the raw input structure
+#'   is wanted. Attached metadata (via \code{\%<+\%}) is preserved for tips.
 #' @param column Character scalar. Name of the metadata column (present in
 #'   the attached data of both trees) used to color the connecting lines and
 #'   tip points, e.g. \code{"family"}.
@@ -97,6 +108,7 @@
 #'   theme(legend.position = "bottom")
 #' }
 my.tanglegram <- function(tree1, tree2, column, cols = NULL,
+                          preserve_topology = TRUE, # TRUE = 按传入树原结构出图（关闭 ladderize）
                           t2_pad = 1.5, lab_pad = 0.15,
                           line_alpha = 0.55, line_lwd = 0.5,
                           tip_size = 2.5,
@@ -110,10 +122,61 @@ my.tanglegram <- function(tree1, tree2, column, cols = NULL,
   # ============================================================
   # 第 0 步：取坐标数据 + 输入校验
   # ============================================================
-  # ggtree 对象的 $data 是 fortify 后的数据框，含 x/y 坐标、label、isTip
-  # 以及 %<+% 挂上去的所有注释列（如 family/genus）
   d1 <- tree1$data
   d2 <- tree2$data
+
+  if (isTRUE(preserve_topology)) {
+    rebuild_phylo <- function(d) {
+      # 1. 剔除无效边与根节点的自环 (parent == node)
+      valid_edges <- !is.na(d$parent) & d$parent != d$node
+      d_clean <- d[valid_edges, ]
+
+      # 2. 映射 Tip (1:N) 与 内部节点 ((N+1):(N+M)) 编号
+      tips <- d$label[d$isTip]
+      tip_nodes <- d$node[d$isTip]
+      internal_nodes <- setdiff(unique(c(d_clean$parent, d_clean$node)), tip_nodes)
+      
+      node_map <- setNames(
+        c(seq_along(tip_nodes), length(tip_nodes) + seq_along(internal_nodes)),
+        c(tip_nodes, internal_nodes)
+      )
+
+      new_parent <- node_map[as.character(d_clean$parent)]
+      new_node   <- node_map[as.character(d_clean$node)]
+
+      phy <- list(
+        edge        = matrix(c(new_parent, new_node), ncol = 2),
+        edge.length = d_clean$branch.length,
+        tip.label   = tips,
+        Nnode       = length(internal_nodes)
+      )
+
+      # 恢复 node.label
+      node_df <- unique(d[!d$isTip, c("node", "label")])
+      new_int_order <- sort(node_map[as.character(node_df$node)])
+      phy$node.label <- node_df$label[order(new_int_order)]
+      
+      class(phy) <- "phylo"
+      return(phy)
+    }
+
+    attach_meta <- function(tree, old_d) {
+      meta_cols <- setdiff(names(old_d),
+                           c("parent","node","branch.length","isTip",
+                             "x","y","branch","angle","label","tree"))
+      if (length(meta_cols) > 0) {
+        meta_sub <- unique(old_d[old_d$isTip, c("label", meta_cols)])
+        tree$data <- merge(tree$data, meta_sub, by = "label", all.x = TRUE, sort = FALSE)
+      }
+      tree$data <- tree$data[order(tree$data$node), ]
+      tree
+    }
+
+    tree1 <- attach_meta(ggtree::ggtree(rebuild_phylo(d1), ladderize = FALSE), d1)
+    tree2 <- attach_meta(ggtree::ggtree(rebuild_phylo(d2), ladderize = FALSE), d2)
+    d1 <- tree1$data
+    d2 <- tree2$data
+  }
 
   # 双向 setdiff 校验 tip 集合完全一致——连线靠 label 配对，
   # 若两棵树 tip 不一致，geom_line 的 group 配对会静默错连或断连，

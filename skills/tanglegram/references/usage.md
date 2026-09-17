@@ -82,11 +82,14 @@ Rscript /workspace/.skills/tanglegram/scripts/run_tanglegram.R \
 | `--t1-color` / `--t2-color` | `#C0392B` / `#2980B9` | 左右树分支颜色；**传值必须加引号**防 shell 吃掉 `#`。 |
 | `--line-alpha` / `--line-lwd` | `0.55` / `0.5` | 连线透明度/线宽。 |
 | `--format` | `both` | `pdf` / `png` / `both`。 |
-| `--width` / `--height` / `--dpi` | `14` / `10` / `1000` | 图尺寸（英寸）与 PNG 分辨率。 |
+| `--width` / `--height` / `--dpi` | `14` / `10` / `300` | 图尺寸（英寸）与 PNG 分辨率；14x10 英寸 @300dpi = 4200x3000 像素，足够看图，更高分辨率渲染极慢。 |
 | `--no-rotate` | 关 | 跳过 TangleR 预旋转。 |
+| `--no-ladderize` | 关 | 跳过绘图内的坐标重建（`preserve_topology=FALSE`）。 |
 
 ## 注意事项
 
 - x 轴是拼合坐标（左树分支长 + 间隙 + 镜像右树），**没有分支长含义**；建议出图后隐藏坐标轴或在图注说明。
-- 镜像/预旋转只改绘图坐标不改拓扑，可用 `ape::all.equal.phylo(tree, rotated, use.edge.length = TRUE)` 验证。
+- **出图结构以传入树为准**：绘图默认 `preserve_topology=TRUE`，会重建坐标并关闭 `ggtree()` 的默认 ladderize，tip 顺序与传入 ggtree 对象一致；`root()`/`pre.rotate()` 这类绘图前的重排不受其控制，想让出图与原始 `.treefile` 完全一致就不要做这些步骤。
+- 只想整理枝形（仅旋转内部节点、不改拓扑/分支长/bootstrap 数值）时，可先用 `ladderize_treefile.R`：`Rscript ladderize_treefile.R 输入.treefile 输出.treefile`。
+- 镜像/预旋转/ladderize 重建只改绘图坐标不改拓扑，可用 `ape::all.equal.phylo(tree, rotated, use.edge.length = TRUE)` 验证。
 - 更多图层细节（tree1/tree2 图层保留行为、bootstrap 对齐方式）见 `scripts/tanglegram.R` 的 roxygen 文档。
