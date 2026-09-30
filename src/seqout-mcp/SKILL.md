@@ -1,27 +1,27 @@
 ---
 name: seqout-mcp
-description: Seqout 公共数据库检索 MCP — 完整覆盖 seqout.org API 的 26 个只读工具（GEO/SRA/ENA/GSA 搜索、项目详情、样本清单、编号反查、本体论、统计、下载链接）。当需要在公共组学数据库中查找数据集、解析 GSE/GSM/SRR/PRJNA 编号、获取样本分组信息或 FASTQ 下载链接时，安装并使用本 MCP。
+description: Seqout public database search MCP — full coverage of the seqout.org API with 26 read-only tools (GEO/SRA/ENA/GSA search, project details, sample manifest, accession resolution, ontology, statistics, download links). Install and use this MCP whenever you need to find datasets in public omics databases, resolve GSE/GSM/SRR/PRJNA accessions, inspect sample grouping, or obtain FASTQ download links.
 ---
 
-# Seqout MCP — 公共数据库检索
+# Seqout MCP — Public Database Search
 
-Seqout MCP 是对 [seqout.org](https://seqout.org) 公共数据库检索 API 的完整封装，提供 **26 个只读 MCP 工具**，覆盖 GEO / SRA / ENA / GSA 等公共数据库的搜索、项目详情、样本清单、编号解析、本体论查询、统计与下载链接。
+Seqout MCP is a complete wrapper around the [seqout.org](https://seqout.org) public database search API, providing **26 read-only MCP tools** covering search across GEO / SRA / ENA / GSA, project details, sample manifests, accession resolution, ontology queries, statistics, and download links.
 
-源自 CygnusX 平台（`mcp-server/tools/seqout.py`）的独立剥离版，仅依赖 `fastmcp` + `httpx`，无任何平台耦合，可安装到任意 MCP 客户端（Kimi Code / Claude Code / Cursor / Cline 等）。
+This is a standalone extraction from the CygnusX platform (`mcp-server/tools/seqout.py`). It depends only on `fastmcp` + `httpx`, has no platform coupling, and can be installed into any MCP client (Kimi Code / Claude Code / Cursor / Cline, etc.).
 
-## 何时使用
+## When to Use
 
-- 用户想"找一个某物种某实验类型的公共数据集"（如人类肝癌单细胞数据）
-- 用户只给了 GSM/SRR 编号，需要反查所属 GSE/PRJNA 项目
-- 需要查看数据集的样本清单、实验分组（处理组/对照组）、样本来源
-- 需要获取 FASTQ 下载链接或合并元数据 CSV
-- 需要项目引用文献（BibTeX）
+- The user wants to "find a public dataset for a given organism and assay type" (e.g., human HCC single-cell data)
+- The user only provides a GSM/SRR accession and you need to resolve its parent GSE/PRJNA project
+- You need a dataset's sample manifest, experimental grouping (treatment vs. control), or sample sources
+- You need FASTQ download links or a merged metadata CSV
+- You need a project's citation (BibTeX)
 
-## 安装
+## Installation
 
-### 方式一：直接引用本 skill 自带的服务器（推荐）
+### Option 1: Reference the bundled server directly (recommended)
 
-本目录下的 `seqout_mcp.py` 是独立的单文件服务器。在 MCP 客户端配置中：
+`seqout_mcp.py` in this directory is a self-contained single-file server. Configure your MCP client:
 
 ```json
 {
@@ -37,7 +37,7 @@ Seqout MCP 是对 [seqout.org](https://seqout.org) 公共数据库检索 API 的
 }
 ```
 
-`uv run --with` 会自动创建临时环境安装依赖，无需手动 pip install。无 uv 的环境可改为：
+`uv run --with` automatically creates an ephemeral environment with the dependencies — no manual pip install needed. On environments without uv, fall back to:
 
 ```json
 {
@@ -51,20 +51,20 @@ Seqout MCP 是对 [seqout.org](https://seqout.org) 公共数据库检索 API 的
 }
 ```
 
-### 方式二：复制为独立项目
+### Option 2: Copy it as a standalone project
 
 ```bash
 mkdir seqout-mcp && cd seqout-mcp
 cp /home/zj/zj_code_libarary/jz_tools/src/seqout-mcp/seqout_mcp.py .
 uv init --no-readme && uv add fastmcp httpx
-# 配置 MCP 客户端: "command": "uv", "args": ["run", "seqout_mcp.py"]
+# Configure MCP client: "command": "uv", "args": ["run", "seqout_mcp.py"]
 ```
 
-服务器以 stdio 传输运行，无需任何环境变量和鉴权（seqout.org API 公开只读）。
+The server runs over stdio and requires no environment variables or authentication (the seqout.org API is public and read-only).
 
-### 验证安装
+### Verify Installation
 
-配置完成后，在 MCP 客户端中应能看到 26 个 `seqout_*` 工具。命令行快速自检（列出全部工具名）：
+After configuring, your MCP client should show 26 `seqout_*` tools. Quick command-line self-check (lists all tool names):
 
 ```bash
 uv run --with fastmcp --with httpx python -c "
@@ -79,94 +79,94 @@ print('\n'.join(t.name for t in tools))
 "
 ```
 
-## 工具清单（26 个）
+## Tool Catalog (26)
 
-### 搜索（4）
+### Search (4)
 
-| 工具 | 端点 | 用途 |
+| Tool | Endpoint | Purpose |
 |---|---|---|
-| `seqout_search` | `GET /search` | 跨 GEO/SRA/ENA/GSA 全文搜索项目 |
-| `seqout_search_geo` | `GET /search/geo` | 仅搜 GEO（微阵列/单细胞） |
-| `seqout_search_sra` | `GET /search/sra` | 仅搜 SRA 测序记录 |
-| `seqout_search_structured` | `GET /search/structured` | 按物种+实验类型精确过滤搜索 |
+| `seqout_search` | `GET /search` | Full-text project search across GEO/SRA/ENA/GSA |
+| `seqout_search_geo` | `GET /search/geo` | GEO only (microarray/single-cell) |
+| `seqout_search_sra` | `GET /search/sra` | SRA sequencing records only |
+| `seqout_search_structured` | `GET /search/structured` | Exact filtered search by organism + assay type |
 
-### 项目（4）
+### Project (4)
 
-| 工具 | 端点 | 用途 |
+| Tool | Endpoint | Purpose |
 |---|---|---|
-| `seqout_get_project_detail` | `GET /project/{acc}` | 项目详情（实验设计、平台、引用） |
-| `seqout_get_project_metadata` | `GET /project/{acc}/metadata` | 项目标题与描述 |
-| `seqout_get_project_citation` | `GET /project/{acc}/cite` | BibTeX 引用文献 |
-| `seqout_get_project_enriched` | `GET /project/{acc}/enriched` | AI 增强样本元数据（含本体论注释） |
+| `seqout_get_project_detail` | `GET /project/{acc}` | Project details (experimental design, platform, citation) |
+| `seqout_get_project_metadata` | `GET /project/{acc}/metadata` | Project title and description |
+| `seqout_get_project_citation` | `GET /project/{acc}/cite` | BibTeX citation |
+| `seqout_get_project_enriched` | `GET /project/{acc}/enriched` | AI-enriched sample metadata (with ontology annotations) |
 
-### 实验与样本（7）
+### Experiment & Sample (7)
 
-| 工具 | 端点 | 用途 |
+| Tool | Endpoint | Purpose |
 |---|---|---|
-| `seqout_get_experiments` | `GET /project/{study}/experiments` | 列出研究下所有实验 |
-| `seqout_get_runs` | `GET /project/{study}/runs` | 列出 FASTQ 下载链接 |
-| `seqout_get_run_download` | `GET /run/{run}` | 单个运行的下载链接 |
-| `seqout_get_sample_metadata` | `GET /sample/{acc}` | 样本元数据 |
-| `seqout_get_sample_detail` | `GET /sample-detail/{acc}` | 样本完整详情 |
-| `seqout_get_sample_manifest` | `GET /geo/series/{acc}/samples` | 样本清单（含分组/来源，默认前 30 个） |
+| `seqout_get_experiments` | `GET /project/{study}/experiments` | List all experiments in a study |
+| `seqout_get_runs` | `GET /project/{study}/runs` | List FASTQ download links |
+| `seqout_get_run_download` | `GET /run/{run}` | Download link for a single run |
+| `seqout_get_sample_metadata` | `GET /sample/{acc}` | Sample metadata |
+| `seqout_get_sample_detail` | `GET /sample-detail/{acc}` | Full sample details |
+| `seqout_get_sample_manifest` | `GET /geo/series/{acc}/samples` | Sample manifest (grouping/source; first 30 by default) |
 
-### 编号解析（2）
+### Accession Resolution (2)
 
-| 工具 | 端点 | 用途 |
+| Tool | Endpoint | Purpose |
 |---|---|---|
-| `seqout_resolve_accession` | `GET /accession/{acc}/project` | GSM/SRR → 所属 GSE/PRJNA 反查 |
-| `seqout_resolve_prj` | `GET /prj/{prj}` | BioProject → 研究级别编号映射 |
+| `seqout_resolve_accession` | `GET /accession/{acc}/project` | GSM/SRR → parent GSE/PRJNA reverse lookup |
+| `seqout_resolve_prj` | `GET /prj/{prj}` | BioProject → study-level accession mapping |
 
-### 本体论与统计（6+2）
+### Ontology & Statistics (6+2)
 
-| 工具 | 端点 | 用途 |
+| Tool | Endpoint | Purpose |
 |---|---|---|
-| `seqout_get_ontology_term` | `GET /ontology/term` | 查询本体论术语（定义/同义词/父类） |
-| `seqout_get_organisms` | `GET /organisms` | 列出所有支持的物种 |
-| `seqout_get_common_name` | `GET /common-name` | 物种常用名 |
-| `seqout_get_stats_growth` | `GET /stats/growth` | 数据库增长趋势 |
-| `seqout_get_organism_totals` | `GET /stats/organism-totals` | 各物种实验总数 |
-| `seqout_get_platform_totals` | `GET /stats/platform-totals` | 各测序平台实验总数 |
-| `seqout_beacon_info` | `GET /beacon/info` | Beacon 协议元数据 |
-| `seqout_beacon_runs` | `GET /beacon/runs` | Beacon 协议浏览运行记录 |
+| `seqout_get_ontology_term` | `GET /ontology/term` | Ontology term lookup (definition/synonyms/parents) |
+| `seqout_get_organisms` | `GET /organisms` | List all supported organisms |
+| `seqout_get_common_name` | `GET /common-name` | Common name of an organism |
+| `seqout_get_stats_growth` | `GET /stats/growth` | Database growth trend |
+| `seqout_get_organism_totals` | `GET /stats/organism-totals` | Experiment counts per organism |
+| `seqout_get_platform_totals` | `GET /stats/platform-totals` | Experiment counts per sequencing platform |
+| `seqout_beacon_info` | `GET /beacon/info` | Beacon protocol metadata |
+| `seqout_beacon_runs` | `GET /beacon/runs` | Browse run records via Beacon protocol |
 
-### 下载（2）
+### Download (2)
 
-| 工具 | 端点 | 用途 |
+| Tool | Endpoint | Purpose |
 |---|---|---|
-| `seqout_get_download_links` | `GET /project/{study}/runs/download` | TSV 格式下载链接 |
-| `seqout_get_metadata_csv` | `GET /project/{study}/metadata/download` | 合并元数据 CSV |
+| `seqout_get_download_links` | `GET /project/{study}/runs/download` | Download links in TSV format |
+| `seqout_get_metadata_csv` | `GET /project/{study}/metadata/download` | Merged metadata CSV |
 
-## 典型调用流程
+## Typical Call Flows
 
-**场景 1：找数据集并查看分组**
-1. `seqout_search(query="melanoma single cell", limit=3)` → 拿到 GSE 编号
-2. `seqout_get_project_detail(accession="GSE151530")` → 了解实验设计
-3. `seqout_get_sample_manifest(accession="GSE151530", max_samples=30)` → 按 characteristics 筛选目标样本
+**Scenario 1: Find a dataset and inspect grouping**
+1. `seqout_search(query="melanoma single cell", limit=3)` → get a GSE accession
+2. `seqout_get_project_detail(accession="GSE151530")` → understand the experimental design
+3. `seqout_get_sample_manifest(accession="GSE151530", max_samples=30)` → filter target samples by characteristics
 
-**场景 2：从样本编号反查**
-1. `seqout_resolve_accession(accession="GSM456789")` → 得到所属 GSE
-2. `seqout_get_sample_detail(accession="GSM456789")` → 完整样本信息
+**Scenario 2: Reverse lookup from a sample accession**
+1. `seqout_resolve_accession(accession="GSM456789")` → get the parent GSE
+2. `seqout_get_sample_detail(accession="GSM456789")` → full sample information
 
-**场景 3：拿下载链接**
-1. `seqout_get_runs(study_accession="GSE123456")` → 全部 SRR + 链接
-2. 或 `seqout_get_download_links(study_accession="GSE123456")` → TSV 批量格式
+**Scenario 3: Get download links**
+1. `seqout_get_runs(study_accession="GSE123456")` → all SRR accessions + links
+2. Or `seqout_get_download_links(study_accession="GSE123456")` → bulk TSV format
 
-**场景 4：精确搜索**
+**Scenario 4: Precise search**
 1. `seqout_search_structured(organism="Homo sapiens", assay="RNA-seq", limit=5)`
 
-## 输出格式与注意事项
+## Output Format & Notes
 
-- 所有工具返回 JSON 字符串：`{"success": bool, "summary": str, "data": ..., "next_steps"?}`，先检查 `success` 再读 `data`。
-- **上下文保护**：搜索类工具默认 `limit=5`，样本清单默认 `max_samples=30`，不要随意调大。
-- **速率限制**：触发 429 时 `summary` 会提示，稍后重试即可，不要连续高频调用。
-- **全部为只读工具**，无写操作、无破坏性风险。
-- 请求超时 15 秒；服务端返回 HTML 错误页时会被识别并报错（而非 JSON 解析崩溃）。
-- `limit` 参数由调用方裁剪结果，服务端 `limit` 参数仅传给结构化/Beacon 接口；搜索接口的服务端分页不受 limit 控制。
+- Every tool returns a JSON string: `{"success": bool, "summary": str, "data": ..., "next_steps"?}`. Check `success` before reading `data`.
+- **Context protection**: search tools default to `limit=5`; sample manifest defaults to `max_samples=30`. Do not increase these casually.
+- **Rate limiting**: on HTTP 429 the `summary` will say so — wait and retry; do not hammer the API.
+- **All tools are read-only** — no write operations, no destructive risk.
+- Request timeout is 15s; HTML error pages from the server are detected and reported (no JSON parse crash).
+- The `limit` parameter trims results client-side; it is forwarded to the server only for the structured/Beacon endpoints. Server-side pagination of the search endpoints is not controlled by `limit`.
 
-## 技术要点（维护者向）
+## Implementation Notes (for maintainers)
 
-- 实现：单文件 `server/seqout_mcp.py`，FastMCP 2.x `@mcp.tool` 装饰器 + httpx 异步客户端。
-- 与平台版的差异：去掉 `core.logger`（改无日志）、去掉 `tools.yaml` 注册表和 `_GROUP_REGISTRY`、去掉 `register(mcp, api)` 双注册（平台版 `register()` 会对已装饰函数二次注册，独立版直接用模块内 FastMCP 实例装饰）。
-- API 基址 `https://seqout.org/api`，如需指向自建实例改 `BASE_URL` 即可。
-- 新增工具：在文件中加 `@mcp.tool` 异步函数，无需其他注册步骤。
+- Implementation: single file `seqout_mcp.py`, FastMCP 2.x `@mcp.tool` decorators + httpx async client.
+- Differences from the platform version: `core.logger` removed (no logging), `tools.yaml` registry and `_GROUP_REGISTRY` removed, and the `register(mcp, api)` double-registration dropped (the platform's `register()` re-decorates already-decorated functions; the standalone version decorates directly against a module-level FastMCP instance).
+- API base URL is `https://seqout.org/api`; change `BASE_URL` to point at a self-hosted instance.
+- Adding a tool: just add an `@mcp.tool` async function in the file — no other registration step is required.
