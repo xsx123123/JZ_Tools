@@ -13,6 +13,27 @@
 
 ## 安装与启动
 
+### 一段 JSON 直接部署（推荐）
+
+复制 [`examples/seqout.uvx.json`](examples/seqout.uvx.json) 到支持 MCP 的客户端配置中即可。它会由 `uvx` 从 Git 仓库临时安装并启动服务，不要求用户克隆仓库或手动安装 Python 依赖：
+
+```json
+{
+  "mcpServers": {
+    "seqout": {
+      "command": "uvx",
+      "args": [
+        "--from",
+        "git+https://github.com/xsx123123/JZ_Tools.git#subdirectory=src/seqout-mcp",
+        "seqout-mcp"
+      ]
+    }
+  }
+}
+```
+
+发布到 PyPI 后，`args` 可以简化为 `["seqout-mcp"]`；更新版本时可加 `--refresh`，固定版本则使用 `seqout-mcp==0.2.0`。
+
 ### 直接从当前目录运行（推荐）
 
 ```bash
@@ -51,6 +72,8 @@ uvx --from \
 ```bash
 uvx seqout-mcp
 ```
+
+`npx` 是 Node.js 包运行器，不能直接安装或运行这个 Python 包。对于 Python MCP，使用 `uvx` 是对应方案；只有在客户端只支持 `npx` 时，才需要额外发布一个 Node.js wrapper，由 wrapper 转调 `uvx`。
 
 ## Cherry Studio 配置
 
