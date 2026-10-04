@@ -1,8 +1,10 @@
 // 排行榜统计：登录用户走 user_stats（auth.uid 本人可写），访客走 guest_stats（匿名设备指纹）
+// 离线模式（无 Supabase 配置）走 localStorage 本地统计：本地开发的排行榜也有数据
 // 所有写入均为 fire-and-forget，失败静默，绝不打断对话主流程。
-import { supabase } from "@/supabase/client";
+import { isOfflineMode, supabase } from "@/supabase/client";
 
 const KEY_DEVICE = "seqout-device-id";
+const KEY_LOCAL_STATS = "seqout-local-stats";
 const DEVICE_CHARS = "abcdefghijklmnopqrstuvwxyz0123456789";
 
 export interface StatRow {
@@ -53,6 +55,72 @@ export interface StatDelta {
   chats?: number;
 }
 
+// ---------- 本地统计（离线模式）：localStorage 单行 upsert，字段语义与云端 RPC 一致 ----------
+
+interface LocalStatRow {
+  device_id: string;
+  display_name: string | null;
+  treasures: number;
+  digs: number;
+  chats: number;
+  week_base: string;
+  week_treasures: number;
+  week_digs: number;
+  week_chats: number;
+  updated_at: string;
+}
+
+function readLocalStats(): LocalStatRow | null {
+  try {
+    const raw = localStorage.getItem(KEY_LOCAL_STATS);
+    return raw ? (JSON.parse(raw) as LocalStatRow) : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeLocalStats(row: LocalStatRow): void {
+  try {
+    localStorage.setItem(KEY_LOCAL_STATS, JSON.stringify(row));
+  } catch {
+    /* ignore */
+  }
+}
+
+function bumpLocalStats(delta: StatDelta): void {
+  const existing = readLocalStats();
+  const monday = mondayOf(new Date());
+  const base: LocalStatRow = existing && existing.device_id === getDeviceId()
+    ? existing
+    : {
+        device_id: getDeviceId(),
+        display_name: existing?.display_name ?? null,
+        treasures: 0,
+        digs: 0,
+        chats: 0,
+        week_base: monday,
+        week_treasures: 0,
+        week_digs: 0,
+        week_chats: 0,
+        updated_at: "",
+      };
+  // 跨周归零（与云端 RPC 的 week_base 逻辑一致）
+  if (base.week_base !== monday) {
+    base.week_base = monday;
+    base.week_treasures = 0;
+    base.week_digs = 0;
+    base.week_chats = 0;
+  }
+  base.treasures += delta.treasures ?? 0;
+  base.digs += delta.digs ?? 0;
+  base.chats += delta.chats ?? 0;
+  base.week_treasures += delta.treasures ?? 0;
+  base.week_digs += delta.digs ?? 0;
+  base.week_chats += delta.chats ?? 0;
+  base.updated_at = new Date().toISOString();
+  writeLocalStats(base);
+}
+
 /** 一次挖宝回合结束后累加统计（累计 + 本周双轨）；isGuest=true 时按 device_id upsert 访客表 */
 export async function bumpStats(
   delta: StatDelta,
@@ -64,11 +132,18 @@ export async function bumpStats(
   if (delta.chats) inc.chats = delta.chats;
   if (Object.keys(inc).length === 0) return;
 
+  // 离线模式：走 localStorage 本地统计（本地开发无 Supabase 配置时排行榜也有数据）
+  if (isOfflineMode) {
+    bumpLocalStats(delta);
+    return;
+  }
+
   // 周列与累计列同增量；week_base 过期时由 RPC 原子归零重计
-  const week: Record<string, number> = {
-    week_treasures: inc.treasures ?? 0,
-    week_digs: inc.digs ?? 0,
-    week_chats: inc.chats ?? 0,
+  // 注意：RPC 参数名带 p_ 前缀（见 src/supabase/types.ts Functions），名字不匹配会被静默忽略 → 统计恒为 0
+  const week = {
+    p_week_treasures: inc.treasures ?? 0,
+    p_week_digs: inc.digs ?? 0,
+    p_week_chats: inc.chats ?? 0,
   };
 
   try {
@@ -76,14 +151,18 @@ export async function bumpStats(
       const deviceId = getDeviceId();
       await supabase.rpc("bump_guest_stats", {
         p_device: deviceId,
-        ...inc,
+        p_treasures: inc.treasures ?? 0,
+        p_digs: inc.digs ?? 0,
+        p_chats: inc.chats ?? 0,
         ...week,
         p_week_base: mondayOf(new Date()),
       });
     } else {
       await supabase.rpc("bump_user_stats", {
         p_username: opts.username ?? "",
-        ...inc,
+        p_treasures: inc.treasures ?? 0,
+        p_digs: inc.digs ?? 0,
+        p_chats: inc.chats ?? 0,
         ...week,
         p_week_base: mondayOf(new Date()),
       });
@@ -97,6 +176,24 @@ export async function bumpStats(
 export async function updateNickname(nick: string): Promise<{ ok: boolean; message?: string }> {
   const name = nick.trim().slice(0, 16);
   if (name.length < 1) return { ok: false, message: "昵称不能为空" };
+
+  // 离线模式：改本地统计行的昵称
+  if (isOfflineMode) {
+    const row = readLocalStats();
+    if (row) {
+      row.display_name = name;
+      writeLocalStats(row);
+      return { ok: true };
+    }
+    // 还没有统计行也允许先占位昵称
+    bumpLocalStats({});
+    const fresh = readLocalStats();
+    if (fresh) {
+      fresh.display_name = name;
+      writeLocalStats(fresh);
+    }
+    return { ok: true };
+  }
   try {
     const { data: sess } = await supabase.auth.getSession();
     const uid = sess?.session?.user?.id;
@@ -116,6 +213,25 @@ export async function updateNickname(nick: string): Promise<{ ok: boolean; messa
 
 /** 拉取双榜（合并排序用）；两张表 RLS 均为公开可读 */
 export async function fetchLeaderboard(): Promise<{ users: StatRow[]; guests: StatRow[] }> {
+  // 离线模式：本地统计行作为访客榜（users 恒为空，登录/云同步未接入）
+  if (isOfflineMode) {
+    const row = readLocalStats();
+    const guests: StatRow[] = row && (row.treasures > 0 || row.chats > 0)
+      ? [{
+          key: `g:${row.device_id}`,
+          name: row.display_name?.trim() || `游客${row.device_id.slice(-4)}`,
+          treasures: row.treasures,
+          digs: row.digs,
+          chats: row.chats,
+          weekTreasures: row.week_treasures,
+          weekDigs: row.week_digs,
+          weekChats: row.week_chats,
+          updated_at: row.updated_at,
+          isGuest: true,
+        }]
+      : [];
+    return { users: [], guests };
+  }
   const [u, g] = await Promise.all([
     supabase
       .from("user_stats")

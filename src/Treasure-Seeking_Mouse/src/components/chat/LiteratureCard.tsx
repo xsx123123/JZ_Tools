@@ -1,6 +1,6 @@
 // T2 文献联动卡片：结构化摘要分段 outline + 原文链接（DOI / PubMed / OA 全文）
-// not_found 显示建议检索词；加载中骨架 ≤3s；完全不阻塞主对话流程
-import { useEffect, useState } from "react";
+// not_found 显示建议检索词；加载中骨架 ≤3s；出现时滚动到可视区（📖 点击反馈闭环）
+import { useEffect, useRef, useState } from "react";
 import { BookOpen, ExternalLink, FileText, X } from "lucide-react";
 import { fetchLiterature, type LiteratureCardDTO } from "@/services/literature";
 
@@ -15,6 +15,7 @@ export function LiteratureCardPanel({
 }): React.ReactElement {
   const [state, setState] = useState<"loading" | "done">("loading");
   const [card, setCard] = useState<LiteratureCardDTO | null>(null);
+  const rootRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     let alive = true;
@@ -30,8 +31,13 @@ export function LiteratureCardPanel({
     };
   }, [kind, id]);
 
+  // 出现时滚动到可视区：📖 点击 / 正文"查看证据链"后用户能立刻看到卡片
+  useEffect(() => {
+    rootRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  }, []);
+
   return (
-    <div className="card-in relative mt-3 overflow-hidden rounded-lg border border-border bg-card shadow-sm">
+    <div ref={rootRef} className="card-in relative mt-3 overflow-hidden rounded-lg border border-helix/40 bg-card shadow-sm ring-2 ring-helix/10">
       <div className="flex items-center gap-2 border-b border-border/60 bg-pet-gold-soft/40 px-3.5 py-2">
         <BookOpen size={13} className="shrink-0 text-pet-amber-deep" />
         <span className="font-display text-[12px] font-semibold tracking-wide text-foreground/80">文献证据链</span>

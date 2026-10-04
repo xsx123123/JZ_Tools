@@ -2,6 +2,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Loader2, Pencil, RefreshCw, Sparkles, Trophy, X } from "lucide-react";
 import { fetchLeaderboard, myGuestKey, updateNickname, type StatRow } from "@/services/statsStore";
+import { isOfflineMode } from "@/supabase/client";
 
 type BoardTab = "diggers" | "guests";
 type Range = "week" | "all";
@@ -124,7 +125,8 @@ function RankRow({
 }
 
 export function Leaderboard({ open, onClose, ownUserId }: LeaderboardProps): React.ReactElement | null {
-  const [tab, setTab] = useState<BoardTab>("diggers");
+  // 离线模式默认切到「临时矿工」页签：本地统计只写在访客榜，登录榜恒为空
+  const [tab, setTab] = useState<BoardTab>(isOfflineMode ? "guests" : "diggers");
   const [range, setRange] = useState<Range>("all");
   const [users, setUsers] = useState<StatRow[]>([]);
   const [guests, setGuests] = useState<StatRow[]>([]);

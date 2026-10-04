@@ -1,4 +1,5 @@
 // GEO/SRA 数据集结果卡片：编号类型徽章 + 标题 + 元信息 + 外链 + T2 文献入口
+import { useEffect, useRef, useState } from "react";
 import { BookOpen, ExternalLink } from "lucide-react";
 import type { DatasetCard as CardData } from "@/services/seqoutChat";
 import { requestEvidence } from "@/lib/evidenceBus";
@@ -54,11 +55,25 @@ function onLiterature(accession: string, hostMessageId?: string): void {
 export function DatasetCardView({ card, hostMessageId }: { card: CardData; hostMessageId?: string }): React.ReactElement {
   const link = buildLink(card.accession);
   const prefix = prefixOf(card.accession);
+  // 📖 点击反馈：短暂高亮 + 卡片描边脉冲（文献卡片在消息层渲染时的视觉锚点）
+  const [litClicked, setLitClicked] = useState(false);
+  const clickTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => { if (clickTimer.current) clearTimeout(clickTimer.current); }, []);
+
+  function onLiteratureClick(): void {
+    onLiterature(card.accession, hostMessageId);
+    setLitClicked(true);
+    if (clickTimer.current) clearTimeout(clickTimer.current);
+    clickTimer.current = setTimeout(() => setLitClicked(false), 2000);
+  }
+
   const metaEntries = Object.entries(card.meta ?? {}).filter(
     ([k, v]) => v && ["organism", "title", "summary"].indexOf(k) === -1,
   );
   return (
-    <div className="hover-lift card-in relative overflow-hidden rounded-lg border border-border bg-card p-2.5 pl-3.5 shadow-sm before:absolute before:inset-y-0 before:left-0 before:w-[3px] before:bg-gradient-to-b before:from-pet-amber/70 before:to-helix/50">
+    <div
+      className={`hover-lift card-in relative overflow-hidden rounded-lg border bg-card p-2.5 pl-3.5 shadow-sm before:absolute before:inset-y-0 before:left-0 before:w-[3px] before:bg-gradient-to-b before:from-pet-amber/70 before:to-helix/50 ${litClicked ? "border-helix/60 ring-2 ring-helix/20" : "border-border"}`}
+    >
       <div className="flex items-start justify-between gap-2">
         <div className="flex min-w-0 items-center gap-1.5">
           {prefix ? (
@@ -80,8 +95,8 @@ export function DatasetCardView({ card, hostMessageId }: { card: CardData; hostM
             {LIT_KIND[prefix ?? ""] ? (
               <button
                 type="button"
-                onClick={() => onLiterature(card.accession, hostMessageId)}
-                className="rounded-md p-1 text-muted-foreground transition-colors hover:bg-secondary hover:text-helix"
+                onClick={onLiteratureClick}
+                className={`rounded-md p-1 transition-colors hover:bg-secondary hover:text-helix ${litClicked ? "bg-helix-soft text-helix" : "text-muted-foreground"}`}
                 title="查看关联文献（证据链）"
                 aria-label="查看关联文献"
               >

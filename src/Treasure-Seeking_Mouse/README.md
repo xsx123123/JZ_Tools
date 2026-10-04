@@ -49,25 +49,34 @@
 │   │   ├── auth/AuthDialog.tsx # 注册/登录/验证码弹窗
 │   │   ├── chat/               # 对话域组件
 │   │   │   ├── SessionSidebar.tsx   # 左侧会话列表（PC 默认折叠）
-│   │   │   ├── ChatMessage.tsx      # 消息气泡：Markdown 渲染 + 复制/重试 + 建议卡
+│   │   │   ├── ChatMessage.tsx      # 消息气泡：Markdown 渲染 + 复制/重试 + 建议卡 + 文献证据链挂载
 │   │   │   ├── SuggestionBlock.tsx  # 「阿寻的下一铲建议」折叠卡 + followup 围栏解析
-│   │   │   ├── DatasetCard.tsx      # 数据集卡片（缩小版，流式结束后才渲染）
+│   │   │   ├── DatasetCard.tsx      # 数据集卡片（含 📖 文献入口，点击高亮反馈）
 │   │   │   ├── ToolTrace.tsx        # 工具调用轨迹展示
-│   │   │   ├── Markdown.tsx         # 自研轻量 Markdown 渲染
+│   │   │   ├── IdLink.tsx           # 正文内嵌编号链接：hover 300ms 浮层（自动预取论文 + 复制 ID / 查看证据链）
+│   │   │   ├── LiteratureCard.tsx   # 文献证据链卡片：结构化摘要分段 + DOI / PubMed / OA 全文链接
+│   │   │   ├── Markdown.tsx         # react-markdown 渲染 + rehypeLinkify 插件（AST 层注入编号链接）
 │   │   │   ├── Composer.tsx         # 输入框
-│   │   │   └── EmptyState.tsx       # 空态引导
+│   │   │   └── EmptyState.tsx       # 空态引导（示例池随机抽样，每次进入换一批）
 │   │   ├── pet/TreasureMouse.tsx    # 桌宠状态机（idle/digging/reveal/stow/...+拖拽）
 │   │   └── ui/                      # shadcn/ui 预置组件（46 个）
 │   ├── services/
 │   │   ├── seqoutChat.ts       # SSE 客户端：解析 Edge Function 下行协议
+│   │   ├── literature.ts       # T2 文献联动客户端：非流式 JSON + 前端 TTL 缓存
 │   │   ├── chatStore.ts        # 会话/消息持久化（登录后走云端，游客走 localStorage）
+│   │   ├── statsStore.ts       # 排行榜统计上报（RPC bump_user_stats / bump_guest_stats）
 │   │   └── petStore.ts         # 桌宠偏好 / 宝藏计数 / 成就（localStorage）
-│   ├── lib/                    # utils（cn）、reveal-engine（滚动入场）
+│   ├── lib/
+│   │   ├── linkify.ts          # 编号模式与 URL 映射（GSE/GSM/GO:/PMID）
+│   │   ├── evidenceBus.ts      # IdLink/卡片 → 消息列表层的"查看证据链"事件桥
+│   │   ├── utils.ts            # cn 等
+│   │   └── reveal-engine.ts    # 滚动入场
 │   └── supabase/
 │       ├── client.ts           # 【平台生成】Cloud 客户端单例，禁止手改
 │       └── types.ts            # 【平台生成】数据库类型，禁止手改
+├── crawler/                    # T1 捉虫休眠模块（最小骨架，见 §3.6）
 ├── functions/
-│   └── seqout-chat/index.ts    # 核心 Edge Function（见下文协议）
+│   └── seqout-chat/index.ts    # 核心 Edge Function（见下文协议，含文献联动 action）
 └── migrations/                 # SQL 迁移（建表 + RLS）
     ├── 20261003_092937_create_profiles.sql
     └── 20261003_092943_create_chat_tables.sql
@@ -115,7 +124,8 @@
 
 - 注册登录：邮箱验证码 + 密码。`signUp → verifyOtp(type:'signup') → getUser → upsert profiles`；忘记密码走 `resetPasswordForEmail` + `/reset-password` 回调页。
 - 数据表：`profiles` / `chat_sessions` / `chat_messages`（cards、tool_logs 为 JSONB）。RLS 全部以 `auth.uid()` 本人隔离。
-- 未登录也可使用：消息仅存本浏览器 localStorage（key `seqout-local-session`），最多保留最近 50 条会话、最后活跃超过 7 天的自动清除；侧栏底部与顶栏「临时试用」处有明确提示。
+- 未登录也可使用：会话与消息存本浏览器 localStorage（key `seqout-local-session`），最多保留最近 50 条会话、最后活跃超过 7 天的自动清除；**侧栏会显示本地历史会话列表**（按最后活跃倒序），可恢复完整消息（含卡片/工具轨迹）、重命名、删除；侧栏底部与顶栏「临时试用」处有明确提示。
+- 离线模式（无 Supabase 配置）：登录按钮隐藏、云端调用静默空转，会话/统计/排行榜全部走 localStorage 本地兜底（见 §3.8）。
 
 ### 3.4 主题系统
 
@@ -123,7 +133,47 @@
 - 两套 token 全在 `src/styles.css`（`:root` / `.dark`），组件一律消费 theme utility（`bg-card` 等），禁止硬编码 `bg-white`。
 - 切换偏好写 localStorage `seqout-theme`；`index.html` 内联 bootstrap 脚本在 React 加载前挂 `.dark` 类防闪白，同时支持 `?theme=dark` URL 参数（沙箱截图取证通道）。
 
-### 3.5 桌宠与成就
+### 3.5 v2.1 正文内嵌超链接（就地可操作）
+
+三级信息架构：正文内嵌链接（L1 主入口）→ hover 浮层（L2）→ 文献证据链卡片（L3）。
+
+- **模式与映射**：`src/lib/linkify.ts` 定义 GSE/GSM/GO:/PMID 四类模式与 URL 映射（模块级常量）；查不到映射的 ID 保持纯文本，不出死链。
+- **AST 层注入**：`Markdown.tsx` 的 rehypeLinkify 插件在渲染树遍历 `text` 节点做切分，**跳过 `code`/`pre`/`a` 祖先链**（代码块内 ID 不可点、已有链接不套娃）；Markdown 源文本保持干净，复制出去的仍是纯文本。
+- **`IdLink.tsx` hover 浮层**（300ms 延迟）：打开时自动经 T2 预取论文元数据（标题/期刊/年份，前端 TTL 缓存：命中 10 分钟 / 未命中 5 分钟），含「复制 ID / 查看证据链 / 原始页」按钮组。
+- **`LiteratureCard.tsx` 文献证据链卡片**：结构化摘要分段 outline + DOI / PubMed / OA 全文链接；出现时平滑滚动到可视区；`not_found` 显示建议检索词优雅降级。
+- **事件桥**：`src/lib/evidenceBus.ts` 把 IdLink/卡片深处的"查看证据链"请求多播给消息列表层（按 hostMessageId 认领），文献卡片渲染在宿主消息下方。
+- 样式：`styles.css` 的 `.id-link`（teal 主色 + hover 下划线展开），双主题自适应。
+
+### 3.6 T1 捉虫休眠模块（crawler/）
+
+最小爬虫骨架 + 休眠一体（`crawler/` 目录）：
+
+- `sleeper.py`：RUNNING/IDLE/SLEEP 三态状态机 + 指数退避阶梯（60/300/900/1800 秒封顶，成功执行任务后计数器清零）+ `poke()` 统一唤醒收口 + 可注入 `Clock`（单测用虚拟时钟，不真等 90 分钟）+ 资源 release/acquire 钩子（SLEEP 释放重建）+ 环境变量覆盖（`CRAWLER_HEARTBEAT=0` 等）。
+- `runner.py`：主循环（命令队列优先于任务队列）；现有捉虫逻辑接入点为 `register_handler` 的任务处理函数。
+- `cli.py`：`python -m crawler.cli demo` 端到端演示（入队 → 执行 → 空闲退避 → SLEEP → 命令唤醒）。
+- `config/crawler.yaml` + `tests/test_sleeper.py`（8 个注入时钟单测）。
+- 唤醒优先级在消费侧处理：所有唤醒源最终只做 `wake_event.set()`，唤醒后先看命令队列再看任务队列。
+- 状态日志格式固定：`crawler.state <FROM> -> <TO> reason=<r> idle_cycles=<n>`——排查"捉虫是不是死了"全靠这条。
+- 生产路径禁止裸 sleep：全项目仅 `Sleeper.Clock` 一处 wait。
+
+### 3.7 T2 PubMed 文献联动
+
+用户选中 GEO/GO 数据后，自动拉取其对应论文的结构化摘要大纲 + 原文链接（走对话后端的非流式 `action:"literature"` 分支，不消耗 LLM token、不要求 AI 凭证）：
+
+- **检索三级策略**：① GEO 条目自带 PMID（seqout `/project/{id}` 的 `pubmed_id` 字段，精确命中；GSM 先经 `/accession/{GSM}/project` 反查所属 GSE 系列，同一系列的所有样本共享同一篇论文）→ ② NCBI esearch 标题精确匹配（`{id}[Title]`，避免命中正文顺带提及的无关文献）→ ③ Europe PMC 兜底（OA 全文覆盖更好）。
+- **NCBI E-utilities 三端点**：esearch（关键词→PMID）/ esummary（PMID→标题/期刊/DOI）/ efetch（PMID→结构化摘要分段 XML，无 Label 的整段摘要降级为 "Abstract" 一段）。请求必带 `tool=go_xunbaoshu`；有 `NCBI_API_KEY` 限 10 次/秒、无 key 3 次/秒（token bucket）。
+- **缓存**：后端进程内 TTL 正缓存 30 天 / 负缓存 7 天（not_found 也要负缓存，防坏 ID 反复打 NCBI）；key 带检索策略版本号，规则升级后旧缓存自然失效。
+- **退避与降级**：429/5xx → 1s/2s/4s 三次后退避，仍失败整条链路降级 Europe PMC（打 WARN 日志，UI 无感知）。
+- **not_found 是正常业务状态**：返回 `{"status":"not_found","suggested_queries":[...]}`，UI 显示建议检索词，不算 error。
+- 前端：`src/services/literature.ts`（3s 超时、never throws）+ `DatasetCard` 的 📖 文献入口（点击高亮反馈 + 卡片自动滚动到可视区）。
+
+### 3.8 排行榜统计与空态引导
+
+- **统计上报**：`statsStore.ts` 在每轮对话结束后 fire-and-forget 调用 RPC（登录 `bump_user_stats` / 访客 `bump_guest_stats`），累计列与周列（`week_*` + `week_base` 周一日期，RPC 内自动跨周归零）双轨累加。注意 RPC 参数名带 `p_` 前缀（见 `src/supabase/types.ts` Functions），名字不匹配会被静默忽略——统计恒为 0 的排查入口。
+- **离线模式本地统计**：无 Supabase 配置时，`statsStore.ts` 走 localStorage 本地统计层（key `seqout-local-stats`，单行 upsert、双轨字段与云端 RPC 语义一致、跨周自动归零）；排行榜直接显示本地统计行在「临时矿工」榜，改昵称也走本地。**排行榜离线模式下默认打开「临时矿工」页签**（登录榜恒为空）。配置 Supabase 后自动切回云端，无需改代码。
+- **空态示例随机化**：`EmptyState.tsx` 维护三组示例池（探矿定位 12 条 / 验宝鉴宝 6 条 / 清点矿藏 6 条），每次进入空态 Fisher-Yates 洗牌随机抽样展示（组内条数 3/2/1 不变）；本次空态内稳定，重新进入会话再换一批。
+
+### 3.9 桌宠与成就
 
 - `TreasureMouse.tsx` 状态机 + pointer 拖拽；主形象为本地抠图 PNG（`src/assets/pet/`，构建时打包）。
 - `index.tsx` 在 SSE 的 onTool/onCards/onEnd/onError 里经 `makePetEvent()`（自增 seq 去重）转发事件。
@@ -188,6 +238,8 @@ LLM 额度与网关、seqout API 代理（函数内直连公网 GET）、存储�
 - Edge Function 冷启动首次调用可能 503，复测即恢复，非故障。
 - Tailwind v4 无 `h-4.5` 这类半档刻度，自定义尺寸用任意值语法（如 `h-[18px]`）。
 - 动效禁用 framer-motion（package.json 里的该依赖是模板遗留，业务代码不引用）。
+- Request body 只能读一次：handler 里对 `req.json()` 的多次调用会抛 `Body has already been read`——文献 action 与对话流程共用同一次解析结果。
+- Supabase RPC 参数名必须与 schema 定义精确匹配（带 `p_` 前缀），名字不对会被静默忽略且失败被 catch 吞掉——排行榜统计恒为 0 的典型根因。
 
 ---
 

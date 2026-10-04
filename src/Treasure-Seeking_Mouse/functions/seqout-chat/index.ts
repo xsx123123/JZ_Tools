@@ -354,11 +354,19 @@ function buildSearchTerms(kind: string, idOrName: string): string[] {
   return [`${idOrName}[Title]`];
 }
 
-/** GEO 条目自带 PMID 反查（seqout 项目详情的 pubmed_id 字段，精确命中优先于关键词检索） */
+/** GEO 条目自带 PMID 反查（seqout 项目详情的 pubmed_id 字段，精确命中优先于关键词检索）。
+ * GSM 样本自己不带文献，先反查所属 GSE 系列（文献挂在系列上），再取系列的 pubmed_id。 */
 async function linkedPubmedId(kind: string, idOrName: string): Promise<string | null> {
   if (kind !== 'geo_series' && kind !== 'geo_sample') return null;
   try {
-    const detail = await seqoutGet(`/project/${encodeURIComponent(idOrName)}`);
+    let seriesId = idOrName;
+    if (kind === 'geo_sample') {
+      const resolved = await seqoutGet(`/accession/${encodeURIComponent(idOrName)}/project`);
+      const project = (resolved as { project_accession?: unknown }).project_accession;
+      if (typeof project !== 'string' || !project) return null;
+      seriesId = project;
+    }
+    const detail = await seqoutGet(`/project/${encodeURIComponent(seriesId)}`);
     const pmids = (detail as { pubmed_id?: unknown }).pubmed_id;
     if (Array.isArray(pmids) && typeof pmids[0] === 'string' && pmids[0]) return pmids[0];
     if (typeof pmids === 'string' && pmids) return pmids;
@@ -521,31 +529,33 @@ export const handler = async (req: Request): Promise<Response> => {
       envGet('MEOO_PROJECT_API_KEY') ||
       envGet('LLM_API_KEY') || '';
 
-    // 文献联动 action 只打公共 API，不需要 AI 凭证，放在凭证检查之前
+    // 请求体只读一次（Request body 不可重复读）：文献 action 在此分流，其余走对话流程
+    // 文献联动只打公共 API，不需要 AI 凭证，放在凭证检查之前
+    let body: Record<string, unknown> = {};
     if (req.method === 'POST') {
-      const ct = req.headers.get('Content-Type') || '';
-      if (ct.includes('application/json')) {
-        try {
-          const body = (await req.json()) as { action?: string };
-          if (body.action === 'literature') {
-            const kind = String(body.kind || '');
-            const idOrName = String(body.id || '').trim();
-            const VALID_KINDS = ['geo_series', 'geo_sample', 'go_term', 'pubmed'];
-            if (!VALID_KINDS.includes(kind) || !idOrName) {
-              return new Response(JSON.stringify({ error: '参数不完整：需要 kind（geo_series/geo_sample/go_term/pubmed）与 id' }), { status: 400, headers: { 'Content-Type': 'application/json' } });
-            }
-            try {
-              const t0 = Date.now();
-              const card = await fetchLiterature(kind, idOrName);
-              console.info(`[${FUNCTION_NAME}] literature ${requestId} ${kind}:${idOrName} -> ${card.status} ${Date.now() - t0}ms`);
-              return new Response(JSON.stringify(card), { status: 200, headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' } });
-            } catch (err) {
-              const message = err instanceof Error ? err.message : 'Literature lookup failed';
-              console.warn(`[${FUNCTION_NAME}] literature failed ${requestId}: ${message}`);
-              return new Response(JSON.stringify({ error: '文献服务暂时不可用，请稍后重试' }), { status: 502, headers: { 'Content-Type': 'application/json' } });
-            }
-          }
-        } catch { /* JSON 解析失败 → 走正常对话流程，由下方 req.json() 报错 */ }
+      try {
+        body = (await req.json()) as Record<string, unknown>;
+      } catch {
+        return new Response(JSON.stringify({ error: '请求体必须是合法 JSON' }), { status: 400, headers: { 'Content-Type': 'application/json' } });
+      }
+    }
+
+    if (body.action === 'literature') {
+      const kind = String(body.kind || '');
+      const idOrName = String(body.id || '').trim();
+      const VALID_KINDS = ['geo_series', 'geo_sample', 'go_term', 'pubmed'];
+      if (!VALID_KINDS.includes(kind) || !idOrName) {
+        return new Response(JSON.stringify({ error: '参数不完整：需要 kind（geo_series/geo_sample/go_term/pubmed）与 id' }), { status: 400, headers: { 'Content-Type': 'application/json' } });
+      }
+      try {
+        const t0 = Date.now();
+        const card = await fetchLiterature(kind, idOrName);
+        console.info(`[${FUNCTION_NAME}] literature ${requestId} ${kind}:${idOrName} -> ${card.status} ${Date.now() - t0}ms`);
+        return new Response(JSON.stringify(card), { status: 200, headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' } });
+      } catch (err) {
+        const message = err instanceof Error ? err.message : 'Literature lookup failed';
+        console.warn(`[${FUNCTION_NAME}] literature failed ${requestId}: ${message}`);
+        return new Response(JSON.stringify({ error: '文献服务暂时不可用，请稍后重试' }), { status: 502, headers: { 'Content-Type': 'application/json' } });
       }
     }
 
@@ -583,7 +593,6 @@ export const handler = async (req: Request): Promise<Response> => {
       }
     }
 
-    const body = await req.json();
     const history = (body.messages || []) as ChatMsg[];
     const model = (body.model as string) || DEFAULT_MODEL;
     const messages: ChatMsg[] = [{ role: 'system', content: SYSTEM_PROMPT }, ...history.slice(-16)];

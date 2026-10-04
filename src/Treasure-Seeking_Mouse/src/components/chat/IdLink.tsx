@@ -1,10 +1,12 @@
-// v2.1 正文内嵌编号链接：L1 直达原始页 + L2 hover 300ms 浮层（复制 ID / 查看证据链）
-// 查看证据链经 evidenceBus 抛给消息列表层（T2 文献联动）；浮层摘要来自消息卡片元数据
-import { useState } from "react";
+// v2.1 正文内嵌编号链接：L1 直达原始页 + L2 hover 300ms 浮层（自动预取论文 + 复制 ID / 查看证据链）
+// 浮层打开时经 T2 fetchLiterature 自动拉论文元数据（前端 TTL 缓存，反复 hover 不重复请求）；
+// 「查看证据链」经 evidenceBus 抛给消息列表层，渲染完整文献卡片
+import { useCallback, useState } from "react";
 import { BookOpen, Copy, Check, ExternalLink } from "lucide-react";
 import { HoverCard, HoverCardTrigger, HoverCardContent } from "@/components/ui/hover-card";
 import { LINK_TYPE_LABEL, type IdMatch } from "@/lib/linkify";
 import { requestEvidence } from "@/lib/evidenceBus";
+import { fetchLiterature, type LiteratureCardDTO } from "@/services/literature";
 
 export function IdLink({
   match,
@@ -18,6 +20,18 @@ export function IdLink({
   hostMessageId?: string;
 }): React.ReactElement {
   const [copied, setCopied] = useState(false);
+  // 浮层自动预取的论文元数据（loading 骨架 → 标题/期刊/年份；not_found 显示提示）
+  const [lit, setLit] = useState<LiteratureCardDTO | null>(null);
+  const [litState, setLitState] = useState<"idle" | "loading" | "done">("idle");
+
+  const loadLiterature = useCallback(() => {
+    if (litState !== "idle") return; // 已加载/加载中不重复请求
+    setLitState("loading");
+    void fetchLiterature(match.type, match.id).then((card) => {
+      setLit(card);
+      setLitState("done");
+    });
+  }, [litState, match.type, match.id]);
 
   function copyId(): void {
     void navigator.clipboard
@@ -30,11 +44,16 @@ export function IdLink({
   }
 
   function showEvidence(): void {
-    requestEvidence({ kind: match.type, id: match.type === "pubmed" ? match.id : match.id, match, hostMessageId });
+    requestEvidence({ kind: match.type, id: match.id, match, hostMessageId });
   }
 
+  const litTitle = lit?.status === "ok" ? lit.title : null;
+  const litMeta = lit?.status === "ok"
+    ? [lit.journal, lit.year].filter(Boolean).join(" · ")
+    : null;
+
   return (
-    <HoverCard openDelay={300} closeDelay={120}>
+    <HoverCard openDelay={300} closeDelay={120} onOpenChange={(open) => { if (open) loadLiterature(); }}>
       <HoverCardTrigger asChild>
         <a
           href={match.url}
@@ -53,7 +72,21 @@ export function IdLink({
             <span className="mx-1">·</span>
             <span className="font-mono">{match.id}</span>
           </p>
-          {summary ? (
+          {/* 自动预取的论文信息：loading 骨架 → 标题/期刊；查不到显示轻提示 */}
+          {litState === "loading" ? (
+            <div className="space-y-1.5 py-0.5" aria-label="正在检索论文">
+              <div className="h-3 w-4/5 animate-pulse rounded bg-secondary" />
+              <div className="h-2.5 w-2/5 animate-pulse rounded bg-secondary" />
+            </div>
+          ) : litTitle ? (
+            <div>
+              <p className="line-clamp-3 text-[12px] font-medium leading-relaxed text-foreground/90">{litTitle}</p>
+              {litMeta ? <p className="mt-0.5 truncate text-[10.5px] text-muted-foreground">{litMeta}</p> : null}
+            </div>
+          ) : litState === "done" ? (
+            <p className="text-[11px] text-muted-foreground/70">未找到直接关联论文，可查看原始页或稍后再试</p>
+          ) : null}
+          {summary && !litTitle ? (
             <p className="line-clamp-4 text-[12px] leading-relaxed text-foreground/85">{summary}</p>
           ) : null}
           <div className="flex items-center gap-1.5 pt-1">

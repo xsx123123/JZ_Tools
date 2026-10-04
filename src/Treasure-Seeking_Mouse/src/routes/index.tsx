@@ -138,7 +138,7 @@ function ChatPage(): React.ReactElement {
     return () => sub.subscription.unsubscribe();
   }, []);
 
-  // 登录后拉云端会话；退出后回到本地
+  // 登录后拉云端会话；未登录时侧栏显示 localStorage 本地会话（一直在保存，此前未展示）
   useEffect(() => {
     if (!user) {
       setSessions([]);
@@ -150,9 +150,39 @@ function ChatPage(): React.ReactElement {
       .catch(() => undefined);
   }, [user]);
 
-  // 切换会话时加载消息
+  // 未登录：本地会话列表状态（localSessions 变化时同步到侧栏）
+  const [localSessions, setLocalSessions] = useState<LocalSession[]>(() => readLocalSessions());
+
+  // 本地临时会话持久化（未登录试用）：写 localStorage 并同步侧栏列表
   useEffect(() => {
-    if (!user || !activeId) return;
+    if (user) return;
+    const list = readLocalSessions();
+    const idx = list.findIndex((s) => s.id === localId);
+    const entry: LocalSession = {
+      id: localId,
+      title: messages.find((m) => m.role === "user")?.content.slice(0, 24) ?? "新对话",
+      messages,
+      ts: Date.now(),
+    };
+    if (idx >= 0) list[idx] = entry;
+    else if (messages.length > 0) list.push(entry);
+    writeLocalSessions(list);
+    setLocalSessions(list.filter((s) => s.messages.length > 0).reverse()); // 侧栏显示：最近活跃在前
+  }, [user, localId, messages]);
+
+  // 侧栏数据源：登录走云端，未登录走本地
+  const displaySessions: SessionRow[] = user
+    ? sessions
+    : localSessions.map((s) => ({ id: s.id, title: s.title, updated_at: new Date(s.ts).toISOString() }));
+
+  // 切换会话时加载消息（登录走云端；未登录走本地会话）
+  useEffect(() => {
+    if (!activeId) return;
+    if (!user) {
+      const local = localSessions.find((s) => s.id === activeId);
+      setMessages(local ? local.messages : []);
+      return;
+    }
     let cancelled = false;
     void listMessages(activeId)
       .then((rows) => {
@@ -171,23 +201,7 @@ function ChatPage(): React.ReactElement {
     return () => {
       cancelled = true;
     };
-  }, [user, activeId]);
-
-  // 本地临时会话持久化（未登录试用）
-  useEffect(() => {
-    if (user) return;
-    const list = readLocalSessions();
-    const idx = list.findIndex((s) => s.id === localId);
-    const entry: LocalSession = {
-      id: localId,
-      title: messages.find((m) => m.role === "user")?.content.slice(0, 24) ?? "新对话",
-      messages,
-      ts: Date.now(),
-    };
-    if (idx >= 0) list[idx] = entry;
-    else if (messages.length > 0) list.push(entry);
-    writeLocalSessions(list);
-  }, [user, localId, messages]);
+  }, [user, activeId, localSessions]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
@@ -328,6 +342,17 @@ function ChatPage(): React.ReactElement {
   }
 
   async function handleDelete(id: string): Promise<void> {
+    if (!user) {
+      // 未登录：删除 localStorage 本地会话
+      writeLocalSessions(readLocalSessions().filter((s) => s.id !== id));
+      setLocalSessions((prev) => prev.filter((s) => s.id !== id));
+      if (activeId === id) {
+        setActiveId(null);
+        setMessages([]);
+        setLocalId(uid());
+      }
+      return;
+    }
     try {
       await deleteSession(id);
       setSessions((prev) => prev.filter((s) => s.id !== id));
@@ -367,7 +392,7 @@ function ChatPage(): React.ReactElement {
 
   const sidebar = (
     <SessionSidebar
-      sessions={sessions}
+      sessions={displaySessions}
       activeId={activeId}
       userLabel={user ? user.email ?? user.id.slice(0, 8) : null}
       onSelect={selectSession}
