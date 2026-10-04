@@ -1,7 +1,7 @@
 // 新会话空态：寻宝主题引导 + 按意图分组的示例提问（藏宝任务板式排版）
 // 每次进入空态从示例池随机抽样展示（useMemo 一次抽定，本次空态内保持稳定不闪动）
 import { useMemo } from "react";
-import { BrandMark } from "@/components/BrandMark";
+import mouseBase from "@/assets/pet/mouse-base.webp";
 
 interface ExampleGroup {
   label: string;
@@ -79,30 +79,38 @@ export function EmptyState({ onPick }: { onPick: (q: string) => void }): React.R
   );
   return (
     <div className="flex h-full flex-col items-center justify-center px-4 py-10">
-      <div className="reveal reveal-zoom gold-glow flex h-16 w-16 items-center justify-center rounded-2xl bg-pet-gold-soft text-pet-amber-deep ring-1 ring-pet-amber/30">
-        <BrandMark size={32} />
-      </div>
-      <h2 className="reveal font-display mt-5 text-[26px] font-semibold tracking-tight text-foreground" data-reveal-delay="80">
-        GEO<span className="text-pet-amber-deep">寻宝鼠</span>
-      </h2>
-      <p className="reveal mt-2 max-w-lg text-center text-[13.5px] leading-relaxed text-muted-foreground" data-reveal-delay="160">
-        告诉阿寻你想挖哪片矿脉，它的小鼻子可灵了！一头扎进 GEO、SRA、ENA、GSA 数据库里刨拉半天，
-        不仅能嗅出高分数据集、啃透繁杂编号，还能把打包好的样本宝藏一口气叼到你跟前。
-      </p>
+      {/* 英雄区（图标+标题+简介）固定不动；只有示例任务清单在内部滚动 */}
+      <div className="flex min-h-0 w-full max-w-2xl flex-col items-center">
+        <div className="reveal reveal-zoom gold-glow flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-[24px] bg-pet-gold-soft ring-1 ring-pet-amber/30">
+          <img
+            src={mouseBase}
+            alt="寻宝鼠阿寻"
+            draggable={false}
+            className="h-full w-full scale-[1.18] object-contain drop-shadow-sm"
+          />
+        </div>
+        <h2 className="reveal font-display mt-5 text-[26px] font-semibold tracking-tight text-foreground" data-reveal-delay="80">
+          GEO<span className="text-pet-amber-deep">寻宝鼠</span>
+        </h2>
+        <p className="reveal mt-2 max-w-lg text-center text-[13.5px] leading-relaxed text-muted-foreground" data-reveal-delay="160">
+          告诉阿寻你想挖哪片矿脉，它的小鼻子可灵了！一头扎进 GEO、SRA、ENA、GSA 数据库里刨拉半天，
+          不仅能嗅出高分数据集、啃透繁杂编号，还能把打包好的样本宝藏一口气叼到你跟前。
+        </p>
 
-      <div className="reveal mt-9 w-full max-w-2xl space-y-7" data-reveal-delay="240">
-        {picked.map((g, gi) => (
-          <section key={g.label}>
-            <GroupHeader label={g.label} caption={g.caption} index={String(gi + 1).padStart(2, "0")} />
-            <ul className="mt-1 divide-y divide-border/70 border-y border-border/70">
-              {g.items.map((q) => (
-                <li key={q}>
-                  <ExampleRow q={q} onPick={onPick} />
-                </li>
-              ))}
-            </ul>
-          </section>
-        ))}
+        <div className="reveal mt-9 w-full min-h-0 flex-1 space-y-7 overflow-y-auto pb-2" data-reveal-delay="240">
+          {picked.map((g, gi) => (
+            <section key={g.label}>
+              <GroupHeader label={g.label} caption={g.caption} index={String(gi + 1).padStart(2, "0")} />
+              <ul className="mt-1 divide-y divide-border/70 border-y border-border/70">
+                {g.items.map((q) => (
+                  <li key={q}>
+                    <ExampleRow q={q} onPick={onPick} />
+                  </li>
+                ))}
+              </ul>
+            </section>
+          ))}
+        </div>
       </div>
     </div>
   );

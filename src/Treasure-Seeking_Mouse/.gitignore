@@ -10,6 +10,15 @@ dist
 截屏*.png
 *.tsbuildinfo
 
+# 开发过程产物（按日期的截图与冲刺文档归档，不入库）
+docs/2[0-9].[0-9]*.[0-9]*/
+
+# 工具生成物（构建/测试缓存，勿入库）
+.pytest_cache/
+.tanstack/
+test-results/
+playwright-report/
+
 # QMuse CLI 本地状态与导入诊断产物
 .qoder/
 **/.qmuse/import-errors/
