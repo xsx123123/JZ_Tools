@@ -64,8 +64,8 @@ React 19 + TypeScript · Vite 7 · Tailwind CSS v4（双主题 design token）·
 本应用在 **QMuse**（应用构建与部署）与 **DeepSeek-V4**、**Kimi-K3**、**GLM-5.3**（AI 模型）的协助下完成：
 
 <p>
-  <img src="docs/badges/qmuse.svg" height="26" alt="QMuse" />&nbsp;&nbsp;
-  <img src="docs/badges/deepseek.svg" height="24" alt="DeepSeek" />&nbsp;&nbsp;
-  <img src="docs/badges/kimi.svg" height="24" alt="Kimi" />&nbsp;&nbsp;
-  <img src="docs/badges/zhipu.svg" height="20" alt="GLM · Z.AI" />
+  <a href="https://www.qmuse.cn/" target="_blank" rel="noreferrer"><img src="docs/badges/qmuse.svg" height="26" alt="QMuse" /></a>&nbsp;&nbsp;
+  <a href="https://www.deepseek.com/" target="_blank" rel="noreferrer"><img src="docs/badges/deepseek.svg" height="24" alt="DeepSeek" /></a>&nbsp;&nbsp;
+  <a href="https://www.kimi.com/" target="_blank" rel="noreferrer"><img src="docs/badges/kimi.svg" height="24" alt="Kimi" /></a>&nbsp;&nbsp;
+  <a href="https://chat.z.ai/" target="_blank" rel="noreferrer"><img src="docs/badges/zhipu.svg" height="20" alt="GLM · Z.AI" /></a>
 </p>
