@@ -37,7 +37,7 @@ export function Composer({
   }
 
   return (
-    <div className="border-t border-border bg-background/80 px-4 py-3 backdrop-blur-sm sm:px-6">
+    <div className="safe-b border-t border-border bg-background/80 px-4 py-3 backdrop-blur-sm sm:px-6">
       <div className="mx-auto max-w-3xl">
         <div className="flex items-end gap-2 rounded-xl border border-border bg-card p-2 shadow-soft transition-all focus-within:border-helix focus-within:ring-2 focus-within:ring-helix/20 focus-within:shadow-[0_1px_3px_0_rgb(0_0_0/0.04),0_8px_24px_-12px_oklch(0.6_0.118_184.704/0.25)]">
           <textarea

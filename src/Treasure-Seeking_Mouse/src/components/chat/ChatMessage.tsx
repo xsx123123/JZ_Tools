@@ -9,7 +9,15 @@ import { DatasetCardGrid } from "./DatasetCard";
 import { SuggestionBlock, extractFollowups } from "./SuggestionBlock";
 import { LiteratureCardPanel } from "./LiteratureCard";
 import { addEvidenceListener, type EvidenceRequest } from "@/lib/evidenceBus";
+import { useIsTouch } from "@/hooks/use-touch";
 import type { DatasetCard, ToolLog } from "@/services/seqoutChat";
+
+/**
+ * 操作按钮组的显隐类：桌面端悬停/聚焦浮现，触摸端常显
+ * （触屏无 hover，若沿用悬停显隐会导致复制/重发按钮永久不可见）
+ */
+const REVEAL_ON_HOVER = "opacity-0 transition-opacity duration-150 group-hover:opacity-100 group-focus-within:opacity-100";
+const ALWAYS_SHOWN = "opacity-100 transition-opacity duration-150";
 
 export interface ChatUIMessage {
   id: string;
@@ -67,6 +75,7 @@ export function ChatMessage({
   onPickSuggestion?: (q: string) => void;
 }): React.ReactElement {
   const [copied, copy] = useCopy();
+  const isTouch = useIsTouch();
   // T2：本条消息挂载的文献证据链请求（来自正文 IdLink 或 DatasetCard 的文献入口）
   const [evidence, setEvidence] = useState<EvidenceRequest | null>(null);
   useEffect(() => {
@@ -79,7 +88,7 @@ export function ChatMessage({
   if (msg.role === "user") {
     return (
       <div className="group flex items-center justify-end gap-1.5">
-        <div className="flex items-center gap-0.5 opacity-0 transition-opacity duration-150 group-hover:opacity-100 group-focus-within:opacity-100">
+        <div className={`flex items-center gap-0.5 ${isTouch ? ALWAYS_SHOWN : REVEAL_ON_HOVER}`}>
           <ActionButton label={copied ? "已复制" : "复制提问"} onClick={() => copy(msg.content)}>
             {copied ? <Check size={13} className="text-helix" /> : <Copy size={13} />}
           </ActionButton>
@@ -138,7 +147,7 @@ export function ChatMessage({
           </p>
         ) : null}
         {showActions ? (
-          <div className="mt-1.5 flex items-center gap-0.5 opacity-0 transition-opacity duration-150 group-hover:opacity-100 group-focus-within:opacity-100">
+          <div className={`mt-1.5 flex items-center gap-0.5 ${isTouch ? ALWAYS_SHOWN : REVEAL_ON_HOVER}`}>
             <ActionButton label={copied ? "已复制" : "复制回答"} onClick={() => copy(main)}>
               {copied ? <Check size={13} className="text-helix" /> : <Copy size={13} />}
             </ActionButton>

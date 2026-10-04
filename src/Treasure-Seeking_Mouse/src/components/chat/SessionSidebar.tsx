@@ -2,6 +2,7 @@
 import { useState } from "react";
 import { LogIn, LogOut, MessageSquare, Pencil, Plus, Trash2, X } from "lucide-react";
 import { BrandMark } from "@/components/BrandMark";
+import { useIsTouch } from "@/hooks/use-touch";
 import type { SessionRow } from "@/services/chatStore";
 
 export function SessionSidebar({
@@ -29,6 +30,7 @@ export function SessionSidebar({
 }): React.ReactElement {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [draft, setDraft] = useState("");
+  const isTouch = useIsTouch();
 
   function commitRename(id: string): void {
     const t = draft.trim();
@@ -91,7 +93,7 @@ export function SessionSidebar({
                       {s.title}
                     </button>
                   )}
-                  <span className="hidden shrink-0 items-center gap-1 group-hover:flex">
+                  <span className={`${isTouch ? "flex" : "hidden group-hover:flex"} shrink-0 items-center gap-1`}>
                     <button
                       type="button"
                       title="重命名"

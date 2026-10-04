@@ -2,6 +2,7 @@
 // 连击转圈、爱心飘浮、闲置散步张望、宝箱累计计数、里程碑成就庆祝，可拖拽、右键静默。
 import { useCallback, useEffect, useRef, useState } from "react";
 import { readPetPos, writePetPos, readPetQuiet, writePetQuiet, bumpPokeCount, readTreasureCount, addTreasure, ACHIEVEMENTS, claimAchievement, earnedAchievements, type Achievement, type PetPos } from "@/services/petStore";
+import { useIsMobile } from "@/hooks/use-mobile";
 import IMG_BASE from "@/assets/pet/mouse-base.webp";
 import IMG_DIG from "@/assets/pet/mouse-dig.webp";
 import IMG_CHEER from "@/assets/pet/mouse-cheer.webp";
@@ -38,13 +39,20 @@ function pick<T>(arr: T[]): T {
   return arr[Math.floor(Math.random() * arr.length)];
 }
 
-const SIZE = 192; // 宠物宽（px），H5 下缩小
+const SIZE = 144; // 宠物宽（px，桌面端）
+const SIZE_MOBILE = 96; // 移动端缩小：原尺寸在手机上占近半屏宽，遮挡对话内容
+const MOBILE_MAX_W = 768; // 与 useIsMobile / Tailwind md: 断点一致
 const MARGIN = 12;
+
+/** 当前设备下的宠物宽度 */
+function petSize(): number {
+  return window.innerWidth < MOBILE_MAX_W ? SIZE_MOBILE : SIZE;
+}
 
 function clampPos(p: PetPos): PetPos {
   const w = window.innerWidth;
   const h = window.innerHeight;
-  const size = w < 768 ? 144 : SIZE;
+  const size = petSize();
   return {
     x: Math.min(Math.max(MARGIN, p.x), w - size - MARGIN),
     y: Math.min(Math.max(MARGIN, p.y), h - size - 120),
@@ -67,11 +75,13 @@ interface Burst {
 let burstId = 0;
 
 export function TreasureMouse({ event }: { event: PetEvent | null }): React.ReactElement {
+  const isMobile = useIsMobile();
+  const size = isMobile ? SIZE_MOBILE : SIZE; // 移动端缩小，避免遮挡近半屏宽
   const [quiet, setQuiet] = useState<boolean>(() => readPetQuiet());
   const [pos, setPos] = useState<PetPos>(() => {
     const saved = readPetPos();
     if (saved) return clampPos(saved);
-    return { x: window.innerWidth - SIZE - 24, y: 120 };
+    return { x: window.innerWidth - petSize() - 24, y: 120 };
   });
   const [state, setState] = useState<PetState>("idle");
   const [bubble, setBubble] = useState<string | null>(null);
@@ -83,6 +93,7 @@ export function TreasureMouse({ event }: { event: PetEvent | null }): React.Reac
   const [milestone, setMilestone] = useState<Achievement | null>(null);
   const [bursts, setBursts] = useState<Burst[]>([]);
   const dragRef = useRef<{ startX: number; startY: number; origX: number; origY: number; moved: boolean } | null>(null);
+  const longPressRef = useRef<ReturnType<typeof setTimeout> | null>(null); // 触摸端长按静默计时器
   const stateTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const idleTimer = useRef<ReturnType<typeof setInterval> | null>(null);
   const lastSeq = useRef(0);
@@ -241,6 +252,7 @@ export function TreasureMouse({ event }: { event: PetEvent | null }): React.Reac
 
   useEffect(() => () => {
     if (stateTimer.current) clearTimeout(stateTimer.current);
+    if (longPressRef.current) clearTimeout(longPressRef.current);
   }, []);
 
   function toggleQuiet(q: boolean): void {
@@ -279,18 +291,38 @@ export function TreasureMouse({ event }: { event: PetEvent | null }): React.Reac
   const onPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
     e.currentTarget.setPointerCapture(e.pointerId);
     dragRef.current = { startX: e.clientX, startY: e.clientY, origX: pos.x, origY: pos.y, moved: false };
+    // 触摸端无右键：长按 600ms 静默（与桌面右键等价）。拖动会先取消该计时器
+    if (e.pointerType === "touch") {
+      longPressRef.current = setTimeout(() => {
+        longPressRef.current = null;
+        dragRef.current = null; // 取消后续拖拽/点击判定
+        toggleQuiet(true);
+      }, 600);
+    }
+  };
+  const cancelLongPress = () => {
+    if (longPressRef.current) {
+      clearTimeout(longPressRef.current);
+      longPressRef.current = null;
+    }
   };
   const onPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
     const d = dragRef.current;
     if (!d) return;
     const dx = e.clientX - d.startX;
     const dy = e.clientY - d.startY;
-    if (Math.abs(dx) + Math.abs(dy) > 4) d.moved = true;
+    // 触摸端阈值放宽（手指抖动比鼠标大，4px 会把"点击"误判成"拖拽"）
+    const threshold = e.pointerType === "touch" ? 10 : 4;
+    if (Math.abs(dx) + Math.abs(dy) > threshold) {
+      d.moved = true;
+      cancelLongPress(); // 已在拖动，不再触发长按静默
+    }
     if (d.moved) {
       setPos(clampPos({ x: d.origX + dx, y: d.origY - dy })); // y 是距底部距离
     }
   };
   const onPointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
+    cancelLongPress();
     const d = dragRef.current;
     dragRef.current = null;
     try {
@@ -337,7 +369,7 @@ export function TreasureMouse({ event }: { event: PetEvent | null }): React.Reac
       role="img"
       aria-label="寻宝鼠阿寻"
       className="fixed z-30 select-none touch-none"
-      style={{ left: pos.x, bottom: pos.y, width: 144 }}
+      style={{ left: pos.x, bottom: pos.y, width: size }}
     >
       {/* 气泡 */}
       {bubble ? (
@@ -436,8 +468,10 @@ export function TreasureMouse({ event }: { event: PetEvent | null }): React.Reac
         </div>
       ) : null}
 
-      {/* 小字提示 */}
-      <p className="mt-0.5 text-center font-mono text-[9px] text-muted-foreground/60">阿寻 · 右键静默</p>
+      {/* 小字提示：触摸端无右键，提示长按 */}
+      <p className="mt-0.5 text-center font-mono text-[9px] text-muted-foreground/60">
+        阿寻 · {isMobile ? "长按静默" : "右键静默"}
+      </p>
     </div>
   );
 }

@@ -11,6 +11,8 @@ import { SessionSidebar, MobileDrawerHeader } from "@/components/chat/SessionSid
 import { BrandMark } from "@/components/BrandMark";
 import { AuthDialog } from "@/components/auth/AuthDialog";
 import { TreasureMouse, makePetEvent, type PetEvent } from "@/components/pet/TreasureMouse";
+import { useIsTouch } from "@/hooks/use-touch";
+import { useVisualViewport } from "@/hooks/use-visual-viewport";
 import { readTheme, writeTheme, applyTheme, type Theme } from "@/services/petStore";
 import { bumpStats } from "@/services/statsStore";
 import { Leaderboard } from "@/components/chat/Leaderboard";
@@ -73,6 +75,8 @@ function writeLocalSessions(list: LocalSession[]): void {
 }
 
 function ChatPage(): React.ReactElement {
+  // 软键盘适配：写入 --vvh，根容器据此收缩（见 use-visual-viewport.ts）
+  useVisualViewport();
   const [session, setSession] = useState<Session | null>(null);
   const [authOpen, setAuthOpen] = useState(false);
   const [sessions, setSessions] = useState<SessionRow[]>([]);
@@ -95,6 +99,7 @@ function ChatPage(): React.ReactElement {
   const [petEvent, setPetEvent] = useState<PetEvent | null>(null); // 桌宠事件流（仅 UI 反馈，不影响消息逻辑）
   const petCardsRef = useRef(0);
   const [boardOpen, setBoardOpen] = useState(false); // 排行榜抽屉
+  const isTouch = useIsTouch();
   const statRef = useRef({ digs: 0, cards: 0 }); // 本轮挖宝统计（下铲次数 / 出土卡片数）
   const [collapsed, setCollapsed] = useState<boolean>(() => {
     try {
@@ -440,7 +445,10 @@ function ChatPage(): React.ReactElement {
   );
 
   return (
-    <div className="bg-grid flex h-dvh overflow-hidden">
+    <div
+      className="bg-grid touch-clean flex overflow-hidden"
+      style={{ height: "var(--vvh, 100dvh)" }}
+    >
       {/* PC 侧栏：默认收起为窄边条，点击展开 */}
       {collapsed ? (
         <div className="hidden w-12 shrink-0 flex-col items-center border-r border-border bg-panel py-3 md:flex">
@@ -485,7 +493,7 @@ function ChatPage(): React.ReactElement {
       {drawerOpen ? (
         <div className="fixed inset-0 z-40 md:hidden">
           <div className="absolute inset-0 bg-black/30 backdrop-blur-[2px]" onClick={() => setDrawerOpen(false)} />
-          <div className="absolute inset-y-0 left-0 w-[280px] max-w-[85%] shadow-soft-lg">
+          <div className="safe-t absolute inset-y-0 left-0 w-[280px] max-w-[85%] shadow-soft-lg">
             <MobileDrawerHeader onClose={() => setDrawerOpen(false)} />
             <div className="h-[calc(100%-49px)]">{sidebar}</div>
           </div>
@@ -494,7 +502,7 @@ function ChatPage(): React.ReactElement {
 
       {/* 主区 */}
       <main className="ambient-glow relative flex min-w-0 flex-1 flex-col">
-        <header className="flex items-center gap-2 border-b border-border bg-panel/70 px-4 py-2.5 backdrop-blur-sm md:px-6">
+        <header className="safe-t flex items-center gap-2 border-b border-border bg-panel/70 px-4 py-2.5 backdrop-blur-sm md:px-6">
           <button
             type="button"
             onClick={() => setDrawerOpen(true)}

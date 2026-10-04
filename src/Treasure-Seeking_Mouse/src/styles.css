@@ -684,3 +684,20 @@
   .pet-spin, .pet-walk, .pet-look, .pet-heart, .pet-chest-pop,
   .pet-burst, .pet-celebrate, .pet-halo, .pet-banner, .pet-badge-in { animation: none; }
 }
+
+/* ---------- 移动端适配 ---------- */
+
+/* 安全区（全面屏 / 刘海屏）：需 index.html 的 viewport-fit=cover 才生效。
+   用 max(设计基线, env) 而非纯 env：无刘海设备取基线（与 py-2.5 / py-3 一致，视觉不变），
+   有刘海时才多出让位空间。基线值与对应元素的原 padding 保持一致。
+   横向（safe-x）不单独处理：竖屏无影响，横屏时内容区自身已有 px-4 缓冲。 */
+.safe-t { padding-top: max(0.625rem, env(safe-area-inset-top)); }    /* header 原 py-2.5 */
+.safe-b { padding-bottom: max(0.75rem, env(safe-area-inset-bottom)); } /* composer 原 py-3 */
+
+/* 触摸端禁用点击高亮与长按系统菜单，避免对话气泡被选中弹菜单 */
+@media (hover: none) {
+  .touch-clean {
+    -webkit-tap-highlight-color: transparent;
+    -webkit-touch-callout: none;
+  }
+}
