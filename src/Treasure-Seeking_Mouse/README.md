@@ -1,8 +1,15 @@
-# GEO寻宝鼠 · 对话式组学数据检索助手
-
-> 🚀 **在线体验**：<https://render.qmuse.pub/p/muse/2842191818002612/index.html>（线上部署版本可能落后于仓库最新代码）
-
-一个把 [seqout-mcp](https://seqout.org) 的 26 个只读组学数据检索工具封装成「聊天式挖宝」体验的单页 Web 应用：用户用自然语言提问，后端大模型自动选择并调用 seqout API，结果以数据卡片 + 可折叠建议卡呈现；页面右下角常驻一只「寻宝鼠」桌宠，随检索进度挖宝、攒宝藏、解锁成就。支持移动端自适应，可完全脱离平台自托管（任意 OpenAI 兼容模型 + Docker 一键部署）。
+<div align="center">
+  <img src="src/assets/pet/mouse-base.webp" width="140" alt="GEO寻宝鼠" />
+  <h1>GEO寻宝鼠 · 对话式组学数据检索助手</h1>
+  <p>
+    <a href="https://render.qmuse.pub/p/muse/2842191818002612/index.html"><img src="https://img.shields.io/badge/在线体验-QMuse 部署-12b76a?style=flat-square" alt="在线体验" /></a>
+    <img src="https://img.shields.io/badge/Docker-Compose-2496ED?logo=docker&logoColor=white&style=flat-square" alt="Docker Compose" />
+    <img src="https://img.shields.io/badge/React-19-61dafb?logo=react&logoColor=white&style=flat-square" alt="React 19" />
+    <img src="https://img.shields.io/badge/LLM-OpenAI 兼容-4D6BFE?style=flat-square" alt="OpenAI 兼容" />
+    <a href="https://github.com/xsx123123/JZ_Tools/blob/main/LICENSE"><img src="https://img.shields.io/badge/License-MIT-yellow?style=flat-square" alt="MIT License" /></a>
+  </p>
+  <p>把 seqout-mcp 的 26 个组学数据检索工具封装成「聊天式挖宝」——自然语言提问，大模型自动检索 GEO / SRA / ENA / GSA，数据卡片 + 文献证据链呈现，附桌宠养成玩法。</p>
+</div>
 
 ![封面 · 夜探矿洞](docs/寻宝鼠.png)
 
