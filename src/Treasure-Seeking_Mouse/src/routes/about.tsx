@@ -1,6 +1,6 @@
 // 关于页：产品介绍图
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Github } from "lucide-react";
 import { BrandMark } from "@/components/BrandMark";
 import introImg from "@/assets/about/intro.png";
 
@@ -34,6 +34,18 @@ function AboutPage(): React.ReactElement {
         <p className="mt-4 text-center font-mono text-[11px] text-muted-foreground/70">
           对话式组学数据检索 · 数据来自 seqout.org 公共 API · 回答由 AI 生成，请以 NCBI / NGDC 原始页面为准
         </p>
+
+        <div className="mt-4 flex justify-center">
+          <a
+            href="https://github.com/xsx123123/JZ_Tools/tree/main/src/Treasure-Seeking_Mouse"
+            target="_blank"
+            rel="noreferrer"
+            className="flex items-center gap-1.5 rounded-lg border border-border bg-card px-3 py-1.5 text-[12.5px] text-muted-foreground shadow-sm transition-colors hover:border-helix/50 hover:text-helix"
+          >
+            <Github size={14} />
+            GitHub 项目主页
+          </a>
+        </div>
       </div>
     </div>
   );
