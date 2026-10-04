@@ -1,0 +1,63 @@
+# GEO寻宝鼠 · Docker Compose 部署
+#
+# 配置只有一个来源：server/.env（与本地 `pnpm run server` 共用同一份，无重复维护）。
+#
+# 部署（在 deploy/ 目录下执行）：
+#   docker compose --env-file ../server/.env up -d --build
+#   打开 http://localhost:8080/     # 发一条消息能看到流式回复即部署成功
+#
+# --env-file ../server/.env 让 VITE_* 等构建期变量与 WEB_PORT 也能从 server/.env 插值；
+# 若不需要 Supabase 登录（纯游客模式），下面的简写命令等效：
+#   docker compose up -d --build
+#
+# 架构（与 README §8.1 同源反代形态一致）：
+#   browser → web(nginx:80) ─┬─ /           → 前端静态产物（构建期 VITE_CHAT_API=/chat-api 固化）
+#                            └─ /chat-api/  → chat:8787（server/local.mjs）→ LLM 网关 + seqout.org
+
+name: treasure-mouse
+
+services:
+  chat:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+      target: chat
+    restart: unless-stopped
+    # 运行时密钥等直接读 server/.env（与本地自托管同一份），无需在部署侧重复填写。
+    # required: false —— 文件缺失时不阻断 build，容器启动后由 server/local.mjs 打印缺密钥告警。
+    env_file:
+      - path: ../server/.env
+        required: false
+    environment:
+      # 覆盖 server/.env 的值：容器内固定监听 8787，与 nginx 的 proxy_pass 对齐
+      # （server/.env 里通常写 8788，那是本地 `pnpm run server` 的端口）
+      CHAT_API_PORT: "8787"
+      NODE_ENV: production
+    expose:
+      - "8787"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O- http://127.0.0.1:8787/models >/dev/null 2>&1 || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+
+  web:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+      target: web
+      args:
+        # 构建期变量：同源反代，浏览器只访问 web 一个端口（勿改，改了要重新 build）
+        VITE_CHAT_API: /chat-api
+        # 可选：配 Supabase 兼容实例则恢复登录/云同步/排行榜，留空则纯游客模式
+        # 需要时把这三个加进 server/.env，并用 --env-file ../server/.env 启动
+        VITE_SUPABASE_URL: ${VITE_SUPABASE_URL:-}
+        VITE_SUPABASE_ANON_KEY: ${VITE_SUPABASE_ANON_KEY:-}
+        VITE_ONEDAY_APP_ID: ${VITE_ONEDAY_APP_ID:-}
+    restart: unless-stopped
+    depends_on:
+      - chat
+    ports:
+      # 宿主端口可用 server/.env 的 WEB_PORT 覆盖（配合 --env-file ../server/.env）
+      - "${WEB_PORT:-8080}:80"

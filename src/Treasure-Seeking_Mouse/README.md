@@ -288,7 +288,40 @@ pnpm run server                      # 启动本地对话服务 http://localhost
 - 前端通过 `VITE_CHAT_API` 找对话服务。生产推荐**同源反代**（`/chat-api` → 8788），无 CORS、无混合内容问题；也可以把 `VITE_CHAT_API` 直接填成对话服务的公网 URL（服务端已带 CORS 头，适合前后端分机器部署）。
 - 注意：`VITE_*` 变量在**构建时**固化进 bundle，改完必须重新 `pnpm run build`。
 
-### 8.2 环境要求
+### 8.2 Docker Compose 部署（推荐）
+
+仓库自带容器化部署（`deploy/` 下的 Dockerfile 双 target + compose + Makefile），无需在宿主机装 Node/pnpm/nginx：
+
+```bash
+cp server/.env.example server/.env   # 填 LLM_API_KEY（必填）；需要 Supabase 登录再填 VITE_SUPABASE_*
+make docker-start                    # 预检 LLM 密钥 → 构建 → 启动
+```
+
+打开 `http://localhost:8090/`（端口由 `server/.env` 的 `WEB_PORT` 控制），发一条消息能看到流式回复即部署成功。
+
+**配置只有一份**：`server/.env` 同时供本地 `pnpm run server` 和容器使用，不用重复维护。宿主机相关变量（`WEB_PORT`/`VITE_*`/NCBI key）也写在这一份里。
+
+**启动前自动预检密钥**：`deploy/check-llm-key.py` 会先请求 `{LLM_BASE_URL}/models` 验证密钥可用、模型存在，不通过就阻止启动——避免"容器起来了、一对话才报错"。跳过：`make docker-start SKIP_LLM_CHECK=1`；单独跑：`make check-llm`。
+
+常用命令（`make` 查看全部）：
+
+| 命令 | 作用 |
+|------|------|
+| `make docker-start` | 预检 + 构建 + 启动（后台） |
+| `make docker-stop` | 停止并移除容器 |
+| `make docker-restart` | 重启（不重建，读最新 `server/.env`） |
+| `make docker-logs` | 跟踪对话服务日志 |
+| `make docker-status` | 查看容器与健康状态 |
+| `make docker-clean` | 停止并删镜像（彻底重来） |
+
+- **架构**：`web`（nginx 托管前端静态产物 + `/chat-api` 同源反代）+ `chat`（`server/local.mjs` 对话服务），与 §8.1 的同源反代形态完全一致，浏览器只访问 web 一个端口。
+- **变量分两类**：chat 服务是运行时变量（改完 `make docker-restart`）；`VITE_SUPABASE_*` 是构建期变量（改完必须 `make docker-start` 重新构建）。
+- **升级**：`git pull && make docker-start`。
+- **端口冲突**：在 `server/.env` 改 `WEB_PORT` 即可。
+- 验证：`curl http://localhost:8090/chat-api/models` 应返回模型目录 JSON。
+- 不用 Docker 的情况下按 §8.4 起手动部署。
+
+### 8.3 环境要求（手动部署）
 
 | 依赖 | 版本 | 说明 |
 |------|------|------|
@@ -297,7 +330,7 @@ pnpm run server                      # 启动本地对话服务 http://localhost
 | LLM 密钥 | 任意 OpenAI 兼容服务 | OpenAI / DeepSeek / 硅基流动 / 本地 vLLM 等 |
 | Supabase 兼容实例 | 可选 | 不配则自动降级纯游客模式（登录/云同步/排行榜不可用） |
 
-### 8.3 部署步骤
+### 8.4 部署步骤（手动）
 
 ```bash
 # 1) 安装依赖
@@ -321,7 +354,7 @@ pnpm run build          # 产出 dist/
 pnpm run server         # 或 CHAT_API_PORT=8788 node server/local.mjs
 ```
 
-### 8.4 nginx 配置示例
+### 8.5 nginx 配置示例（手动部署）
 
 ```nginx
 server {
@@ -346,7 +379,7 @@ server {
 }
 ```
 
-### 8.5 进程守护（systemd）
+### 8.6 进程守护（systemd，手动部署）
 
 ```ini
 # /etc/systemd/system/treasure-mouse-chat.service
@@ -371,7 +404,7 @@ sudo systemctl status treasure-mouse-chat   # 查看状态
 journalctl -u treasure-mouse-chat -f        # 查看日志
 ```
 
-### 8.6 验证清单
+### 8.7 验证清单
 
 ```bash
 # 1. 对话服务正常（应返回模型目录 JSON）
@@ -384,7 +417,7 @@ curl http://your-domain.com/chat-api/models
 #    浏览器打开 http://your-domain.com/ ，发一条消息能看到流式回复即全部打通
 ```
 
-### 8.7 常见问题
+### 8.8 常见问题
 
 | 现象 | 原因与解决 |
 |------|-----------|

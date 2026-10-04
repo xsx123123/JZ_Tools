@@ -85,9 +85,9 @@ export function EmptyState({ onPick }: { onPick: (q: string) => void }): React.R
       <h2 className="reveal font-display mt-5 text-[26px] font-semibold tracking-tight text-foreground" data-reveal-delay="80">
         GEO<span className="text-pet-amber-deep">寻宝鼠</span>
       </h2>
-      <p className="reveal mt-2 max-w-md text-center text-[13.5px] leading-relaxed text-muted-foreground" data-reveal-delay="160">
-        告诉阿寻你想挖哪片矿——它会调用 GEO / SRA / ENA / GSA 公共数据库，
-        帮你检索数据集、解析编号、汇总样本信息，把宝藏叼到你面前。
+      <p className="reveal mt-2 max-w-lg text-center text-[13.5px] leading-relaxed text-muted-foreground" data-reveal-delay="160">
+        告诉阿寻你想挖哪片矿脉，它的小鼻子可灵了！一头扎进 GEO、SRA、ENA、GSA 数据库里刨拉半天，
+        不仅能嗅出高分数据集、啃透繁杂编号，还能把打包好的样本宝藏一口气叼到你跟前。
       </p>
 
       <div className="reveal mt-9 w-full max-w-2xl space-y-7" data-reveal-delay="240">

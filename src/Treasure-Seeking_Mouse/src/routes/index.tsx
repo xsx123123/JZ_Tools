@@ -116,6 +116,11 @@ function ChatPage(): React.ReactElement {
   }, []);
   const abortRef = useRef<AbortController | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const messagesRef = useRef<ChatUIMessage[]>(messages); // 最新消息快照：异步收尾时读，避免闭包过期
+  useEffect(() => {
+    messagesRef.current = messages;
+  }, [messages]);
   const catalogOkRef = useRef(false); // 模型目录是否加载成功；失败时发送空模型名，由服务端 LLM_MODEL 兜底，避免前端兜底模型在网关上不存在
   const user = session?.user ?? null;
 
@@ -154,20 +159,25 @@ function ChatPage(): React.ReactElement {
   const [localSessions, setLocalSessions] = useState<LocalSession[]>(() => readLocalSessions());
 
   // 本地临时会话持久化（未登录试用）：写 localStorage 并同步侧栏列表
+  // 流式期间 messages 每 delta 变一次，直接落盘会全量 JSON 序列化 + 刷新侧栏 → 回答越长越卡；
+  // 这里对中间态做 400ms debounce，仅在停止变化（或流结束）后统一落盘
   useEffect(() => {
     if (user) return;
-    const list = readLocalSessions();
-    const idx = list.findIndex((s) => s.id === localId);
-    const entry: LocalSession = {
-      id: localId,
-      title: messages.find((m) => m.role === "user")?.content.slice(0, 24) ?? "新对话",
-      messages,
-      ts: Date.now(),
-    };
-    if (idx >= 0) list[idx] = entry;
-    else if (messages.length > 0) list.push(entry);
-    writeLocalSessions(list);
-    setLocalSessions(list.filter((s) => s.messages.length > 0).reverse()); // 侧栏显示：最近活跃在前
+    const timer = setTimeout(() => {
+      const list = readLocalSessions();
+      const idx = list.findIndex((s) => s.id === localId);
+      const entry: LocalSession = {
+        id: localId,
+        title: messages.find((m) => m.role === "user")?.content.slice(0, 24) ?? "新对话",
+        messages,
+        ts: Date.now(),
+      };
+      if (idx >= 0) list[idx] = entry;
+      else if (messages.length > 0) list.push(entry);
+      writeLocalSessions(list);
+      setLocalSessions(list.filter((s) => s.messages.length > 0).reverse()); // 侧栏显示：最近活跃在前
+    }, 400);
+    return () => clearTimeout(timer);
   }, [user, localId, messages]);
 
   // 侧栏数据源：登录走云端，未登录走本地
@@ -176,10 +186,15 @@ function ChatPage(): React.ReactElement {
     : localSessions.map((s) => ({ id: s.id, title: s.title, updated_at: new Date(s.ts).toISOString() }));
 
   // 切换会话时加载消息（登录走云端；未登录走本地会话）
+  // 不依赖 localSessions：它被持久化 effect 高频刷新，靠 ref 读取避免流式期间整组 effect 重跑
+  const localSessionsRef = useRef<LocalSession[]>(localSessions);
+  useEffect(() => {
+    localSessionsRef.current = localSessions;
+  }, [localSessions]);
   useEffect(() => {
     if (!activeId) return;
     if (!user) {
-      const local = localSessions.find((s) => s.id === activeId);
+      const local = localSessionsRef.current.find((s) => s.id === activeId);
       setMessages(local ? local.messages : []);
       return;
     }
@@ -201,11 +216,24 @@ function ChatPage(): React.ReactElement {
     return () => {
       cancelled = true;
     };
-  }, [user, activeId, localSessions]);
+  }, [user, activeId]);
 
+  // 流式期间每分片一次 smooth scrollIntoView 会互相打断产生抖动：
+  // 中间态直接把容器 scrollTop 推到底（auto），仅流结束/消息数变化时平滑滚动
+  const lastCountRef = useRef(0);
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
-  }, [messages]);
+    const el = scrollContainerRef.current;
+    if (!el) return;
+    if (streaming) {
+      el.scrollTop = el.scrollHeight;
+      lastCountRef.current = messages.length;
+      return;
+    }
+    if (messages.length !== lastCountRef.current) {
+      bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+      lastCountRef.current = messages.length;
+    }
+  }, [messages, streaming]);
 
   const startNew = useCallback(() => {
     if (streaming) return;
@@ -224,9 +252,11 @@ function ChatPage(): React.ReactElement {
     [streaming],
   );
 
-  async function handleSend(text: string): Promise<void> {
+  async function handleSend(text: string, historyOverride?: ChatUIMessage[]): Promise<void> {
     if (streaming) return;
-    const history: { role: "user" | "assistant"; content: string }[] = messages
+    // historyOverride：重新生成时传入截断后的消息，避免闭包里的全量 messages 把已废弃回答带给模型
+    const source = historyOverride ?? messages;
+    const history: { role: "user" | "assistant"; content: string }[] = source
       .filter((m) => !m.error && m.content)
       .map((m) => ({ role: m.role, content: m.content }));
 
@@ -241,6 +271,7 @@ function ChatPage(): React.ReactElement {
     let finalCards: DatasetCard[] = [];
     const finalTools: ToolLog[] = [];
     statRef.current = { digs: 0, cards: 0 };
+    petCardsRef.current = 0; // 每轮重置：否则开箱动画只在当页第一个回答触发一次
 
     function patch(fn: (m: ChatUIMessage) => ChatUIMessage): void {
       setMessages((prev) => prev.map((m) => (m.id === asstMsg.id ? fn(m) : m)));
@@ -313,19 +344,17 @@ function ChatPage(): React.ReactElement {
           );
         }
         await insertMessage(sid, user.id, { role: "user", content: text });
+        // 流已结束，asstMsg 内容即最终值；不在 setState updater 里做网络副作用（StrictMode 下 updater 双调用会重复入库）
         const snapshot = asstMsg;
-        setMessages((cur) => {
-          const latest = cur.find((m) => m.id === snapshot.id);
-          if (latest && !latest.error) {
-            void insertMessage(sid!, user.id, {
-              role: "assistant",
-              content: latest.content,
-              cards: latest.cards ?? null,
-              tool_logs: latest.toolLogs ?? null,
-            }).catch(() => undefined);
-          }
-          return cur;
-        });
+        const latest = messagesRef.current.find((m) => m.id === snapshot.id);
+        if (latest && !latest.error) {
+          void insertMessage(sid, user.id, {
+            role: "assistant",
+            content: latest.content,
+            cards: latest.cards ?? null,
+            tool_logs: latest.toolLogs ?? null,
+          }).catch(() => undefined);
+        }
       } catch {
         /* 持久化失败不打断对话，内容仍在内存 */
       }
@@ -373,7 +402,7 @@ function ChatPage(): React.ReactElement {
     setLocalId(uid());
   }
 
-  /** 重新挖一次：截断到该助手消息之前，用其前最近一条用户提问重发 */
+  /** 重新挖一次：截断到该助手消息之前，用其前最近一条用户提问 + 截断后的历史重发 */
   function handleRegenerate(id: string): void {
     if (streaming) return;
     const idx = messages.findIndex((m) => m.id === id);
@@ -386,8 +415,9 @@ function ChatPage(): React.ReactElement {
       }
     }
     if (!q) return;
-    setMessages(messages.slice(0, idx));
-    void handleSend(q);
+    const truncated = messages.slice(0, idx);
+    setMessages(truncated);
+    void handleSend(q, truncated);
   }
 
   const sidebar = (
@@ -509,7 +539,7 @@ function ChatPage(): React.ReactElement {
           ) : null}
         </header>
 
-        <div className="flex-1 overflow-y-auto">
+        <div ref={scrollContainerRef} className="flex-1 overflow-y-auto">
           {messages.length === 0 ? (
             <EmptyState onPick={(q) => void handleSend(q)} />
           ) : (
