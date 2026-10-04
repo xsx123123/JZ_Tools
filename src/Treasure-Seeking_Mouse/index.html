@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>GEO寻宝鼠</title>
+    <style>
+      /* 内联样式确保主题底色立即生效，避免首帧闪烁 */
+      html, body {
+        margin: 0;
+        padding: 0;
+        width: 100%;
+        height: 100%;
+      }
+      html {
+        background-color: #f9fafb;
+        color-scheme: light;
+      }
+      html.dark {
+        background-color: #1a202c;
+        color-scheme: dark;
+      }
+    </style>
+    <script>
+      // React 加载前按已存偏好挂 dark 类（seqout-theme 由应用写入），默认浅色
+      (function () {
+        try {
+          if (localStorage.getItem("seqout-theme") === "dark" || /[?&]theme=dark/.test(location.search)) {
+            document.documentElement.classList.add("dark");
+          }
+        } catch (e) {
+          /* ignore */
+        }
+      })();
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

@@ -1,0 +1,11 @@
+node_modules
+dist
+.env
+.env.*
+!.env.example
+*.local
+.DS_Store
+
+# 需求沟通用的临时截图，不入库
+截屏*.png
+*.tsbuildinfo
