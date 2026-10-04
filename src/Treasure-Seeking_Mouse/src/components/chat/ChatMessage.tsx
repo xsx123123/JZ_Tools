@@ -1,11 +1,14 @@
 // 单条聊天消息：用户右对齐气泡 / 助手左对齐 + Markdown + 工具轨迹 + 结果卡片 + 复制/重试
-import { useState } from "react";
+// v2.1/T2：接收 evidenceBus 请求，在本条消息下方渲染文献证据链卡片
+import { useEffect, useState } from "react";
 import { Check, Copy, RotateCcw, User } from "lucide-react";
 import { BrandMark } from "@/components/BrandMark";
 import { Markdown } from "./Markdown";
 import { ToolTrace, type LiveToolEvent } from "./ToolTrace";
 import { DatasetCardGrid } from "./DatasetCard";
 import { SuggestionBlock, extractFollowups } from "./SuggestionBlock";
+import { LiteratureCardPanel } from "./LiteratureCard";
+import { addEvidenceListener, type EvidenceRequest } from "@/lib/evidenceBus";
 import type { DatasetCard, ToolLog } from "@/services/seqoutChat";
 
 export interface ChatUIMessage {
@@ -64,6 +67,14 @@ export function ChatMessage({
   onPickSuggestion?: (q: string) => void;
 }): React.ReactElement {
   const [copied, copy] = useCopy();
+  // T2：本条消息挂载的文献证据链请求（来自正文 IdLink 或 DatasetCard 的文献入口）
+  const [evidence, setEvidence] = useState<EvidenceRequest | null>(null);
+  useEffect(() => {
+    // 多播监听：只认领 hostMessageId 是本条消息的请求
+    return addEvidenceListener((req) => {
+      if (req.hostMessageId === msg.id) setEvidence(req);
+    });
+  }, [msg.id]);
 
   if (msg.role === "user") {
     return (
@@ -105,7 +116,7 @@ export function ChatMessage({
         ) : null}
         {hasBody ? (
           <div className="rounded-xl rounded-tl-sm border border-border bg-card px-4 py-3 shadow-soft">
-            {main ? <Markdown text={main} /> : null}
+            {main ? <Markdown text={main} hostMessageId={msg.id} /> : null}
             {!msg.content && msg.streaming ? (
               <span className="text-[13px] text-muted-foreground">正在思考…</span>
             ) : null}
@@ -114,7 +125,12 @@ export function ChatMessage({
             ) : null}
           </div>
         ) : null}
-        {!msg.streaming && msg.cards && msg.cards.length > 0 ? <DatasetCardGrid cards={msg.cards} /> : null}
+        {!msg.streaming && msg.cards && msg.cards.length > 0 ? (
+          <DatasetCardGrid cards={msg.cards} hostMessageId={msg.id} />
+        ) : null}
+        {evidence ? (
+          <LiteratureCardPanel kind={evidence.kind} id={evidence.id} onClose={() => setEvidence(null)} />
+        ) : null}
         {!msg.streaming && items.length > 0 ? <SuggestionBlock items={items} onPick={onPickSuggestion} /> : null}
         {msg.error ? (
           <p className="mt-2 rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-[13px] text-destructive">

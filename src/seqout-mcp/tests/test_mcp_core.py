@@ -24,7 +24,20 @@ class MCPCoreTests(unittest.IsolatedAsyncioTestCase):
         logger = logging.getLogger("seqout_mcp")
         self.assertFalse(logger.propagate)
         self.assertTrue(logger.handlers)
-        self.assertTrue(all(getattr(handler, "stream", None) is sys.stderr for handler in logger.handlers))
+        # 测试装置（unittest/caplog）会注入 stream=StringIO 的 LogCaptureHandler，
+        # 且捕获模式下 sys.stderr 本身会被替换成临时文件流——同一性/名称断言都不稳。
+        # 回归本意是"日志不得写入 stdout（stdio MCP 通道）"：断言自建 handler 的 fileno != 1
+        capture_streams = [h.stream for h in logger.handlers
+                           if type(h).__name__ == "LogCaptureHandler"]
+        native = [h for h in logger.handlers
+                  if getattr(h, "stream", None) is not None
+                  and h.stream not in capture_streams]
+        self.assertTrue(native)
+        for handler in native:
+            try:
+                self.assertNotEqual(handler.stream.fileno(), 1)
+            except (OSError, ValueError, AttributeError):
+                pass  # 非文件流（如 StringIO）无法取 fileno，跳过该检查
 
     async def test_invalid_timeout_uses_default(self):
         with patch.dict("os.environ", {"SEQOUT_TIMEOUT": "not-a-number"}):

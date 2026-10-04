@@ -1,6 +1,7 @@
-// GEO/SRA 数据集结果卡片：编号类型徽章 + 标题 + 元信息 + 外链
-import { ExternalLink } from "lucide-react";
+// GEO/SRA 数据集结果卡片：编号类型徽章 + 标题 + 元信息 + 外链 + T2 文献入口
+import { BookOpen, ExternalLink } from "lucide-react";
 import type { DatasetCard as CardData } from "@/services/seqoutChat";
+import { requestEvidence } from "@/lib/evidenceBus";
 
 const NCBI_BASE: Record<string, string> = {
   GSE: "https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=",
@@ -37,7 +38,20 @@ function prefixOf(accession: string): string | null {
   return m ? m[1].toUpperCase() : null;
 }
 
-export function DatasetCardView({ card }: { card: CardData }): React.ReactElement {
+/** 编号前缀 → 文献联动的 kind（GSE/GSM 有专门检索策略，其余暂不联动） */
+const LIT_KIND: Record<string, string> = {
+  GSE: "geo_series",
+  GSM: "geo_sample",
+};
+
+/** T2 文献入口：GEO 条目向 NCBI 检索关联文献；hostMessageId 锚定卡片渲染位置 */
+function onLiterature(accession: string, hostMessageId?: string): void {
+  const prefix = prefixOf(accession);
+  const kind = prefix ? LIT_KIND[prefix] : undefined;
+  if (kind) requestEvidence({ kind, id: accession.toUpperCase(), hostMessageId });
+}
+
+export function DatasetCardView({ card, hostMessageId }: { card: CardData; hostMessageId?: string }): React.ReactElement {
   const link = buildLink(card.accession);
   const prefix = prefixOf(card.accession);
   const metaEntries = Object.entries(card.meta ?? {}).filter(
@@ -62,15 +76,28 @@ export function DatasetCardView({ card }: { card: CardData }): React.ReactElemen
           </a>
         </div>
         {link ? (
-          <a
-            href={link}
-            target="_blank"
-            rel="noreferrer noopener"
-            className="shrink-0 text-muted-foreground transition-colors hover:text-helix"
-            title="在 NCBI 打开"
-          >
-            <ExternalLink size={12} />
-          </a>
+          <div className="flex shrink-0 items-center gap-1">
+            {LIT_KIND[prefix ?? ""] ? (
+              <button
+                type="button"
+                onClick={() => onLiterature(card.accession, hostMessageId)}
+                className="rounded-md p-1 text-muted-foreground transition-colors hover:bg-secondary hover:text-helix"
+                title="查看关联文献（证据链）"
+                aria-label="查看关联文献"
+              >
+                <BookOpen size={12} />
+              </button>
+            ) : null}
+            <a
+              href={link}
+              target="_blank"
+              rel="noreferrer noopener"
+              className="shrink-0 text-muted-foreground transition-colors hover:text-helix"
+              title="在 NCBI 打开"
+            >
+              <ExternalLink size={12} />
+            </a>
+          </div>
         ) : null}
       </div>
       <p className="mt-1 line-clamp-1 text-[12.5px] leading-snug text-foreground">{card.title}</p>
@@ -91,12 +118,12 @@ export function DatasetCardView({ card }: { card: CardData }): React.ReactElemen
   );
 }
 
-export function DatasetCardGrid({ cards }: { cards: CardData[] }): React.ReactElement | null {
+export function DatasetCardGrid({ cards, hostMessageId }: { cards: CardData[]; hostMessageId?: string }): React.ReactElement | null {
   if (!cards || cards.length === 0) return null;
   return (
     <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-3">
       {cards.map((c, i) => (
-        <DatasetCardView key={`${c.accession}-${i}`} card={c} />
+        <DatasetCardView key={`${c.accession}-${i}`} card={c} hostMessageId={hostMessageId} />
       ))}
     </div>
   );

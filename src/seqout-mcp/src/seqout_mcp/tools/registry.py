@@ -9,9 +9,9 @@ from urllib.parse import quote
 
 import httpx
 
-from ..accessions import GSM_PATTERN
 from ..errors import encode_result, make_error
-from ..parsers import parse_samples_response, parse_search_response, trim_collection
+from ..services.resolve import sample_metadata_path
+from ..services.search import apply_transform, build_search_query, summarize_pagination
 
 logger = logging.getLogger("seqout_mcp")
 
@@ -55,13 +55,14 @@ def make_tool(spec: ToolSpec, client_getter: Callable[[], Any]) -> Callable[...,
         started = time.monotonic()
         path = spec.path
         try:
+            # 路径构造（resolver）→ services.resolve
             if spec.resolver == "study":
                 key = "study_accession"
                 resolved = await client.resolve_study(values[key])
                 path = path.replace("{study_accession}", quote(resolved, safe=""))
             elif spec.resolver == "sample":
                 accession = client.validate_sample(values["accession"])
-                path = ("/sample-detail/" if GSM_PATTERN.fullmatch(accession) else "/sample/") + quote(accession, safe="")
+                path = sample_metadata_path(accession)
             elif spec.resolver == "sample_detail":
                 accession = client.validate_sample(values["accession"])
                 path = spec.path.replace("{accession}", quote(accession, safe=""))
@@ -71,24 +72,21 @@ def make_tool(spec: ToolSpec, client_getter: Callable[[], Any]) -> Callable[...,
                 for param in spec.params:
                     if param.name in path:
                         path = path.replace("{" + param.name + "}", quote(str(values[param.name]), safe=""))
-            query = {api_name: values[arg_name] for api_name, arg_name in spec.query.items()
-                     if values.get(arg_name) is not None}
-            data = await client.request(path, query or None)
+            # 查询参数映射 → services.search
+            query = build_search_query(values, spec.query)
+            data = await client.request(path, query)
+            # 结果归一 → services.search
             extra: dict[str, Any] = {}
             if spec.transform == "search":
-                data, extra = parse_search_response(data, values.get("limit", 20))
+                data, extra = apply_transform("search", data, limit=values.get("limit", 20))
                 if not data:
                     return encode_result(summary="没有找到匹配的数据", data=[],
                                          total=extra.get("total"), took_ms=extra.get("took_ms"),
                                          next_cursor=extra.get("next_cursor"))
-            elif spec.transform == "samples":
-                data, extra = parse_samples_response(data, values.get("max_samples", 20))
-            elif spec.transform == "bounded":
-                data, extra = trim_collection(data)
+            elif spec.transform:
+                data, extra = apply_transform(spec.transform, data, limit=values.get("max_samples", 20))
             summary = _summary(spec, values)
-            shown = extra.pop("shown", len(data))
-            if extra.get("total") is not None and extra["total"] > shown:
-                summary += f"；共 {extra['total']} 条，当前展示 {shown} 条，可用 next_cursor 翻页"
+            summary = summarize_pagination(summary, extra)
             logger.info("tool=%s method=GET path=%s status=200 elapsed_ms=%d",
                         spec.name, path, (time.monotonic() - started) * 1000)
             return encode_result(summary=summary, data=data, **extra)

@@ -8,6 +8,8 @@
 //   LLM_BASE_URL     可选：OpenAI 兼容接口根地址，默认 Meoo AI 的 compatible-mode/v1
 //   LLM_MODEL        可选：请求未指定模型时的默认值
 //   SEQOUT_BASE_URL  可选：seqout 数据 API 地址
+//   NCBI_API_KEY     可选：NCBI E-utilities key（无 key 限 3 次/秒，有 key 10 次/秒）
+//   NCBI_EMAIL       可选：NCBI 要求的联系方式（tool=go_xunbaoshu）
 const LLM_BASE_URL = envGet('LLM_BASE_URL') || 'https://api.meoo.host/meoo-ai/compatible-mode/v1';
 const SEQOUT_BASE_URL = envGet('SEQOUT_BASE_URL') || 'https://seqout.org/api';
 const DEFAULT_MODEL = envGet('LLM_MODEL') || 'qwen3.6-plus';
@@ -183,6 +185,262 @@ function wrap(data: Json): Json {
   return { success: true, data };
 }
 
+// ---------- T2：PubMed 文献联动（NCBI E-utilities 主路 + Europe PMC 兜底） ----------
+
+const EUTILS = 'https://eutils.ncbi.nlm.nih.gov/entrez/eutils';
+const EPMC = 'https://www.ebi.ac.uk/europepmc/webservices/rest/search';
+/** 缓存 key 带检索策略版本号：检索词规则升级后旧缓存自然失效 */
+const LIT_STRATEGY_VERSION = 'v1';
+
+interface OutlineSection { section: string; text: string }
+interface LiteratureCard {
+  status: 'ok' | 'not_found';
+  pmid?: string; title?: string; journal?: string; year?: string; doi?: string;
+  outline?: OutlineSection[];
+  urls?: { pubmed?: string; doi?: string; full_text?: string };
+  suggested_queries?: string[];
+}
+
+// --- 进程内缓存（Edge 实例级；TTL 正缓存 30 天 / 负缓存 7 天，量级小直接 Map） ---
+const LIT_TTL_OK = 30 * 24 * 3600;
+const LIT_TTL_NEG = 7 * 24 * 3600;
+const litCache = new Map<string, { expires: number; card: LiteratureCard }>();
+
+function cacheGet(key: string): LiteratureCard | null {
+  const hit = litCache.get(key);
+  if (!hit) return null;
+  if (Date.now() > hit.expires) { litCache.delete(key); return null; }
+  return hit.card;
+}
+function cacheSet(key: string, card: LiteratureCard): void {
+  litCache.set(key, { expires: Date.now() + (card.status === 'ok' ? LIT_TTL_OK : LIT_TTL_NEG) * 1000, card });
+  // 粗暴容量上限：超过 2000 条清最旧的一半（Map 迭代序 = 插入序）
+  if (litCache.size > 2000) {
+    const drop = litCache.size - 1000;
+    let i = 0;
+    for (const k of litCache.keys()) { if (i++ >= drop) break; litCache.delete(k); }
+  }
+}
+
+// --- token bucket 限流：NCBI 无 key 3 req/s / 有 key 10 req/s，留 0.5 余量 ---
+const ncbiBucket = { tokens: 2.5, last: Date.now(), capacity: 2.5 };
+const NCBI_RATE = envGet('NCBI_API_KEY') ? 9.5 : 2.5;
+
+function acquireNcbi(): boolean {
+  const now = Date.now();
+  ncbiBucket.tokens = Math.min(ncbiBucket.capacity, ncbiBucket.tokens + ((now - ncbiBucket.last) / 1000) * NCBI_RATE);
+  ncbiBucket.last = now;
+  if (ncbiBucket.tokens >= 1) { ncbiBucket.tokens -= 1; return true; }
+  return false; // 不排队等待：直接降级 Europe PMC（它无限流压力）
+}
+
+// --- HTTP helper：429/5xx 退避 1s/2s/4s，三次后抛出 ---
+async function fetchWithRetry(url: string, timeoutMs = 6000, retries = 3): Promise<Json> {
+  let delay = 1000;
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    if (attempt > 0) {
+      await sleep(Math.min(delay, 4000));
+      delay *= 2;
+    }
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      const resp = await fetch(url, { signal: controller.signal, headers: { Accept: 'application/json' } });
+      if (resp.ok) return JSON.parse(await resp.text()) as Json;
+      if (resp.status === 429 || resp.status >= 500) continue; // 重试
+      throw new Error(`HTTP ${resp.status}`);
+    } catch (err) {
+      if (attempt === retries) throw err;
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+  throw new Error('unreachable');
+}
+
+function sleep(ms: number): Promise<void> { return new Promise((r) => setTimeout(r, ms)); }
+
+function eutilsParams(params: Record<string, string>): string {
+  const usp = new URLSearchParams({ tool: 'go_xunbaoshu', ...params });
+  const email = envGet('NCBI_EMAIL');
+  const key = envGet('NCBI_API_KEY');
+  if (email) usp.set('email', email);
+  if (key) usp.set('api_key', key);
+  return usp.toString();
+}
+
+/** esearch：关键词 → PMID 列表 */
+async function esearch(term: string, retmax = 5): Promise<string[]> {
+  const json = await fetchWithRetry(`${EUTILS}/esearch.fcgi?${eutilsParams({ db: 'pubmed', term, retmode: 'json', retmax: String(retmax) })}`);
+  const ids = (json as { esearchresult?: { idlist?: string[] } }).esearchresult?.idlist;
+  return Array.isArray(ids) ? ids : [];
+}
+
+/** esummary：PMID → 标题/期刊/日期/DOI */
+async function esummary(pmids: string[]): Promise<Record<string, { title?: string; journal?: string; pubdate?: string; doi?: string }>> {
+  if (pmids.length === 0) return {};
+  const json = await fetchWithRetry(`${EUTILS}/esummary.fcgi?${eutilsParams({ db: 'pubmed', id: pmids.join(','), retmode: 'json' })}`);
+  const result = (json as { result?: Record<string, unknown> }).result ?? {};
+  const out: Record<string, { title?: string; journal?: string; pubdate?: string; doi?: string }> = {};
+  for (const pmid of pmids) {
+    const item = result[pmid] as { title?: string; fulljournalname?: string; pubdate?: string; articleids?: { type?: string; value?: string }[] } | undefined;
+    if (!item) continue;
+    const doi = (item.articleids ?? []).find((a) => a.type === 'doi')?.value;
+    out[pmid] = { title: item.title, journal: item.fulljournalname, pubdate: item.pubdate, doi };
+  }
+  return out;
+}
+
+/** efetch：PMID → 结构化摘要分段（无 Label 则整段降级为 "Abstract"） */
+async function efetchOutline(pmid: string): Promise<OutlineSection[]> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 6000);
+  try {
+    const resp = await fetch(`${EUTILS}/efetch.fcgi?${eutilsParams({ db: 'pubmed', id: pmid, rettype: 'abstract', retmode: 'xml' })}`, { signal: controller.signal });
+    if (!resp.ok) throw new Error(`efetch HTTP ${resp.status}`);
+    const xml = await resp.text();
+    const sections: OutlineSection[] = [];
+    // 轻量 XML 解析：AbstractText 标签配对正则（避免引 DOMParser，Deno/Node 均原生可用但保持零依赖风格）
+    const re = /<AbstractText([^>]*)>([\s\S]*?)<\/AbstractText>/g;
+    let m: RegExpExecArray | null;
+    while ((m = re.exec(xml)) !== null) {
+      const labelMatch = /Label="([^"]*)"/.exec(m[1]);
+      const label = labelMatch ? labelMatch[1] : '';
+      const text = m[2].replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim();
+      if (text) sections.push({ section: label || 'Abstract', text });
+    }
+    if (sections.length === 0) return [{ section: 'Abstract', text: xml.replace(/<[^>]+>/g, '').trim().slice(0, 2000) || '' }].filter((s) => s.text);
+    return sections;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/** Europe PMC 兜底：DOI/PMID 查 core 结果（OA 全文地址覆盖更好） */
+async function epmcLookup(query: string): Promise<LiteratureCard | null> {
+  const json = await fetchWithRetry(`${EPMC}?${new URLSearchParams({ query, format: 'json', resultType: 'core' })}`);
+  const first = (json as { resultList?: { result?: Record<string, unknown>[] } }).resultList?.result?.[0];
+  if (!first) return null;
+  const title = String(first.title || '').trim();
+  const pmid = String(first.pmid || '');
+  if (!title) return null;
+  const journalInfo = first.journalInfo as { journal?: { title?: string }; yearOfPublication?: number } | undefined;
+  const fullTextUrls = (first.fullTextUrlList as { fullTextUrl?: { documentStyle?: string; availability?: string; url?: string }[] } | undefined)?.fullTextUrl ?? [];
+  const oa = fullTextUrls.find((u) => u.documentStyle === 'pdf' || u.availability === 'Open access');
+  const sections: OutlineSection[] = [];
+  const abstract = String(first.abstractText || '').trim();
+  if (abstract) sections.push({ section: 'Abstract', text: abstract });
+  return {
+    status: 'ok',
+    pmid: pmid || undefined,
+    title,
+    journal: journalInfo?.journal?.title || undefined,
+    year: journalInfo?.yearOfPublication ? String(journalInfo.yearOfPublication) : undefined,
+    doi: String(first.doi || '') || undefined,
+    outline: sections,
+    urls: {
+      pubmed: pmid ? `https://pubmed.ncbi.nlm.nih.gov/${pmid}/` : undefined,
+      doi: first.doi ? `https://doi.org/${first.doi}` : undefined,
+      full_text: oa?.url,
+    },
+  };
+}
+
+/** 检索策略：三级（条目自带 PMID/DOI → 工具型数据库 → GO 本体），返回 esearch 检索词 */
+function buildSearchTerms(kind: string, idOrName: string): string[] {
+  if (kind === 'pubmed') return []; // 直接按 PMID 查，不走 esearch
+  if (kind === 'go_term') return [`"${idOrName}"[Title] AND "Gene Ontology"[Title]`, `${idOrName} gene ontology consortium`];
+  // geo_series / geo_sample：编号必须出现在标题里（否则 esearch 会匹配到正文顺带提及 GEO 的无关文献）
+  return [`${idOrName}[Title]`];
+}
+
+/** GEO 条目自带 PMID 反查（seqout 项目详情的 pubmed_id 字段，精确命中优先于关键词检索） */
+async function linkedPubmedId(kind: string, idOrName: string): Promise<string | null> {
+  if (kind !== 'geo_series' && kind !== 'geo_sample') return null;
+  try {
+    const detail = await seqoutGet(`/project/${encodeURIComponent(idOrName)}`);
+    const pmids = (detail as { pubmed_id?: unknown }).pubmed_id;
+    if (Array.isArray(pmids) && typeof pmids[0] === 'string' && pmids[0]) return pmids[0];
+    if (typeof pmids === 'string' && pmids) return pmids;
+  } catch { /* seqout 未收录该编号 → 走关键词检索 */ }
+  return null;
+}
+
+/** 文献联动主入口：选中编号 → 文献卡片（not_found 是正常业务状态，不算 error） */
+async function fetchLiterature(kind: string, idOrName: string): Promise<LiteratureCard> {
+  const cacheKey = `${LIT_STRATEGY_VERSION}:${kind}:${idOrName}`;
+  const cached = cacheGet(cacheKey);
+  if (cached) return cached;
+
+  let card: LiteratureCard | null = null;
+  const suggested = buildSearchTerms(kind, idOrName);
+
+  try {
+    if (kind === 'pubmed') {
+      // 直接 PMID：esummary + efetch
+      const pmid = idOrName.replace(/^PMID:?/i, '').trim();
+      if (!acquireNcbi()) throw new Error('rate-limited');
+      const meta = await esummary([pmid]);
+      const m = meta[pmid];
+      if (m?.title) {
+        const outline = await (acquireNcbi() ? efetchOutline(pmid) : Promise.resolve([{ section: 'Abstract', text: '' } as OutlineSection]));
+        card = {
+          status: 'ok', pmid, title: m.title, journal: m.journal,
+          year: (m.pubdate || '').slice(0, 4), doi: m.doi,
+          outline: outline.filter((s) => s.text),
+          urls: {
+            pubmed: `https://pubmed.ncbi.nlm.nih.gov/${pmid}/`,
+            doi: m.doi ? `https://doi.org/${m.doi}` : undefined,
+          },
+        };
+      }
+    } else {
+      // 三级检索：① GEO 条目自带 PMID（精确） → ② esearch 关键词
+      const linked = await linkedPubmedId(kind, idOrName);
+      const tryTerms = linked ? [`__direct__:${linked}`] : suggested;
+      for (const term of tryTerms) {
+        let pmid: string;
+        if (term.startsWith('__direct__:')) {
+          pmid = term.slice('__direct__:'.length); // seqout 自带 PMID，跳过 esearch
+        } else {
+          if (!acquireNcbi()) break;
+          const ids = await esearch(term, 3);
+          if (ids.length === 0) continue;
+          pmid = ids[0];
+        }
+        const meta = await esummary([pmid]);
+        const m = meta[pmid];
+        if (m?.title) {
+          const outline = acquireNcbi() ? await efetchOutline(pmid) : [];
+          card = {
+            status: 'ok', pmid, title: m.title, journal: m.journal,
+            year: (m.pubdate || '').slice(0, 4), doi: m.doi,
+            outline: outline.filter((s) => s.text),
+            urls: {
+              pubmed: `https://pubmed.ncbi.nlm.nih.gov/${pmid}/`,
+              doi: m.doi ? `https://doi.org/${m.doi}` : undefined,
+            },
+          };
+          break;
+        }
+      }
+    }
+  } catch (err) {
+    console.warn(`[${FUNCTION_NAME}] NCBI fallback to Europe PMC ${idOrName}: ${err instanceof Error ? err.message : String(err)}`);
+    // NCBI 3 次退避仍失败 / 429 持续 → 整条链路降级 Europe PMC；UI 无感知
+    try {
+      card = await epmcLookup(`DOI:"${idOrName}" OR EXT_ID:${idOrName}`);
+    } catch { /* 兜底也失败则走 not_found */ }
+  }
+
+  const final: LiteratureCard = card ?? {
+    status: 'not_found',
+    suggested_queries: suggested.length ? suggested : [idOrName],
+  };
+  cacheSet(cacheKey, final);
+  return final;
+}
+
 // 结果瘦身：搜索类结果截断 summary，集合截断到 20 条，控制回传给 LLM 的体积
 function trimForLLM(payload: Json): string {
   let text: string;
@@ -262,6 +520,35 @@ export const handler = async (req: Request): Promise<Response> => {
       (projectUrlId ? envGet(projectSecretName) : '') ||
       envGet('MEOO_PROJECT_API_KEY') ||
       envGet('LLM_API_KEY') || '';
+
+    // 文献联动 action 只打公共 API，不需要 AI 凭证，放在凭证检查之前
+    if (req.method === 'POST') {
+      const ct = req.headers.get('Content-Type') || '';
+      if (ct.includes('application/json')) {
+        try {
+          const body = (await req.json()) as { action?: string };
+          if (body.action === 'literature') {
+            const kind = String(body.kind || '');
+            const idOrName = String(body.id || '').trim();
+            const VALID_KINDS = ['geo_series', 'geo_sample', 'go_term', 'pubmed'];
+            if (!VALID_KINDS.includes(kind) || !idOrName) {
+              return new Response(JSON.stringify({ error: '参数不完整：需要 kind（geo_series/geo_sample/go_term/pubmed）与 id' }), { status: 400, headers: { 'Content-Type': 'application/json' } });
+            }
+            try {
+              const t0 = Date.now();
+              const card = await fetchLiterature(kind, idOrName);
+              console.info(`[${FUNCTION_NAME}] literature ${requestId} ${kind}:${idOrName} -> ${card.status} ${Date.now() - t0}ms`);
+              return new Response(JSON.stringify(card), { status: 200, headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' } });
+            } catch (err) {
+              const message = err instanceof Error ? err.message : 'Literature lookup failed';
+              console.warn(`[${FUNCTION_NAME}] literature failed ${requestId}: ${message}`);
+              return new Response(JSON.stringify({ error: '文献服务暂时不可用，请稍后重试' }), { status: 502, headers: { 'Content-Type': 'application/json' } });
+            }
+          }
+        } catch { /* JSON 解析失败 → 走正常对话流程，由下方 req.json() 报错 */ }
+      }
+    }
+
     if (!projectServiceAK) {
       return new Response(JSON.stringify({ error: '当前项目的 AI 服务凭证未就绪，请稍后重试' }), { status: 503, headers: { 'Content-Type': 'application/json' } });
     }

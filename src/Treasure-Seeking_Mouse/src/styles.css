@@ -268,6 +268,21 @@
   transform-origin: bottom left;
 }
 
+/* v2.1 正文内嵌编号链接（teal 主色 + hover 下划线展开，双主题自适应） */
+.id-link {
+  position: relative;
+  color: var(--color-helix);
+  text-decoration: none;
+  border-bottom: 1px dashed color-mix(in oklch, var(--color-helix) 45%, transparent);
+  transition: color 0.2s ease, border-color 0.2s ease;
+}
+.id-link:hover,
+.id-link:focus-visible {
+  color: var(--color-helix);
+  border-bottom-color: var(--color-helix);
+  border-bottom-style: solid;
+}
+
 /* Markdown 消息排版（亮色档） */
 .md-body {
   line-height: 1.75;
