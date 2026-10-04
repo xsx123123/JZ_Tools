@@ -64,6 +64,14 @@
 #'   symmetrically to the left (\code{hjust = 1}), so text never overlaps
 #'   branches. Default \code{0.05}.
 #' @param bs_color Color of the bootstrap labels. Default \code{"grey20"}.
+#' @param tiplab Logical. If \code{TRUE}, the tip labels of the right-hand
+#'   tree are drawn as a right-aligned column just right of the tree (the
+#'   same layout as \code{common.tanglegram(tiplab = TRUE)}). Default
+#'   \code{FALSE}.
+#' @param tiplab_pad Numeric. Horizontal gap between the rightmost tip point
+#'   and the (right-aligned) tip-label column. Default \code{0.3}.
+#' @param tiplab_size Numeric. Font size of the tip labels. Default \code{2.2}.
+#' @param tiplab_color Color of the tip labels. Default \code{"black"}.
 #'
 #' @details
 #' \strong{How the layout works.} Only the coordinate data
@@ -117,7 +125,11 @@ my.tanglegram <- function(tree1, tree2, column, cols = NULL,
                           bs_cutoff = 70,         # bootstrap 显示阈值；Inf = 关闭标注
                           bs_size   = 2.2,        # bootstrap 字号
                           bs_nudge  = 0.05,       # bootstrap 标签离节点的水平距离
-                          bs_color  = "grey20") { # bootstrap 标签颜色
+                          bs_color  = "grey20",   # bootstrap 标签颜色
+                          tiplab      = FALSE,    # 是否画右树 tip 标签（右对齐成一列）
+                          tiplab_pad  = 0.3,      # tip 标签列与最右 tip 点的间距
+                          tiplab_size = 2.2,      # tip 标签字号
+                          tiplab_color = "black") {# tip 标签颜色
 
   # ============================================================
   # 第 0 步：取坐标数据 + 输入校验
@@ -253,6 +265,17 @@ my.tanglegram <- function(tree1, tree2, column, cols = NULL,
                         aes(x = x, y = y, color = .data[[column]]), size = tip_size) +
     ggplot2::geom_point(data = dplyr::filter(tips, tree == "t2"),
                         aes(x = x, y = y, color = .data[[column]]), size = tip_size)
+
+  # 右树 tip 标签：右对齐成一列（与 common.tanglegram(tiplab = TRUE) 同款布局），
+  # 列右缘位于最右 tip 点右侧 tiplab_pad 处
+  if (isTRUE(tiplab)) {
+    t2_tips <- dplyr::filter(tips, tree == "t2")
+    t2_tips$lab_x <- max(t2_tips$x) + tiplab_pad
+    pp <- pp +
+      ggplot2::geom_text(data = t2_tips,
+                         aes(x = lab_x, y = y, label = label),
+                         hjust = 1, size = tiplab_size, color = tiplab_color)
+  }
 
   # ============================================================
   # 第 4 步：配色标度

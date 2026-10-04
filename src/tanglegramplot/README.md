@@ -84,7 +84,11 @@ my.tanglegram(
   bs_cutoff = 70,
   bs_size   = 2.2,
   bs_nudge  = 0.05,
-  bs_color  = "grey20"
+  bs_color  = "grey20",
+  tiplab       = FALSE,
+  tiplab_pad   = 0.3,
+  tiplab_size  = 2.2,
+  tiplab_color = "black"
 )
 ```
 
@@ -105,6 +109,10 @@ my.tanglegram(
 | `bs_size` | `2.2` | bootstrap 标签字号。 |
 | `bs_nudge` | `0.05` | 标签与节点的水平距离。左树标签右对齐节点（`hjust = 0`），右树镜像后左对齐（`hjust = 1`），两侧对称互不压枝。 |
 | `bs_color` | `"grey20"` | bootstrap 标签颜色。 |
+| `tiplab` | `FALSE` | 是否绘制右树 tip 标签（右对齐成一列，布局同 `common.tanglegram(tiplab = TRUE)`）。右树同时有 bootstrap 节点标签时，需配合 `tiplab_pad` 把标签列右移以免重叠。 |
+| `tiplab_pad` | `0.3` | 右树 tip 标签列右缘与最右 tip 点的水平距离。 |
+| `tiplab_size` | `2.2` | tip 标签字号。 |
+| `tiplab_color` | `"black"` | tip 标签颜色。 |
 
 #### 返回值
 
