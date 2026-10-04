@@ -8,7 +8,7 @@
     <img src="https://img.shields.io/badge/LLM-OpenAI 兼容-4D6BFE?style=flat-square" alt="OpenAI 兼容" />
     <a href="https://github.com/xsx123123/JZ_Tools/blob/main/LICENSE"><img src="https://img.shields.io/badge/License-MIT-yellow?style=flat-square" alt="MIT License" /></a>
   </p>
-  <p>把 seqout-mcp 的 26 个组学数据检索工具封装成「聊天式挖宝」——自然语言提问，大模型自动检索 GEO / SRA / ENA / GSA，数据卡片 + 文献证据链呈现，附桌宠养成玩法。</p>
+  <p>把 <a href="https://github.com/xsx123123/JZ_Tools/tree/main/src/seqout-mcp">seqout-mcp</a> 的 26 个组学数据检索工具封装成「聊天式挖宝」——自然语言提问，大模型自动检索 GEO / SRA / ENA / GSA，数据卡片 + 文献证据链呈现，附桌宠养成玩法。</p>
 </div>
 
 ![封面 · 夜探矿洞](docs/寻宝鼠.png)
