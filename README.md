@@ -13,8 +13,8 @@ JZ_Tools 收录了日常组学分析中长期沉淀的可复用工具，覆盖 R
 
 ```
 jz_tools/
-├── skills/          # 24 个 skill 化的 Agent 技能（含 SKILLS_REGISTRY.md 技能台账）
-├── src/             # 各工具的原始脚本模块
+├── skills/          # 25 个 skill 化的 Agent 技能（含 SKILLS_REGISTRY.md 技能台账）
+├── src/             # 各工具的原始脚本模块（27 个）
 ├── docs/            # 技能设计规范（OSDP）、技能构建提示词等文档
 ├── data/            # Agent 声明式配置目录
 └── code/            # 代码片段
@@ -64,7 +64,17 @@ jz_tools/
 
 ### GEO寻宝鼠 · 对话式组学数据检索助手（`src/Treasure-Seeking_Mouse/`）
 
-把 [seqout.org](https://seqout.org) 的 26 个只读组学数据检索工具封装成「聊天式挖宝」体验的单页 Web 应用：自然语言提问 → 后端 LLM tool-calling 检索 → 数据卡片 + 文献证据链呈现，附桌宠养成玩法。React 19 + Vite 7 + Tailwind v4 前端，Supabase 兼容后端，支持完全自托管。详见其 [README](src/Treasure-Seeking_Mouse/README.md)。
+把 [seqout.org](https://seqout.org) 的 26 个只读组学数据检索工具封装成「聊天式挖宝」体验的单页 Web 应用：自然语言提问 → 后端 LLM tool-calling 检索 → 数据卡片 + 文献证据链呈现，附桌宠养成玩法。React 19 + Vite 7 + Tailwind v4 前端，Supabase 兼容后端，**支持完全自托管**，并**自带容器化部署**（`deploy/`）与**移动端自适应**（按宽度 + 触摸能力自动切换布局与交互）。
+
+在线体验：<https://q1vj9sqopzwj.meoo.fun/>（线上版本可能落后于仓库最新代码）。详见其 [README](src/Treasure-Seeking_Mouse/README.md)。
+
+一键容器部署（配置统一走 `server/.env`，启动前自动预检 LLM 密钥）：
+
+```bash
+cd src/Treasure-Seeking_Mouse
+cp server/.env.example server/.env   # 填 LLM_API_KEY（必填）
+make docker-start                    # 预检密钥 → 构建 → 启动
+```
 
 ### seqout-mcp（`src/seqout-mcp/`）
 
