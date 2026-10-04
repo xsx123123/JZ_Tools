@@ -44,6 +44,125 @@ interface ToolCall {
   function: { name: string; arguments: string };
 }
 
+// ---------- 使用统计（内存聚合；GET <endpoint>/stats 供前端统计面板读取） ----------
+// 自托管 Node 由 server/local.mjs 定期持久化到 server/.stats.json 并在启动时恢复；
+// Meoo 平台（Deno）无文件系统，仅进程内存，实例重启归零。
+
+export interface ToolUsageEntry {
+  name: string;
+  label: string;
+  count: number;
+  errors: number;
+}
+
+export interface UsageStatsSnapshot {
+  chats: number;
+  llmCalls: number;
+  promptTokens: number;
+  completionTokens: number;
+  totalTokens: number;
+  toolCalls: number;
+  toolErrors: number;
+  /** 去重使用人数（按前端上报的 X-Stats-Actor：登录用户 id 或访客设备指纹） */
+  actors: number;
+  /** 每个工具的调用次数，按 count 降序 */
+  tools: ToolUsageEntry[];
+  since: string;
+  updatedAt: string;
+}
+
+const MAX_TRACKED_ACTORS = 20_000; // 内存护栏：超过后不再记录新面孔，计数不再上涨
+
+const usageStats = {
+  chats: 0,
+  llmCalls: 0,
+  promptTokens: 0,
+  completionTokens: 0,
+  totalTokens: 0,
+  toolCalls: 0,
+  toolErrors: 0,
+  tools: {} as Record<string, { count: number; errors: number }>,
+  actors: {} as Record<string, 1>,
+  since: new Date().toISOString(),
+  updatedAt: '',
+};
+
+export function getUsageStatsSnapshot(): UsageStatsSnapshot {
+  return {
+    chats: usageStats.chats,
+    llmCalls: usageStats.llmCalls,
+    promptTokens: usageStats.promptTokens,
+    completionTokens: usageStats.completionTokens,
+    totalTokens: usageStats.totalTokens,
+    toolCalls: usageStats.toolCalls,
+    toolErrors: usageStats.toolErrors,
+    actors: Object.keys(usageStats.actors).length,
+    tools: Object.entries(usageStats.tools)
+      .map(([name, v]) => ({ name, label: labelOf(name), count: v.count, errors: v.errors }))
+      .sort((a, b) => b.count - a.count),
+    since: usageStats.since,
+    updatedAt: usageStats.updatedAt,
+  };
+}
+
+/** 内部形态的完整转储（含 actors 明细），仅供持久化用；API 响应用上面的 snapshot（actors 只给计数） */
+export function dumpUsageStats(): Record<string, unknown> {
+  return JSON.parse(JSON.stringify(usageStats)) as Record<string, unknown>;
+}
+
+/** local.mjs 启动时恢复上次持久化的统计（兼容内部转储与 API 快照两种形态） */
+export function restoreUsageStats(saved: unknown): void {
+  if (!saved || typeof saved !== 'object') return;
+  const s = saved as Record<string, unknown>;
+  const num = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? v : 0);
+  usageStats.chats = num(s.chats);
+  usageStats.llmCalls = num(s.llmCalls);
+  usageStats.promptTokens = num(s.promptTokens);
+  usageStats.completionTokens = num(s.completionTokens);
+  usageStats.totalTokens = num(s.totalTokens);
+  usageStats.toolCalls = num(s.toolCalls);
+  usageStats.toolErrors = num(s.toolErrors);
+  // tools：内部形态是 Record；API 快照形态是数组（降级兼容）
+  if (Array.isArray(s.tools)) {
+    for (const item of s.tools as Record<string, unknown>[]) {
+      if (typeof item?.name === 'string') {
+        usageStats.tools[item.name] = { count: num(item.count), errors: num(item.errors) };
+      }
+    }
+  } else if (s.tools && typeof s.tools === 'object') {
+    for (const [k, v] of Object.entries(s.tools as Record<string, unknown>)) {
+      const e = (v ?? {}) as Record<string, unknown>;
+      usageStats.tools[k] = { count: num(e.count), errors: num(e.errors) };
+    }
+  }
+  // actors：内部形态是 Record；API 快照只有计数（计数无法还原明细，忽略）
+  if (s.actors && typeof s.actors === 'object' && !Array.isArray(s.actors)) {
+    for (const k of Object.keys(s.actors as Record<string, unknown>)) usageStats.actors[k] = 1;
+  }
+  if (typeof s.since === 'string' && s.since) usageStats.since = s.since;
+  usageStats.updatedAt = typeof s.updatedAt === 'string' ? s.updatedAt : '';
+}
+
+function trackActor(id: string): void {
+  const key = id.trim().slice(0, 128);
+  if (!key) return;
+  if (!usageStats.actors[key] && Object.keys(usageStats.actors).length >= MAX_TRACKED_ACTORS) return;
+  usageStats.actors[key] = 1;
+}
+
+function trackTokens(usage: unknown): void {
+  const u = (usage ?? {}) as Record<string, unknown>;
+  const num = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? v : 0);
+  usageStats.promptTokens += num(u.prompt_tokens);
+  usageStats.completionTokens += num(u.completion_tokens);
+  usageStats.totalTokens += num(u.total_tokens) || num(u.prompt_tokens) + num(u.completion_tokens);
+  touchStats();
+}
+
+function touchStats(): void {
+  usageStats.updatedAt = new Date().toISOString();
+}
+
 // ---------- seqout 工具定义（与 seqout-mcp 26 个工具一一对应） ----------
 
 function strEnum(values: string[]) {
@@ -559,6 +678,15 @@ export const handler = async (req: Request): Promise<Response> => {
       }
     }
 
+    // GET <endpoint>/stats：使用统计面板（本地聚合数据，不需要 AI 凭证）
+    // 注意必须在模型目录分支之前——目录分支会把一切 GET 当 /models 处理
+    if (req.method === 'GET' && new URL(req.url).pathname.endsWith('/stats')) {
+      return new Response(JSON.stringify(getUsageStatsSnapshot()), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' },
+      });
+    }
+
     if (!projectServiceAK) {
       return new Response(JSON.stringify({ error: '当前项目的 AI 服务凭证未就绪，请稍后重试' }), { status: 503, headers: { 'Content-Type': 'application/json' } });
     }
@@ -599,6 +727,11 @@ export const handler = async (req: Request): Promise<Response> => {
 
     console.info(`[${FUNCTION_NAME}] request ${requestId} model=${model} messages=${history.length}`);
 
+    // 使用统计：本算一轮对话 + 记录使用者（登录用户 id / 访客设备指纹，前端经 X-Stats-Actor 上报）
+    usageStats.chats += 1;
+    trackActor(req.headers.get('x-stats-actor') ?? '');
+    touchStats();
+
     const encoder = new TextEncoder();
     const allCards: Json[] = [];
     const toolLogs: { name: string; label: string; ok: boolean; ms: number }[] = [];
@@ -618,10 +751,13 @@ export const handler = async (req: Request): Promise<Response> => {
         };
         try {
           for (let round = 0; round < 40; round++) {
+            usageStats.llmCalls += 1;
+            touchStats();
             const llmResp = await fetch(`${LLM_BASE_URL}/chat/completions`, {
               method: 'POST',
               headers: { Authorization: `Bearer ${projectServiceAK}`, 'Content-Type': 'application/json' },
-              body: JSON.stringify({ model, messages, stream: true, tools: TOOL_DEFS, tool_choice: 'auto' }),
+              // stream_options.include_usage：让网关在流末尾回传 token 用量（统计面板数据源）
+              body: JSON.stringify({ model, messages, stream: true, stream_options: { include_usage: true }, tools: TOOL_DEFS, tool_choice: 'auto' }),
             });
             if (!llmResp.ok) {
               const errText = await llmResp.text();
@@ -649,6 +785,7 @@ export const handler = async (req: Request): Promise<Response> => {
                 if (payload === '[DONE]') { sawDone = true; continue; }
                 try {
                   const json = JSON.parse(payload);
+                  if (json.usage) trackTokens(json.usage); // 流末尾的 usage 帧（choices 为空）
                   const choice = json.choices?.[0];
                   if (!choice) continue;
                   const content = choice.delta?.content;
@@ -676,6 +813,9 @@ export const handler = async (req: Request): Promise<Response> => {
             for (const call of callsArr) {
               const label = labelOf(call.function.name);
               const t0 = Date.now();
+              usageStats.toolCalls += 1;
+              const entry = (usageStats.tools[call.function.name] ??= { count: 0, errors: 0 });
+              entry.count += 1;
               send({ event: 'tool', name: call.function.name, label, status: 'running' });
               let resultText: string;
               try {
@@ -689,6 +829,9 @@ export const handler = async (req: Request): Promise<Response> => {
               } catch (err) {
                 const message = err instanceof Error ? err.message : String(err);
                 resultText = JSON.stringify({ success: false, error: message });
+                usageStats.toolErrors += 1;
+                entry.errors += 1;
+                touchStats();
                 toolLogs.push({ name: call.function.name, label, ok: false, ms: Date.now() - t0 });
                 send({ event: 'tool', name: call.function.name, label, status: 'error', ms: Date.now() - t0, error: message });
                 console.warn(`[${FUNCTION_NAME}] tool failed ${requestId} ${call.function.name}: ${message.slice(0, 200)}`);

@@ -4,7 +4,7 @@
 //   2) pnpm run server        → http://localhost:8787
 //   3) 前端 .env.local 加 VITE_CHAT_API=http://localhost:8787，pnpm run dev
 import { createServer } from 'node:http';
-import { readFileSync } from 'node:fs';
+import { readFileSync, writeFileSync, renameSync } from 'node:fs';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { dirname, resolve } from 'node:path';
 
@@ -29,7 +29,27 @@ try {
 } catch { /* server/.env 不存在时全部依赖进程环境变量 */ }
 
 // 2) 再加载 Edge Function 模块（Node 24 原生 type-stripping 直接跑 .ts）
-const { handler } = await import(pathToFileURL(resolve(root, 'functions/seqout-chat/index.ts')).href);
+const { handler, restoreUsageStats, dumpUsageStats } = await import(pathToFileURL(resolve(root, 'functions/seqout-chat/index.ts')).href);
+
+// 使用统计持久化：启动时恢复上次快照，之后每 15s 有变化就落盘（tmp + rename，防写一半）
+// 路径可用 STATS_FILE 覆盖（Docker 挂载命名卷到 /app/data，容器重建不丢统计）
+const STATS_FILE = process.env.STATS_FILE || resolve(root, 'server/.stats.json');
+try {
+  restoreUsageStats(JSON.parse(readFileSync(STATS_FILE, 'utf8')));
+  console.info('[seqout-chat] 已恢复使用统计：' + STATS_FILE);
+} catch { /* 首次启动无快照，从零开始 */ }
+let lastSaved = '';
+setInterval(() => {
+  try {
+    const snap = JSON.stringify(dumpUsageStats());
+    if (snap === lastSaved) return;
+    writeFileSync(STATS_FILE + '.tmp', snap);
+    renameSync(STATS_FILE + '.tmp', STATS_FILE);
+    lastSaved = snap;
+  } catch (err) {
+    console.warn('[seqout-chat] 统计落盘失败：', err?.message || err);
+  }
+}, 15_000).unref();
 
 const PORT = Number(process.env.CHAT_API_PORT || 8787);
 const CORS = {

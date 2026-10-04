@@ -1,5 +1,6 @@
 // seqout-chat Edge Function 前端封装：流式请求 + SSE 解析
 import { projectUrlId, supabase, supabaseUrl } from "@/supabase/client";
+import { getDeviceId } from "@/services/statsStore";
 
 // 自托管模式：VITE_CHAT_API 指向任意 OpenAI 兼容对话服务（如本地 server/local.mjs 的 http://localhost:8787）
 // 未设置时走 Meoo 平台 Edge Function（须带 OneDay-App-Id 头）
@@ -43,7 +44,34 @@ async function authHeaders(): Promise<Record<string, string>> {
     "Content-Type": "application/json",
     ...(projectUrlId ? { "OneDay-App-Id": projectUrlId } : {}),
     ...(session ? { Authorization: `Bearer ${session.access_token}` } : {}),
+    // 使用统计去重标识：登录用户用 user id，访客用设备指纹（服务端只存哈希键，不关联对话内容）
+    "X-Stats-Actor": session?.user?.id ?? getDeviceId(),
   };
+}
+
+/** 服务端使用统计（GET <endpoint>/stats）：对话次数 / token / 去重人数 / 每个工具调用次数 */
+export interface UsageStats {
+  chats: number;
+  llmCalls: number;
+  promptTokens: number;
+  completionTokens: number;
+  totalTokens: number;
+  toolCalls: number;
+  toolErrors: number;
+  actors: number;
+  tools: { name: string; label: string; count: number; errors: number }[];
+  since: string;
+  updatedAt: string;
+}
+
+export async function fetchUsageStats(): Promise<UsageStats | null> {
+  try {
+    const resp = await fetch(`${chatEndpoint()}/stats`, { headers: await authHeaders() });
+    if (!resp.ok) return null;
+    return (await resp.json()) as UsageStats;
+  } catch {
+    return null;
+  }
 }
 
 /** GET 模型目录（失败由调用方兜底，不抛出） */

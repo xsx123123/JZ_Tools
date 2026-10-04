@@ -1,7 +1,7 @@
 // GEO寻宝鼠：主页（会话栏 + 对话区 + 登录弹窗 + 桌宠）
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { ChevronsLeft, ChevronsRight, Info, Menu, Moon, Sun, Trophy } from "lucide-react";
+import { ChevronsLeft, ChevronsRight, Info, Menu, Moon, Sun, BarChart3, Trophy } from "lucide-react";
 import { supabase, isOfflineMode } from "@/supabase/client";
 import type { Session } from "@supabase/supabase-js";
 import { EmptyState } from "@/components/chat/EmptyState";
@@ -16,6 +16,7 @@ import { useVisualViewport } from "@/hooks/use-visual-viewport";
 import { readTheme, writeTheme, applyTheme, type Theme } from "@/services/petStore";
 import { bumpStats } from "@/services/statsStore";
 import { Leaderboard } from "@/components/chat/Leaderboard";
+import { UsageStatsDialog } from "@/components/chat/UsageStatsDialog";
 
 import { fetchModelCatalog, requestSeqoutChat, type DatasetCard, type ToolLog } from "@/services/seqoutChat";
 import {
@@ -99,6 +100,7 @@ function ChatPage(): React.ReactElement {
   const [petEvent, setPetEvent] = useState<PetEvent | null>(null); // 桌宠事件流（仅 UI 反馈，不影响消息逻辑）
   const petCardsRef = useRef(0);
   const [boardOpen, setBoardOpen] = useState(false); // 排行榜抽屉
+  const [statsOpen, setStatsOpen] = useState(false); // 使用统计弹窗
   const isTouch = useIsTouch();
   const statRef = useRef({ digs: 0, cards: 0 }); // 本轮挖宝统计（下铲次数 / 出土卡片数）
   const [collapsed, setCollapsed] = useState<boolean>(() => {
@@ -523,6 +525,15 @@ function ChatPage(): React.ReactElement {
           >
             <Trophy size={17} />
           </button>
+          <button
+            type="button"
+            onClick={() => setStatsOpen(true)}
+            title="使用统计"
+            aria-label="打开使用统计"
+            className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-secondary hover:text-helix"
+          >
+            <BarChart3 size={17} />
+          </button>
           <Link
             to="/about"
             title="关于 GEO寻宝鼠"
@@ -590,6 +601,7 @@ function ChatPage(): React.ReactElement {
 
       {/* 挖宝排行榜 */}
       <Leaderboard open={boardOpen} onClose={() => setBoardOpen(false)} ownUserId={user?.id ?? null} />
+      <UsageStatsDialog open={statsOpen} onClose={() => setStatsOpen(false)} />
     </div>
   );
 }

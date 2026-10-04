@@ -33,6 +33,10 @@ services:
       # （server/.env 里通常写 8788，那是本地 `pnpm run server` 的端口）
       CHAT_API_PORT: "8787"
       NODE_ENV: production
+      # 使用统计快照写到命名卷，容器重建/重启不丢（server/local.mjs 每 15s 落盘）
+      STATS_FILE: /app/data/stats.json
+    volumes:
+      - stats-data:/app/data
     expose:
       - "8787"
     healthcheck:
@@ -61,3 +65,7 @@ services:
     ports:
       # 宿主端口可用 server/.env 的 WEB_PORT 覆盖（配合 --env-file ../server/.env）
       - "${WEB_PORT:-8080}:80"
+
+volumes:
+  # 使用统计快照（chat 服务挂载到 /app/data），docker compose down 不会删除
+  stats-data:

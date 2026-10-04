@@ -19,6 +19,9 @@ docs/2[0-9].[0-9]*.[0-9]*/
 test-results/
 playwright-report/
 
+# 自托管对话服务的本地运行数据（使用统计快照，重启后恢复）
+server/.stats.json
+
 # QMuse CLI 本地状态与导入诊断产物
 .qoder/
 **/.qmuse/import-errors/
