@@ -198,7 +198,7 @@ pnpm run build          # 产物输出到 dist/（dist/index.html 为入口）
 pnpm run preview        # 本地预览构建产物
 ```
 
-环境变量：`.env` / `.env.local` 中的 `VITE_SUPABASE_*`、`VITE_ONEDAY_APP_ID` 等平台托管变量由云服务初始化流程生成，**不要手工编辑或删除**；丢失时通过平台的 Cloud 重新生成能力恢复。
+环境变量唯一来源是 `server/.env`：本地 `pnpm run server`/`pnpm run dev` 与 Docker 部署共用（vite `envDir` 已指向 `server/`，Makefile 起容器带 `--env-file server/.env`）。平台托管变量（`VITE_SUPABASE_*`、`VITE_ONEDAY_APP_ID` 等）丢失时通过平台的 Cloud 重新生成能力恢复。
 
 ---
 
@@ -253,19 +253,20 @@ LLM 额度与网关、seqout API 代理（函数内直连公网 GET）、存储�
 
 ```bash
 cp server/.env.example server/.env   # 填入 LLM_API_KEY（OpenAI / DeepSeek / 硅基流动 / 本地 vLLM 均可）
-pnpm run server                      # 启动本地对话服务 http://localhost:8787
+pnpm run server                      # 启动本地对话服务（端口读 server/.env 的 CHAT_API_PORT，默认 8787）
+pnpm run dev                         # 前端 dev server，自动从 server/.env 读 VITE_*（vite envDir 已指向 server/）
 ```
 
-前端 `.env.local` 加一行 `VITE_CHAT_API=http://localhost:8787`，再 `pnpm run dev`：对话、SSE 流式、工具轨迹、数据卡片全部走本地服务（Node 原生跑 `functions/seqout-chat/index.ts` 导出的 handler，零额外依赖）。
+`server/.env` 已带 `VITE_CHAT_API=http://localhost:<CHAT_API_PORT>`（与本地服务端口保持一致即可）：对话、SSE 流式、工具轨迹、数据卡片全部走本地服务（Node 原生跑 `functions/seqout-chat/index.ts` 导出的 handler，零额外依赖）。
 
 - 自托管模式下 `VITE_ONEDAY_APP_ID` 可留空（`client.ts` 已改为可选，不再发送 `OneDay-App-Id` 头）。
 - `VITE_SUPABASE_URL` / `VITE_SUPABASE_ANON_KEY` 没有时会自动降级为**纯游客模式**（`client.ts` 的 `isOfflineMode`：Proxy 桩客户端让 auth 固定未登录、云端调用静默空转，登录按钮隐藏），对话/桌宠/会话（localStorage）不受影响；配上 Supabase 兼容实例则登录/云同步/排行榜恢复可用。
-- dev 下推荐 `VITE_CHAT_API=/chat-api`：vite 把 `/chat-api` 代理到本地服务（`vite.config.ts` 的 `server.proxy`，目标可用 `CHAT_API_PROXY_TARGET` 覆盖），浏览器只访问 3015 单端口——同源无 CORS，局域网其他设备打开也能完整对话。
+- dev 下也可以把 `VITE_CHAT_API` 改成 `/chat-api`（相对路径）：vite 把 `/chat-api` 代理到本地服务（`vite.config.ts` 的 `server.proxy`，目标可用 `CHAT_API_PROXY_TARGET` 覆盖），浏览器只访问 3015 单端口——同源无 CORS，局域网其他设备打开也能完整对话。
 - 服务端可覆盖的环境变量见 `functions/seqout-chat/index.ts` 头部注释：`LLM_API_KEY`（必填）、`LLM_BASE_URL`（默认 Meoo AI 的 compatible-mode/v1）、`LLM_MODEL`、`SEQOUT_BASE_URL`、`CHAT_API_PORT`（默认 8787，见 `server/local.mjs`）。
 
 ### 7.2 与平台模式的切换
 
-`.env.local` 中 `VITE_CHAT_API` 留空或删除即回到平台模式：请求走 `{supabaseUrl}/functions/v1/seqout-chat` 并携带 `OneDay-App-Id` 头，行为与改造前完全一致（Edge Function 部署到平台后仍按原方式读取 `MEOO_PROJECT_API_KEY*` secrets，本地新增的 `LLM_API_KEY` 仅为兜底）。
+`server/.env` 中 `VITE_CHAT_API` 留空或删除即回到平台模式：请求走 `{supabaseUrl}/functions/v1/seqout-chat` 并携带 `OneDay-App-Id` 头，行为与改造前完全一致（Edge Function 部署到平台后仍按原方式读取 `MEOO_PROJECT_API_KEY*` secrets，本地新增的 `LLM_API_KEY` 仅为兜底）。
 
 ---
 
@@ -344,14 +345,14 @@ cp server/.env.example server/.env
 #      LLM_MODEL=deepseek-flash         # 填 /models 目录里真实存在的 id
 #      CHAT_API_PORT=8788               # 避开已占用端口
 
-# 3) 配置前端构建变量（生产构建默认读 .env.production）
-cp .env.production.example .env.production   # 同源反代部署用默认值即可，无需修改
+# 3) 前端构建变量已收敛到 server/.env（vite envDir 指向 server/），无需另建 .env.production
+#    同源反代部署把 VITE_CHAT_API 设为 /chat-api 即可；也可直接填对话服务公网 URL
 
 # 4) 构建前端
 pnpm run build          # 产出 dist/
 
 # 5) 启动对话服务
-pnpm run server         # 或 CHAT_API_PORT=8788 node server/local.mjs
+pnpm run server         # 端口读 server/.env 的 CHAT_API_PORT
 ```
 
 ### 8.5 nginx 配置示例（手动部署）
@@ -425,6 +426,6 @@ curl http://your-domain.com/chat-api/models
 | 「AI 服务返回 400」 | 模型名在该网关不存在：`LLM_MODEL` 必须填 `/models` 目录里的真实 id |
 | 页面能开但发消息一直转圈/报错 | 浏览器访问不到对话服务：确认 `VITE_CHAT_API` 与反代路径一致；F12 Network 面板看 `/chat-api` 请求状态 |
 | 只本机能用、局域网/公网不行 | `VITE_CHAT_API` 填了 `localhost`：生产一律用 `/chat-api`（同源反代）或服务器公网 IP/域名，重新构建 |
-| 改了 `.env.production` / `.env.local` 没效果 | `VITE_*` 是构建期变量，必须重新 `pnpm run build` |
+| 改了 `server/.env` 没效果 | `VITE_*` 是构建期变量，必须重新构建（dev 直接生效）；LLM/端口类变量改完要重启服务 |
 | 8788 端口冲突 | 改 `server/.env` 的 `CHAT_API_PORT`，nginx `proxy_pass` 同步改 |
 | 想恢复登录/排行榜 | 配任意 Supabase 兼容实例的 `VITE_SUPABASE_URL` + `VITE_SUPABASE_ANON_KEY`，重新构建（参考 §五 的表结构迁移） |

@@ -22,6 +22,9 @@ const SOURCE_LOCATION_PLUGIN_PATH = SOURCE_LOCATION_PLUGIN_CANDIDATES.find((path
  * - outDir 'dist' / assetsDir 'assets' — 归一化产物目录
  */
 export default defineConfig({
+  // 环境变量唯一来源：server/.env（本地 dev 与 docker 部署共用，见 Makefile 头注释）
+  // .dockerignore 已排除 server/.env，容器构建只认 Dockerfile 注入的构建期变量，互不干扰
+  envDir: "server",
   plugins: [
     tailwindcss(),
     TanStackRouterVite(),
