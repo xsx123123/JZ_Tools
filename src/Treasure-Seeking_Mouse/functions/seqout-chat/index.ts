@@ -267,9 +267,10 @@ export const handler = async (req: Request): Promise<Response> => {
     }
 
     // GET：模型目录（注入 defaultModel：优先本地 LLM_MODEL 配置，让前端默认选中它）
+    // 超时放宽到 8s：网关冷启动/跨网较慢时前端仍能拿到目录，避免回退到无效的兜底模型
     if (req.method === 'GET') {
       const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), 1500);
+      const timer = setTimeout(() => controller.abort(), 8000);
       try {
         const response = await fetch(`${LLM_BASE_URL}/models`, {
           headers: { Authorization: `Bearer ${projectServiceAK}` },

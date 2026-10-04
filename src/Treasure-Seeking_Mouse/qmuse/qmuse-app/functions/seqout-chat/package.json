@@ -1,0 +1,9 @@
+{
+  "name": "seqout-chat",
+  "version": "1.0.0",
+  "type": "module",
+  "main": "src/main.js",
+  "dependencies": {
+    "node-appwrite": "^23.0.0"
+  }
+}

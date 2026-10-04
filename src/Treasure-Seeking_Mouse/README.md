@@ -115,7 +115,7 @@
 
 - 注册登录：邮箱验证码 + 密码。`signUp → verifyOtp(type:'signup') → getUser → upsert profiles`；忘记密码走 `resetPasswordForEmail` + `/reset-password` 回调页。
 - 数据表：`profiles` / `chat_sessions` / `chat_messages`（cards、tool_logs 为 JSONB）。RLS 全部以 `auth.uid()` 本人隔离。
-- 未登录也可使用：消息仅存 localStorage（key `seqout-local-session`）。
+- 未登录也可使用：消息仅存本浏览器 localStorage（key `seqout-local-session`），最多保留最近 50 条会话、最后活跃超过 7 天的自动清除；侧栏底部与顶栏「临时试用」处有明确提示。
 
 ### 3.4 主题系统
 

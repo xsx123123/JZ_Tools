@@ -34,11 +34,14 @@ export const Route = createFileRoute("/")({
 const FALLBACK_MODEL = "qwen3.8-flash";
 const LOCAL_SESSION_KEY = "seqout-local-session";
 const RAIL_COLLAPSED_KEY = "seqout-sidebar-collapsed"; // '1' = 收起（默认），'0' = 展开
+const GUEST_MAX_SESSIONS = 50; // 游客（未登录）最多保留的会话条数
+const GUEST_KEEP_DAYS = 7; // 游客会话最后活跃后保留天数
 
 interface LocalSession {
   id: string;
   title: string;
   messages: ChatUIMessage[];
+  ts: number; // 最后活跃时间（ms），用于 7 天过期清理
 }
 
 function uid(): string {
@@ -48,7 +51,14 @@ function uid(): string {
 function readLocalSessions(): LocalSession[] {
   try {
     const raw = localStorage.getItem(LOCAL_SESSION_KEY);
-    return raw ? (JSON.parse(raw) as LocalSession[]) : [];
+    if (!raw) return [];
+    const parsed = JSON.parse(raw) as (LocalSession & { ts?: number })[];
+    if (!Array.isArray(parsed)) return [];
+    const cutoff = Date.now() - GUEST_KEEP_DAYS * 24 * 3600 * 1000;
+    return parsed
+      .map((s) => ({ ...s, ts: typeof s.ts === "number" ? s.ts : Date.now() })) // 旧数据补时间戳
+      .filter((s) => s.ts >= cutoff) // 仅保留最近 7 天有活跃的会话
+      .slice(-GUEST_MAX_SESSIONS);
   } catch {
     return [];
   }
@@ -56,7 +66,7 @@ function readLocalSessions(): LocalSession[] {
 
 function writeLocalSessions(list: LocalSession[]): void {
   try {
-    localStorage.setItem(LOCAL_SESSION_KEY, JSON.stringify(list.slice(-30)));
+    localStorage.setItem(LOCAL_SESSION_KEY, JSON.stringify(list.slice(-GUEST_MAX_SESSIONS)));
   } catch {
     /* 容量满时静默丢弃 */
   }
@@ -106,12 +116,14 @@ function ChatPage(): React.ReactElement {
   }, []);
   const abortRef = useRef<AbortController | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const catalogOkRef = useRef(false); // 模型目录是否加载成功；失败时发送空模型名，由服务端 LLM_MODEL 兜底，避免前端兜底模型在网关上不存在
   const user = session?.user ?? null;
 
   // 模型目录
   useEffect(() => {
     void fetchModelCatalog().then((c) => {
       if (c && c.models.length > 0) {
+        catalogOkRef.current = true;
         setModels(c.models);
         const def = c.defaultModel && c.models.includes(c.defaultModel) ? c.defaultModel : c.models[0];
         setModel(def);
@@ -170,6 +182,7 @@ function ChatPage(): React.ReactElement {
       id: localId,
       title: messages.find((m) => m.role === "user")?.content.slice(0, 24) ?? "新对话",
       messages,
+      ts: Date.now(),
     };
     if (idx >= 0) list[idx] = entry;
     else if (messages.length > 0) list.push(entry);
@@ -221,7 +234,7 @@ function ChatPage(): React.ReactElement {
 
     await requestSeqoutChat(
       [...history, { role: "user", content: text }],
-      model,
+      catalogOkRef.current ? model : "", // 目录加载失败时留空，由服务端 LLM_MODEL 兜底
       {
         onDelta: (t) => patch((m) => ({ ...m, content: m.content + t })),
         onTool: (evt) => {
@@ -363,6 +376,11 @@ function ChatPage(): React.ReactElement {
       onDelete={handleDelete}
       onLogin={isOfflineMode ? undefined : () => setAuthOpen(true)}
       onLogout={handleLogout}
+      storageNote={
+        user
+          ? undefined
+          : `游客记录仅保存在本浏览器：最多 ${GUEST_MAX_SESSIONS} 条会话，保留 ${GUEST_KEEP_DAYS} 天${isOfflineMode ? "" : "；登录可云端永久保存"}`
+      }
     />
   );
 
@@ -431,7 +449,7 @@ function ChatPage(): React.ReactElement {
             <Menu size={18} />
           </button>
           <h1 className="truncate text-[13.5px] font-medium tracking-tight">
-            {activeId ? sessions.find((s) => s.id === activeId)?.title ?? "GEO寻宝鼠" : user ? "新对话" : "临时试用（未登录不保存）"}
+            {activeId ? sessions.find((s) => s.id === activeId)?.title ?? "GEO寻宝鼠" : user ? "新对话" : `临时试用（本机保存 ${GUEST_MAX_SESSIONS} 条 · ${GUEST_KEEP_DAYS} 天）`}
           </h1>
           <button
             type="button"

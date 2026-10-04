@@ -38,11 +38,24 @@ const CORS = {
   'Access-Control-Allow-Headers': 'Content-Type,Authorization,OneDay-App-Id,X-Meoo-Project-Url-Id',
 };
 
+const MAX_BODY = 1024 * 1024; // 请求体上限 1MB（对话请求远小于此，防异常大请求打满内存）
+
 createServer(async (req, res) => {
   if (req.method === 'OPTIONS') { res.writeHead(204, CORS); res.end(); return; }
+  const ac = new AbortController();
+  res.on('close', () => ac.abort()); // 客户端断连 → 中止 handler 内的 LLM 循环，省 token
   try {
     const chunks = [];
-    for await (const c of req) chunks.push(c);
+    let size = 0;
+    for await (const c of req) {
+      size += c.length;
+      if (size > MAX_BODY) {
+        res.writeHead(413, { 'Content-Type': 'application/json', ...CORS });
+        res.end(JSON.stringify({ error: '请求体过大' }));
+        return;
+      }
+      chunks.push(c);
+    }
     const headers = {};
     for (const [k, v] of Object.entries(req.headers)) {
       if (v === undefined) continue;
@@ -52,6 +65,7 @@ createServer(async (req, res) => {
       method: req.method,
       headers,
       body: chunks.length && req.method !== 'GET' && req.method !== 'HEAD' ? Buffer.concat(chunks) : undefined,
+      signal: ac.signal,
     });
     const response = await handler(request);
     res.writeHead(response.status, { ...CORS, ...Object.fromEntries(response.headers.entries()) });

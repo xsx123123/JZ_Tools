@@ -2,10 +2,10 @@
 // 连击转圈、爱心飘浮、闲置散步张望、宝箱累计计数、里程碑成就庆祝，可拖拽、右键静默。
 import { useCallback, useEffect, useRef, useState } from "react";
 import { readPetPos, writePetPos, readPetQuiet, writePetQuiet, bumpPokeCount, readTreasureCount, addTreasure, ACHIEVEMENTS, claimAchievement, earnedAchievements, type Achievement, type PetPos } from "@/services/petStore";
-import IMG_BASE from "@/assets/pet/mouse-base.png";
-import IMG_DIG from "@/assets/pet/mouse-dig.png";
-import IMG_CHEER from "@/assets/pet/mouse-cheer.png";
-import IMG_CHEST from "@/assets/pet/chest.png";
+import IMG_BASE from "@/assets/pet/mouse-base.webp";
+import IMG_DIG from "@/assets/pet/mouse-dig.webp";
+import IMG_CHEER from "@/assets/pet/mouse-cheer.webp";
+import IMG_CHEST from "@/assets/pet/chest.webp";
 
 type PetState = "idle" | "digging" | "reveal" | "stow" | "miss" | "poke" | "spin" | "walk" | "look" | "celebrate";
 

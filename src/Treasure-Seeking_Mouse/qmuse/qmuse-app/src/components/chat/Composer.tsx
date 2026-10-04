@@ -1,0 +1,97 @@
+// 对话输入区：多行输入 + 模型选择 + 发送/停止
+import { useEffect, useRef, useState } from "react";
+import { Send, Square } from "lucide-react";
+
+export function Composer({
+  models,
+  model,
+  onModelChange,
+  streaming,
+  disabled,
+  onSend,
+  onStop,
+}: {
+  models: string[];
+  model: string;
+  onModelChange: (m: string) => void;
+  streaming: boolean;
+  disabled?: boolean;
+  onSend: (text: string) => void;
+  onStop: () => void;
+}): React.ReactElement {
+  const [value, setValue] = useState("");
+  const taRef = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    const ta = taRef.current;
+    if (!ta) return;
+    ta.style.height = "auto";
+    ta.style.height = `${Math.min(ta.scrollHeight, 160)}px`;
+  }, [value]);
+
+  function submit(): void {
+    const t = value.trim();
+    if (!t || streaming || disabled) return;
+    setValue("");
+    onSend(t);
+  }
+
+  return (
+    <div className="border-t border-border bg-background/80 px-4 py-3 backdrop-blur-sm sm:px-6">
+      <div className="mx-auto max-w-3xl">
+        <div className="flex items-end gap-2 rounded-xl border border-border bg-card p-2 shadow-soft transition-all focus-within:border-helix focus-within:ring-2 focus-within:ring-helix/20 focus-within:shadow-[0_1px_3px_0_rgb(0_0_0/0.04),0_8px_24px_-12px_oklch(0.6_0.118_184.704/0.25)]">
+          <textarea
+            ref={taRef}
+            rows={1}
+            value={value}
+            onChange={(e) => setValue(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
+                e.preventDefault();
+                submit();
+              }
+            }}
+            placeholder="告诉阿寻去哪儿挖宝，如：搜索小鼠心脏发育的单细胞测序数据集…（Enter 发送）"
+            className="max-h-40 min-h-[40px] flex-1 resize-none bg-transparent px-2 py-1.5 text-[14px] leading-relaxed text-foreground outline-none placeholder:text-muted-foreground/70"
+            disabled={disabled}
+          />
+          {streaming ? (
+            <button
+              type="button"
+              onClick={onStop}
+              title="停止生成"
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-destructive/40 bg-destructive/5 text-destructive transition-colors hover:bg-destructive/10"
+            >
+              <Square size={14} fill="currentColor" />
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={submit}
+              disabled={!value.trim() || disabled}
+              title="发送"
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground shadow-sm transition-all hover:bg-[oklch(0.53_0.11_184.7)] active:scale-95 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              <Send size={15} />
+            </button>
+          )}
+        </div>
+        <div className="mt-2 flex items-center justify-between px-1 text-[11.5px] text-muted-foreground">
+          <label className="flex items-center gap-1.5">
+            <span className="font-mono">model</span>
+            <select
+              value={model}
+              onChange={(e) => onModelChange(e.target.value)}
+              className="rounded-md border border-border bg-card px-2 py-1 font-mono text-[11.5px] text-muted-foreground shadow-sm outline-none transition-colors hover:border-helix/50 focus:border-helix"
+            >
+              {models.map((m) => (
+                <option key={m} value={m}>{m}</option>
+              ))}
+            </select>
+          </label>
+          <span className="hidden sm:inline">阿寻挖的宝藏由 AI 生成，数据以 NCBI / NGDC 原始页面为准</span>
+        </div>
+      </div>
+    </div>
+  );
+}
