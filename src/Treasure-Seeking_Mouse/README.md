@@ -61,7 +61,7 @@ React 19 + TypeScript · Vite 7 · Tailwind CSS v4（双主题 design token）·
 
 ## 致谢
 
-本应用在 **QMuse**（应用构建与部署）与 **DeepSeek-V4**、**Kimi-K3**、**GLM-5.3**（AI 模型）的协助下完成：
+本应用基于 QMuse 构建与部署，并在 DeepSeek-V4、Kimi-K3、GLM-5.3 等 AI 模型的协助下开发完成。
 
 <p>
   <a href="https://www.qmuse.cn/" target="_blank" rel="noreferrer"><img src="docs/badges/qmuse.svg" height="26" alt="QMuse" /></a>&nbsp;&nbsp;
