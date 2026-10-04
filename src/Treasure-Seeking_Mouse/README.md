@@ -4,6 +4,10 @@
 
 ![封面 · 夜探矿洞](docs/寻宝鼠.png)
 
+**界面预览**（自托管模式 + DeepSeek 模型，纯游客运行）：
+
+![使用界面](docs/使用页面.png)
+
 ---
 
 ## 一、技术栈
@@ -208,3 +212,132 @@ pnpm run server                      # 启动本地对话服务 http://localhost
 ### 7.2 与平台模式的切换
 
 `.env.local` 中 `VITE_CHAT_API` 留空或删除即回到平台模式：请求走 `{supabaseUrl}/functions/v1/seqout-chat` 并携带 `OneDay-App-Id` 头，行为与改造前完全一致（Edge Function 部署到平台后仍按原方式读取 `MEOO_PROJECT_API_KEY*` secrets，本地新增的 `LLM_API_KEY` 仅为兜底）。
+
+---
+
+## 八、自托管生产部署（详细步骤）
+
+### 8.1 部署形态
+
+生产环境由**两个进程**组成，可同一台机器部署：
+
+```
+浏览器 ──► nginx（80/443）
+              ├── /            → 静态文件 dist/（React 前端）
+              └── /chat-api/   → 反向代理 → 对话服务 127.0.0.1:8788（server/local.mjs）
+                                     │
+                                     └──► 你的 LLM 网关（OpenAI 兼容）+ seqout.org 公共 API
+```
+
+- **前端是纯静态文件**（`pnpm run build` 产出 `dist/`），任何静态托管（nginx / Caddy / OSS）均可。
+- **对话服务持有 LLM 密钥**，必须运行在服务器侧，永远不要暴露密钥给浏览器。
+- 前端通过 `VITE_CHAT_API` 找对话服务。生产推荐**同源反代**（`/chat-api` → 8788），无 CORS、无混合内容问题；也可以把 `VITE_CHAT_API` 直接填成对话服务的公网 URL（服务端已带 CORS 头，适合前后端分机器部署）。
+- 注意：`VITE_*` 变量在**构建时**固化进 bundle，改完必须重新 `pnpm run build`。
+
+### 8.2 环境要求
+
+| 依赖 | 版本 | 说明 |
+|------|------|------|
+| Node.js | ≥ 22.6（推荐 24.x） | 对话服务依赖原生 type-stripping 直接跑 TS，无需 Deno |
+| pnpm | 9+ | `corepack enable` 即可 |
+| LLM 密钥 | 任意 OpenAI 兼容服务 | OpenAI / DeepSeek / 硅基流动 / 本地 vLLM 等 |
+| Supabase 兼容实例 | 可选 | 不配则自动降级纯游客模式（登录/云同步/排行榜不可用） |
+
+### 8.3 部署步骤
+
+```bash
+# 1) 安装依赖
+pnpm install
+
+# 2) 配置对话服务（密钥等，文件已被 gitignore）
+cp server/.env.example server/.env
+#    编辑 server/.env：
+#      LLM_API_KEY=sk-你的密钥           # 必填
+#      LLM_BASE_URL=https://xxx/v1      # 非 Meoo AI 时必填
+#      LLM_MODEL=deepseek-flash         # 填 /models 目录里真实存在的 id
+#      CHAT_API_PORT=8788               # 避开已占用端口
+
+# 3) 配置前端构建变量（生产构建默认读 .env.production）
+cp .env.production.example .env.production   # 同源反代部署用默认值即可，无需修改
+
+# 4) 构建前端
+pnpm run build          # 产出 dist/
+
+# 5) 启动对话服务
+pnpm run server         # 或 CHAT_API_PORT=8788 node server/local.mjs
+```
+
+### 8.4 nginx 配置示例
+
+```nginx
+server {
+    listen 80;
+    server_name your-domain.com;
+    root /opt/Treasure-Seeking_Mouse/dist;
+    index index.html;
+
+    # SPA 路由回退（/about 等前端路径都落到 index.html）
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+
+    # 对话服务反代（SSE 流式必需的两项：关缓冲、拉长读超时）
+    location /chat-api/ {
+        proxy_pass http://127.0.0.1:8788/;   # 末尾斜杠 = 去掉 /chat-api 前缀
+        proxy_http_version 1.1;
+        proxy_set_header Connection "";
+        proxy_buffering off;
+        proxy_read_timeout 600s;
+    }
+}
+```
+
+### 8.5 进程守护（systemd）
+
+```ini
+# /etc/systemd/system/treasure-mouse-chat.service
+[Unit]
+Description=Treasure Mouse chat server
+After=network.target
+
+[Service]
+WorkingDirectory=/opt/Treasure-Seeking_Mouse
+EnvironmentFile=/opt/Treasure-Seeking_Mouse/server/.env
+ExecStart=/usr/bin/node server/local.mjs
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target
+```
+
+```bash
+sudo systemctl enable --now treasure-mouse-chat
+sudo systemctl status treasure-mouse-chat   # 查看状态
+journalctl -u treasure-mouse-chat -f        # 查看日志
+```
+
+### 8.6 验证清单
+
+```bash
+# 1. 对话服务正常（应返回模型目录 JSON）
+curl http://127.0.0.1:8788/models
+
+# 2. 经 nginx 代理正常（应返回同样的 JSON）
+curl http://your-domain.com/chat-api/models
+
+# 3. 页面可访问且模型下拉有值
+#    浏览器打开 http://your-domain.com/ ，发一条消息能看到流式回复即全部打通
+```
+
+### 8.7 常见问题
+
+| 现象 | 原因与解决 |
+|------|-----------|
+| 「AI 服务凭证未就绪」 | 对话服务没读到密钥：检查 `server/.env` 是否生效；**改完必须重启服务** |
+| 「AI 服务返回 400」 | 模型名在该网关不存在：`LLM_MODEL` 必须填 `/models` 目录里的真实 id |
+| 页面能开但发消息一直转圈/报错 | 浏览器访问不到对话服务：确认 `VITE_CHAT_API` 与反代路径一致；F12 Network 面板看 `/chat-api` 请求状态 |
+| 只本机能用、局域网/公网不行 | `VITE_CHAT_API` 填了 `localhost`：生产一律用 `/chat-api`（同源反代）或服务器公网 IP/域名，重新构建 |
+| 改了 `.env.production` / `.env.local` 没效果 | `VITE_*` 是构建期变量，必须重新 `pnpm run build` |
+| 8788 端口冲突 | 改 `server/.env` 的 `CHAT_API_PORT`，nginx `proxy_pass` 同步改 |
+| 想恢复登录/排行榜 | 配任意 Supabase 兼容实例的 `VITE_SUPABASE_URL` + `VITE_SUPABASE_ANON_KEY`，重新构建（参考 §五 的表结构迁移） |
