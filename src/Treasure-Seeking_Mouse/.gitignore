@@ -12,4 +12,4 @@ dist
 
 # QMuse CLI 本地状态与导入诊断产物
 .qoder/
-.qmuse/import-errors/
+**/.qmuse/import-errors/
