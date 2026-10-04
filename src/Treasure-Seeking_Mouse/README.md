@@ -56,3 +56,16 @@ React 19 + TypeScript · Vite 7 · Tailwind CSS v4（双主题 design token）·
 | `server/` | 自托管对话服务（Node 原生跑 Edge Function 的 handler，零依赖） |
 
 详细架构说明、Meoo 平台发布流程、手动部署步骤与常见问题排查，请见 **[docs/DETAILED_README.md](docs/DETAILED_README.md)**。
+
+---
+
+## 致谢
+
+本应用在 **QMuse**（应用构建与部署）与 **DeepSeek-V4**、**Kimi-K3**、**GLM-5.3**（AI 模型）的协助下完成：
+
+<p>
+  <img src="docs/badges/qmuse.svg" height="26" alt="QMuse" />&nbsp;&nbsp;
+  <img src="docs/badges/deepseek.svg" height="24" alt="DeepSeek" />&nbsp;&nbsp;
+  <img src="docs/badges/kimi.svg" height="24" alt="Kimi" />&nbsp;&nbsp;
+  <img src="docs/badges/zhipu.svg" height="20" alt="GLM · Z.AI" />
+</p>
