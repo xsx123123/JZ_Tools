@@ -97,3 +97,26 @@ qmuse import .          # 首次或更新云资源；密钥：qmuse-cli cloud se
 - `src/types/global.d.ts` 按契约补 `__MUSE__.appwrite` 可选类型（5 行）。
 - 验证：`npm run check` 0 error（1 条 warning 为 SRC 原样复制件既有）、`npm run build` 通过、产物校验器通过。
 - 未执行（需平台环境）：`qmuse import .`、真实云资源联调、`qmuse-cli cloud set-secret "LLM_API_KEY"`。
+
+### R2 — 2026-10-04 同步 v2.0 冲刺四特性 + 测试反馈修复（源：主仓库 commit `c8bac95`）
+
+**同步内容（按 §二 映射规范）：**
+
+- **v2.1 正文内嵌超链接**：
+  - 原样复制：`src/lib/linkify.ts`、`src/lib/evidenceBus.ts`、`src/components/chat/IdLink.tsx`、更新的 `Markdown.tsx`/`ChatMessage.tsx`/`DatasetCard.tsx`/`EmptyState.tsx`、`styles.css`（.id-link 样式）。
+  - 适配修正：Markdown.tsx 的 idlink 渲染器抽成大写开头组件 `IdLinkRenderer`（oxlint rules-of-hooks 不允许 hook 在小写开头的匿名函数里调用；主仓库同步修复）。
+- **T2 PubMed 文献联动**：
+  - 新增 `src/services/literature.ts`（改写迁移：Supabase Edge Function fetch → `executeQmuseFunction`，responseBody JSON 解析；前端 TTL 缓存 10/5 分钟不变）。
+  - 云函数 `functions/seqout-chat/src/main.js` 新增 `literature` action（node-22 ESM 改写：NCBI esearch/esummary/efetch + Europe PMC 兜底 + token bucket + 30d/7d 正负缓存 + GSM 反查 GSE 系列策略，与主仓库同一检索策略版本 `v1`）；放在 LLM 凭证检查之前（文献 action 不需要 AI 凭证）。
+- **测试反馈修复**：
+  - 本地历史会话侧栏展示（`index.tsx`：localSessions 状态 + displaySessions 数据源 + 未登录删除/恢复分支；注意 `localSessions` useState 须在消息加载 effect 之前声明，否则 TDZ）。
+  - EmptyState 示例池 12/6/6 条随机抽样（原样复制件自动带过来）。
+- **不迁移**（QMuse 无此概念）：statsStore 的 isOfflineMode 本地统计层、Leaderboard 离线默认页签（QMuse 平台账号体系不同，游客统计走云函数 bump_guest action）。
+
+**踩坑记录（迁移规范 §三 的补充）：**
+
+- **产物校验器的字符串掩码与正则字面量冲突**：`efetchOutline` 里 `/Label="([^"]*)"/` 的 `"` 被校验器 analyzeSource 误判为字符串边界，连锁吞掉后续 ~3000 字符代码，导致「必须直接读取 process.env.QMUSE_APPWRITE_DATABASE_ID」检查失败（实际代码没问题）。修法：正则里用 `\x22` 代替 `"` 字面量。**以后在云函数源码里写含 `"` 的正则一律用 `\x22`。**
+- QMuse SDK 字段名是 `responseBody`（不是 `body`）——`executeQmuseFunction` 返回的 Execution 对象解析时注意。
+
+**验证**：`npm run check` 0 error（2 条 warning 为 R1 既有）、`npm run build` 通过、产物校验器通过。
+**未执行（需平台环境）**：`qmuse import .`（重新导入云函数使 literature action 生效）、`qmuse-cli cloud set-secret "NCBI_API_KEY"`（可选，提升限速）、真实云资源联调。

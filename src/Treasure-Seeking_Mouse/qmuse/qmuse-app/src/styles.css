@@ -2,9 +2,6 @@
 @source "../src";
 @import "tw-animate-css";
 
-/* shadcn 组件 dark: variant 需要（模板预置） */
-@custom-variant dark (&:is(.dark *));
-
 /* 字体本地化托管（@fontsource，不依赖外部 CDN） */
 @import "@fontsource-variable/noto-sans-sc";
 @import "@fontsource/fraunces/400.css";
@@ -18,9 +15,6 @@
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
-  --radius-2xl: calc(var(--radius) + 8px);
-  --radius-3xl: calc(var(--radius) + 12px);
-  --radius-4xl: calc(var(--radius) + 16px);
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
@@ -48,20 +42,6 @@
   --color-pet-amber: var(--pet-amber);
   --color-pet-amber-deep: var(--pet-amber-deep);
   --color-pet-gold-soft: var(--pet-gold-soft);
-  /* 模板 chart/sidebar token（未被业务用到的模板 ui 组件编译需要） */
-  --color-chart-1: var(--chart-1);
-  --color-chart-2: var(--chart-2);
-  --color-chart-3: var(--chart-3);
-  --color-chart-4: var(--chart-4);
-  --color-chart-5: var(--chart-5);
-  --color-sidebar: var(--sidebar);
-  --color-sidebar-foreground: var(--sidebar-foreground);
-  --color-sidebar-primary: var(--sidebar-primary);
-  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
-  --color-sidebar-accent: var(--sidebar-accent);
-  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
-  --color-sidebar-border: var(--sidebar-border);
-  --color-sidebar-ring: var(--sidebar-ring);
   --font-sans: var(--font-sans);
   --font-mono: var(--font-mono);
   --font-display: var(--font-display);
@@ -104,21 +84,6 @@
   --pet-amber: oklch(0.72 0.15 75);                  /* 琥珀金 */
   --pet-amber-deep: oklch(0.55 0.13 65);             /* 深琥珀（文字档） */
   --pet-gold-soft: oklch(0.965 0.045 85);            /* 浅金底 */
-
-  /* 模板 chart/sidebar token（模板原值） */
-  --chart-1: oklch(0.646 0.222 41.116);
-  --chart-2: oklch(0.6 0.118 184.704);
-  --chart-3: oklch(0.398 0.07 227.392);
-  --chart-4: oklch(0.828 0.189 84.429);
-  --chart-5: oklch(0.769 0.188 70.08);
-  --sidebar: oklch(0.984 0.003 247.858);
-  --sidebar-foreground: oklch(0.129 0.042 264.695);
-  --sidebar-primary: oklch(0.208 0.042 265.755);
-  --sidebar-primary-foreground: oklch(0.984 0.003 247.858);
-  --sidebar-accent: oklch(0.968 0.007 247.896);
-  --sidebar-accent-foreground: oklch(0.208 0.042 265.755);
-  --sidebar-border: oklch(0.929 0.013 255.508);
-  --sidebar-ring: oklch(0.704 0.04 256.788);
 }
 
 /* 夜探矿洞：深蓝灰底、卡片亮一档、teal/琥珀金提亮发光 */
@@ -151,21 +116,6 @@
   --pet-amber: oklch(0.78 0.15 78);
   --pet-amber-deep: oklch(0.85 0.13 82);             /* 暗底上"深琥珀"反转为亮金文字档 */
   --pet-gold-soft: oklch(0.3 0.06 80);
-
-  /* 模板 chart/sidebar token（模板原值） */
-  --chart-1: oklch(0.488 0.243 264.376);
-  --chart-2: oklch(0.696 0.17 162.48);
-  --chart-3: oklch(0.769 0.188 70.08);
-  --chart-4: oklch(0.627 0.265 303.9);
-  --chart-5: oklch(0.645 0.246 16.439);
-  --sidebar: oklch(0.208 0.042 265.755);
-  --sidebar-foreground: oklch(0.984 0.003 247.858);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.984 0.003 247.858);
-  --sidebar-accent: oklch(0.279 0.041 260.031);
-  --sidebar-accent-foreground: oklch(0.984 0.003 247.858);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.551 0.027 264.364);
 }
 
 @layer base {
@@ -316,6 +266,21 @@
 .story-link:hover::after {
   transform: scaleX(1);
   transform-origin: bottom left;
+}
+
+/* v2.1 正文内嵌编号链接（teal 主色 + hover 下划线展开，双主题自适应） */
+.id-link {
+  position: relative;
+  color: var(--color-helix);
+  text-decoration: none;
+  border-bottom: 1px dashed color-mix(in oklch, var(--color-helix) 45%, transparent);
+  transition: color 0.2s ease, border-color 0.2s ease;
+}
+.id-link:hover,
+.id-link:focus-visible {
+  color: var(--color-helix);
+  border-bottom-color: var(--color-helix);
+  border-bottom-style: solid;
 }
 
 /* Markdown 消息排版（亮色档） */

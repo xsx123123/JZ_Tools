@@ -110,12 +110,16 @@ const REHYPE_PLUGINS: [typeof rehypeHighlight | typeof rehypeLinkify, Record<str
   [rehypeLinkify, {}],
 ];
 
+/** idlink 渲染器：大写开头组件（oxlint rules-of-hooks 要求 hook 只在组件里调用） */
+function IdLinkRenderer({ node }: { node?: unknown }): React.ReactElement | null {
+  const hit = (node as { properties?: { hit?: IdMatch } } | undefined)?.properties?.hit;
+  const hostMessageId = useContext(HostMessageContext);
+  return hit ? <IdLink match={hit} hostMessageId={hostMessageId ?? undefined} /> : null;
+}
+
 const COMPONENTS = {
-  idlink: ({ node }: { node?: unknown }) => {
-    const hit = (node as { properties?: { hit?: IdMatch } } | undefined)?.properties?.hit;
-    const hostMessageId = useContext(HostMessageContext);
-    return hit ? <IdLink match={hit} hostMessageId={hostMessageId ?? undefined} /> : null;
-  },  a: ({ node: _n, ...props }: { node?: unknown } & React.ComponentProps<"a">) => (
+  idlink: IdLinkRenderer,
+  a: ({ node: _n, ...props }: { node?: unknown } & React.ComponentProps<"a">) => (
     <a {...props} target="_blank" rel="noreferrer noopener" className="story-link no-underline hover:underline" />
   ),
   table: ({ node: _n, ...props }: { node?: unknown } & React.ComponentProps<"table">) => (
