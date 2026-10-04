@@ -2,7 +2,7 @@
 
 > 🚀 **在线体验**：<https://q1vj9sqopzwj.meoo.fun/>（线上部署版本可能落后于仓库最新代码）
 
-一个把 [seqout-mcp](https://seqout.org) 的 26 个只读组学数据检索工具封装成「聊天式挖宝」体验的单页 Web 应用：用户用自然语言提问，后端大模型自动选择并调用 seqout API，结果以数据卡片 + 可折叠建议卡呈现；页面右下角常驻一只「寻宝鼠」桌宠，随检索进度挖宝、攒宝藏、解锁成就。
+一个把 [seqout-mcp](https://seqout.org) 的 26 个只读组学数据检索工具封装成「聊天式挖宝」体验的单页 Web 应用：用户用自然语言提问，后端大模型自动选择并调用 seqout API，结果以数据卡片 + 可折叠建议卡呈现；页面右下角常驻一只「寻宝鼠」桌宠，随检索进度挖宝、攒宝藏、解锁成就。支持移动端自适应，可完全脱离平台自托管（任意 OpenAI 兼容模型 + Docker 一键部署，见 §七/§八）。
 
 ![封面 · 夜探矿洞](docs/寻宝鼠.png)
 
@@ -79,9 +79,14 @@
 ├── crawler/                    # T1 捉虫休眠模块（最小骨架，见 §3.6）
 ├── functions/
 │   └── seqout-chat/index.ts    # 核心 Edge Function（见下文协议，含文献联动 action）
-└── migrations/                 # SQL 迁移（建表 + RLS）
-    ├── 20261003_092937_create_profiles.sql
-    └── 20261003_092943_create_chat_tables.sql
+├── server/
+│   ├── local.mjs               # 自托管对话服务（Node 原生跑 index.ts 的 handler，零依赖）
+│   └── .env                    # 环境变量唯一来源（已被 gitignore；示例见 .env.example）
+├── deploy/                     # Docker 部署（Dockerfile 双 target + compose + nginx + 密钥预检）
+├── migrations/                 # SQL 迁移（建表 + RLS）
+│   ├── 20261003_092937_create_profiles.sql
+│   └── 20261003_092943_create_chat_tables.sql
+└── Makefile                    # 快捷命令（make docker-start / docker-logs / docker-stop ...）
 ```
 
 ---
@@ -93,11 +98,13 @@
 ```
 用户输入 (Composer)
   → src/routes/index.tsx handleSend()
-    → src/services/seqoutChat.ts  POST {supabaseUrl}/functions/v1/seqout-chat
-      （裸 fetch，必须携带 OneDay-App-Id 头，值取自 src/supabase/client.ts 的 projectUrlId）
-      → Edge Function functions/seqout-chat/index.ts
-          1. 调 Meoo AI（OpenAI 兼容 /chat/completions，带 26 个 tool schema）
-          2. 模型发起 tool_calls → 函数内直接 GET https://seqout.org/api/...（最多 5 轮循环）
+    → src/services/seqoutChat.ts  POST chatEndpoint()
+      （平台模式：{supabaseUrl}/functions/v1/seqout-chat，必须携带 OneDay-App-Id 头，
+        值取自 src/supabase/client.ts 的 projectUrlId；
+       自托管模式：VITE_CHAT_API 直连本地/自建服务，见 §七）
+      → Edge Function functions/seqout-chat/index.ts（自托管时由 server/local.mjs 本地托管）
+          1. 调 LLM 网关（OpenAI 兼容 /chat/completions，带 26 个 tool schema）
+          2. 模型发起 tool_calls → 函数内直接 GET https://seqout.org/api/...（最多 40 轮循环）
           3. 结果回填给模型继续推理；search 响应超大时先截断再送 LLM
         ← 以 SSE 下行自定义协议推给前端
   → 前端按事件类型分发：
@@ -173,13 +180,22 @@
 
 - **统计上报**：`statsStore.ts` 在每轮对话结束后 fire-and-forget 调用 RPC（登录 `bump_user_stats` / 访客 `bump_guest_stats`），累计列与周列（`week_*` + `week_base` 周一日期，RPC 内自动跨周归零）双轨累加。注意 RPC 参数名带 `p_` 前缀（见 `src/supabase/types.ts` Functions），名字不匹配会被静默忽略——统计恒为 0 的排查入口。
 - **离线模式本地统计**：无 Supabase 配置时，`statsStore.ts` 走 localStorage 本地统计层（key `seqout-local-stats`，单行 upsert、双轨字段与云端 RPC 语义一致、跨周自动归零）；排行榜直接显示本地统计行在「临时矿工」榜，改昵称也走本地。**排行榜离线模式下默认打开「临时矿工」页签**（登录榜恒为空）。配置 Supabase 后自动切回云端，无需改代码。
-- **空态示例随机化**：`EmptyState.tsx` 维护三组示例池（探矿定位 12 条 / 验宝鉴宝 6 条 / 清点矿藏 6 条），每次进入空态 Fisher-Yates 洗牌随机抽样展示（组内条数 3/2/1 不变）；本次空态内稳定，重新进入会话再换一批。
+- **空态示例随机化**：`EmptyState.tsx` 维护三组示例池（探矿定位 12 条 / 验宝鉴宝 6 条 / 清点矿藏 6 条），每次进入空态 Fisher-Yates 洗牌随机抽样展示（组内条数 3/2/1 不变）；本次空态内稳定，重新进入会话再换一批。英雄区（桌宠图标 + 标题 + 简介）固定不随滚动消失，滚动的只有示例清单（内部独立 overflow 区）。
 
 ### 3.9 桌宠与成就
 
 - `TreasureMouse.tsx` 状态机 + pointer 拖拽；主形象为本地抠图 PNG（`src/assets/pet/`，构建时打包）。
 - `index.tsx` 在 SSE 的 onTool/onCards/onEnd/onError 里经 `makePetEvent()`（自增 seq 去重）转发事件。
 - 成就：累计挖宝 10/50/100 三档一次性庆祝动画 + 常驻徽章，领取记录存 localStorage `seqout-pet-achievements`（幂等）；cards 与 done 同轮触发时用 `countedRef` 防重复计数。
+
+### 3.10 移动端自适应
+
+判定依据为**宽度 + 触摸能力双维度**（宽度管布局，触摸管交互）：触屏笔记本保持桌面交互，手机/平板走触摸交互。
+
+- **软键盘适配**：viewport 加 `interactive-widget=resizes-content`；`use-visual-viewport` hook 把 visualViewport 高度写入 `--vvh`，根容器消费它，软键盘弹出不再遮挡输入框。
+- **安全区**：`viewport-fit=cover` + `safe-t` / `safe-b` 工具类（`max(基线, env(...))` 保证无刘海设备视觉不变）。
+- **触摸端交互改写**：复制/重发/重命名/删除等按钮组原依赖 `group-hover`，触屏上改为常显；`IdLink` 浮层在触摸端从 HoverCard 换成 Popover 点击弹出（原方案触屏点击会直接跳转）；Composer 补 `enterkeyhint=send`。
+- **桌宠**：移动端尺寸缩小（96px），拖拽阈值放宽至 10px 防手指抖动误判；触摸端静默入口为长按 600ms（桌面端是右键）。
 
 ---
 
@@ -191,6 +207,9 @@ pnpm install
 
 # 2. 启动开发服务器（固定 3015 端口，勿改）
 pnpm run dev
+
+# 2.5 需要真实对话时另开终端起本地对话服务（读 server/.env 的密钥与端口）
+pnpm run server
 
 # 3. 类型检查 / 生产构建
 pnpm run typecheck
@@ -241,6 +260,7 @@ LLM 额度与网关、seqout API 代理（函数内直连公网 GET）、存储�
 - Tailwind v4 无 `h-4.5` 这类半档刻度，自定义尺寸用任意值语法（如 `h-[18px]`）。
 - 动效禁用 framer-motion（package.json 里的该依赖是模板遗留，业务代码不引用）。
 - Request body 只能读一次：handler 里对 `req.json()` 的多次调用会抛 `Body has already been read`——文献 action 与对话流程共用同一次解析结果。
+- nginx 反代必须同时配 `location = /chat-api`（精确，无尾斜杠）与 `location /chat-api/`：只配后者时，无尾斜杠请求被 try_files 301 到 `http://<host>/chat-api/`（`$host` 不含端口），浏览器跟到 80 端口，页面报「无法连接数据服务」（deploy/nginx.docker.conf 已含两条）。
 - Supabase RPC 参数名必须与 schema 定义精确匹配（带 `p_` 前缀），名字不对会被静默忽略且失败被 catch 吞掉——排行榜统计恒为 0 的典型根因。
 
 ---
@@ -370,6 +390,16 @@ server {
     }
 
     # 对话服务反代（SSE 流式必需的两项：关缓冲、拉长读超时）
+    # 注意：前端 chatEndpoint 是无尾斜杠的 /chat-api，必须加这条精确匹配——
+    # 否则它会落到 location / 的 try_files 被 301 到 http://<host>/chat-api/（丢端口），浏览器跟错端口直接连不上
+    location = /chat-api {
+        proxy_pass http://127.0.0.1:8788/;
+        proxy_http_version 1.1;
+        proxy_set_header Connection "";
+        proxy_buffering off;
+        proxy_read_timeout 600s;
+    }
+
     location /chat-api/ {
         proxy_pass http://127.0.0.1:8788/;   # 末尾斜杠 = 去掉 /chat-api 前缀
         proxy_http_version 1.1;
@@ -413,6 +443,7 @@ curl http://127.0.0.1:8788/models
 
 # 2. 经 nginx 代理正常（应返回同样的 JSON）
 curl http://your-domain.com/chat-api/models
+curl http://your-domain.com/chat-api        # 无尾斜杠也要 200 且不带 301——前端实际走这个路径
 
 # 3. 页面可访问且模型下拉有值
 #    浏览器打开 http://your-domain.com/ ，发一条消息能看到流式回复即全部打通
