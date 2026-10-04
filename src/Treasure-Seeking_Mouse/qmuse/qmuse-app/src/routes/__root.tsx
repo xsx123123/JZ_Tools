@@ -1,5 +1,7 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Link, Outlet, createRootRouteWithContext } from "@tanstack/react-router";
+import { useLayoutEffect } from "react";
+import { initRevealEngine } from "@/lib/reveal-engine";
 
 function NotFoundComponent() {
   return (
@@ -55,6 +57,11 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
 
 function RootRoute() {
   const { queryClient } = Route.useRouteContext();
+
+  // 全局滚动渐入引擎：业务组件用 reveal / data-reveal 类即可，MutationObserver 自动接管
+  useLayoutEffect(() => {
+    initRevealEngine();
+  }, []);
 
   return (
     <QueryClientProvider client={queryClient}>

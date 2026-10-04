@@ -3,13 +3,9 @@ import React from "react";
 import ReactDOM from "react-dom/client";
 import { RouterProvider } from "@tanstack/react-router";
 import { getRouter } from "./router";
-import { initRevealEngine } from "./lib/reveal-engine";
 import "./styles.css";
 
 const router = getRouter();
-
-// 全局滚动渐入引擎：业务组件用 reveal / data-reveal 类即可，需早于首帧渲染启动
-initRevealEngine();
 
 function reportFatalReactError(
   error: unknown,

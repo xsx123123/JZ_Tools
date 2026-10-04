@@ -9,3 +9,7 @@ dist
 # 需求沟通用的临时截图，不入库
 截屏*.png
 *.tsbuildinfo
+
+# QMuse CLI 本地状态与导入诊断产物
+.qoder/
+.qmuse/import-errors/
