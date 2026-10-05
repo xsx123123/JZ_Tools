@@ -1,0 +1,671 @@
+/* 【小程序版】已移除：Tailwind v4 指令（@import "tailwindcss"/@source/@theme）、
+   Web 字体 @import（小程序用系统字体）。保留 :root / .dark 两套 token。 */
+/* 【小程序版】由主仓库 src/styles.css 转换而来
+   1) 全部 114 处 oklch() 已按 CSS Color 4 定义转成 rgb()/rgba()
+      （小程序低版本 WebView 不认 oklch，会整条声明失效）
+   2) WXSS 不支持带参伪类：:nth-child(even) 需人工改为显式类名（见文件内 TODO 注记）
+   3) 属性选择器本文件原本就没有，无需处理
+*/
+
+/* 字体本地化托管（@fontsource，不依赖外部 CDN） */
+
+/* 主题：亮色 :root + 夜探矿洞 .dark 两套 */
+
+:root {
+  --radius: 0.5rem;
+  --font-sans: "Noto Sans SC Variable", "PingFang SC", "Microsoft YaHei", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", "SFMono-Regular", ui-monospace, Menlo, Consolas, monospace;
+  --font-display: "Fraunces", "Noto Serif SC", Georgia, serif;
+
+  /* gray-50 画布 + 纯白内容面 + teal-600 强调 */
+  --background: rgb(249, 250, 251);          /* #F9FAFB */
+  --foreground: rgb(18, 24, 36);            /* #111827 */
+  --card: rgb(255, 255, 255);                              /* #FFFFFF */
+  --card-foreground: rgb(18, 24, 36);
+  --popover: rgb(255, 255, 255);
+  --popover-foreground: rgb(18, 24, 36);
+  --primary: rgb(0, 150, 137);               /* #0D9488 teal-600 */
+  --primary-foreground: rgb(249, 250, 251);
+  --secondary: rgb(243, 244, 246);           /* #F3F4F6 */
+  --secondary-foreground: rgb(18, 24, 36);
+  --muted: rgb(243, 244, 246);               /* gray-100 */
+  --muted-foreground: rgb(106, 114, 125);          /* #4B5563 一档 */
+  --accent: rgb(241, 245, 249);              /* hover 浅 slate */
+  --accent-foreground: rgb(18, 24, 36);
+  --destructive: rgb(215, 53, 47);               /* red-600 档 */
+  --destructive-foreground: rgb(249, 250, 251);
+  --border: rgb(227, 229, 232);               /* #E5E7EB */
+  --input: rgb(227, 229, 232);
+  --ring: rgba(0, 150, 137, 0.35);
+
+  /* 自定义语义色 */
+  --helix: rgb(0, 150, 137);                 /* teal-600 */
+  --helix-soft: rgb(228, 246, 243);                /* teal-50 */
+  --strand: rgb(0, 117, 144);                     /* 沉稳青蓝（RNA） */
+  --panel: rgb(243, 244, 246);               /* 侧栏/头部 gray-100 */
+
+  /* 寻宝琥珀金点缀（桌宠/空态/宝箱彩蛋专用） */
+  --pet-amber: rgb(218, 149, 11);                  /* 琥珀金 */
+  --pet-amber-deep: rgb(164, 94, 0);             /* 深琥珀（文字档） */
+  --pet-gold-soft: rgb(255, 242, 210);            /* 浅金底 */
+}
+
+/* 夜探矿洞：深蓝灰底、卡片亮一档、teal/琥珀金提亮发光 */
+.dark {
+  --background: rgb(11, 16, 22);
+  --foreground: rgb(227, 233, 238);
+  --card: rgb(22, 28, 36);
+  --card-foreground: rgb(227, 233, 238);
+  --popover: rgb(25, 32, 40);
+  --popover-foreground: rgb(227, 233, 238);
+  --primary: rgb(20, 189, 173);                  /* teal-400 档，暗底更亮 */
+  --primary-foreground: rgb(8, 19, 25);
+  --secondary: rgb(33, 39, 47);
+  --secondary-foreground: rgb(227, 233, 238);
+  --muted: rgb(33, 39, 47);
+  --muted-foreground: rgb(152, 163, 174);
+  --accent: rgb(39, 47, 56);
+  --accent-foreground: rgb(227, 233, 238);
+  --destructive: rgb(247, 93, 89);
+  --destructive-foreground: rgb(5, 15, 20);
+  --border: rgb(47, 54, 63);
+  --input: rgb(47, 54, 63);
+  --ring: rgba(20, 189, 173, 0.4);
+
+  --helix: rgb(20, 189, 173);
+  --helix-soft: rgb(12, 41, 40);
+  --strand: rgb(87, 172, 197);
+  --panel: rgb(19, 25, 32);
+
+  --pet-amber: rgb(235, 170, 45);
+  --pet-amber-deep: rgb(248, 197, 98);             /* 暗底上"深琥珀"反转为亮金文字档 */
+  --pet-gold-soft: rgb(61, 42, 2);
+}
+
+@layer base {
+  * {
+    border-color: var(--color-border);
+  }
+
+  html,
+  body {
+    height: 100%;
+  }
+
+  body {
+    background-color: var(--color-background);
+    color: var(--color-foreground);
+    font-family: var(--font-sans);
+  }
+
+  ::selection {
+    background: rgba(0, 150, 137, 0.18);
+  }
+  .dark ::selection {
+    background: rgba(20, 189, 173, 0.3);
+  }
+
+  /* 细滚动条 */
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: rgb(206, 209, 212);
+    border-radius: 8px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: rgb(169, 175, 180);
+  }
+  .dark ::-webkit-scrollbar-thumb {
+    background: rgb(54, 62, 72);
+  }
+  .dark ::-webkit-scrollbar-thumb:hover {
+    background: rgb(78, 86, 96);
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+}
+
+/* ---------- 全局装饰与动效 token ---------- */
+
+/* 极淡纸感底纹（亮色下几乎不可见，避免发脏） */
+.bg-grid {
+  background-image:
+    linear-gradient(rgba(105, 115, 125, 0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(105, 115, 125, 0.035) 1px, transparent 1px);
+  background-size: 42px 42px;
+}
+
+/* 顶部极淡 teal 晕染 */
+.ambient-glow {
+  background:
+    radial-gradient(60% 45% at 18% 0%, rgba(0, 150, 137, 0.05) 0%, transparent 60%),
+    radial-gradient(50% 40% at 85% 8%, rgba(0, 117, 144, 0.045) 0%, transparent 65%);
+}
+
+/* 统一轻投影体系 */
+.shadow-soft {
+  box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.04), 0 1px 2px -1px rgb(0 0 0 / 0.04);
+}
+.shadow-soft-lg {
+  box-shadow: 0 4px 16px -6px rgb(0 0 0 / 0.08), 0 1px 3px 0 rgb(0 0 0 / 0.04);
+}
+.dark .shadow-soft {
+  box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.3), 0 1px 2px -1px rgb(0 0 0 / 0.3);
+}
+.dark .shadow-soft-lg {
+  box-shadow: 0 4px 18px -6px rgb(0 0 0 / 0.5), 0 1px 3px 0 rgb(0 0 0 / 0.35);
+}
+
+/* 打字光标 */
+@keyframes caret-blink {
+  0%, 55% { opacity: 1; }
+  56%, 100% { opacity: 0; }
+}
+.typing-caret::after {
+  content: "";
+  display: inline-block;
+  width: 0.55em;
+  height: 1.05em;
+  margin-left: 2px;
+  vertical-align: text-bottom;
+  background: var(--color-helix);
+  animation: caret-blink 1s steps(1) infinite;
+}
+
+/* 工具执行中的扫描线（teal 淡扫） */
+@keyframes scan-sweep {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(220%); }
+}
+.scan-line {
+  position: relative;
+  overflow: hidden;
+}
+.scan-line::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  width: 45%;
+  background: linear-gradient(90deg, transparent, rgba(0, 150, 137, 0.14), transparent);
+  animation: scan-sweep 1.4s ease-in-out infinite;
+}
+
+/* 卡片入场 */
+@keyframes card-in {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: none; }
+}
+.card-in {
+  animation: card-in 0.35s ease-out both;
+}
+
+/* hover 微抬（中性黑低透明阴影） */
+.hover-lift {
+  transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
+}
+.hover-lift:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 24px -12px rgb(0 0 0 / 0.14), 0 2px 6px -2px rgb(0 0 0 / 0.05);
+}
+
+/* 链接下划线展开 */
+.story-link {
+  position: relative;
+}
+.story-link::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -2px;
+  height: 1px;
+  background: currentColor;
+  transform: scaleX(0);
+  transform-origin: bottom right;
+  transition: transform 0.3s ease;
+}
+.story-link:hover::after {
+  transform: scaleX(1);
+  transform-origin: bottom left;
+}
+
+/* v2.1 正文内嵌编号链接（teal 主色 + hover 下划线展开，双主题自适应）
+   注：原用 color-mix(in oklch, ...) 生成半透明主色，小程序不支持 → 直接写死 rgba 等价色 */
+.id-link {
+  position: relative;
+  color: var(--color-helix);
+  text-decoration: none;
+  border-bottom: 1px dashed rgba(0, 150, 137, 0.45);
+  transition: color 0.2s ease, border-color 0.2s ease;
+}
+.id-link:hover,
+.id-link:focus-visible {
+  color: var(--color-helix);
+  border-bottom-color: var(--color-helix);
+  border-bottom-style: solid;
+}
+
+/* Markdown 消息排版（亮色档） */
+.md-body {
+  line-height: 1.75;
+  word-break: break-word;
+}
+.md-body p { margin: 0.35em 0; }
+.md-body p:first-child { margin-top: 0; }
+.md-body p:last-child { margin-bottom: 0; }
+.md-body strong { color: rgb(0, 128, 116); font-weight: 600; }
+.md-body em { color: var(--color-strand); font-style: normal; }
+.md-body del { color: var(--color-muted-foreground); }
+.md-body h1, .md-body h2, .md-body h3 {
+  font-weight: 700;
+  margin: 0.8em 0 0.35em;
+  letter-spacing: 0.01em;
+  color: var(--color-foreground);
+}
+.md-body h1 { font-size: 1.15em; }
+.md-body h2 { font-size: 1.08em; }
+.md-body h3 { font-size: 1.02em; }
+.md-body ul, .md-body ol {
+  margin: 0.4em 0;
+  padding-left: 1.4em;
+}
+.md-body ul { list-style: disc; }
+.md-body ol { list-style: decimal; }
+.md-body li { margin: 0.2em 0; }
+.md-body li::marker { color: var(--color-helix); }
+.md-body code {
+  font-family: var(--font-mono);
+  font-size: 0.86em;
+  background: rgb(243, 244, 246);
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  padding: 0.08em 0.4em;
+  color: rgb(51, 74, 98);
+}
+.md-body pre {
+  background: rgb(248, 249, 250);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  padding: 0.8em 1em;
+  overflow-x: auto;
+  margin: 0.5em 0;
+}
+.md-body pre code {
+  background: transparent;
+  border: none;
+  padding: 0;
+  color: rgb(35, 52, 71);
+}
+.dark .md-body strong { color: rgb(74, 197, 182); }
+.dark .md-body code {
+  background: rgb(33, 39, 47);
+  color: rgb(175, 202, 204);
+}
+.dark .md-body pre {
+  background: rgb(17, 22, 29);
+}
+.dark .md-body pre code {
+  color: rgb(204, 213, 222);
+}
+.dark .md-body th {
+  background: rgb(33, 39, 47);
+  color: rgb(74, 197, 182);
+}
+/* WXSS 不支持 :nth-child(even)（带参伪类），改为显式类名 .row-even，由渲染层在生成表格行时打标 */
+.dark .md-body tbody tr.row-even {
+  background: rgb(20, 25, 31);
+}
+.md-body blockquote {
+  border-left: 3px solid var(--color-helix);
+  margin: 0.5em 0;
+  padding: 0.15em 0 0.15em 0.9em;
+  color: var(--color-muted-foreground);
+  background: var(--color-helix-soft);
+}
+.md-body a {
+  color: var(--color-strand);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.md-body a:hover { color: var(--color-helix); }
+.md-body hr {
+  border: none;
+  border-top: 1px dashed var(--color-border);
+  margin: 0.8em 0;
+}
+.md-body table {
+  border-collapse: collapse;
+  margin: 0.5em 0;
+  font-size: 0.92em;
+}
+.md-body th, .md-body td {
+  border: 1px solid var(--color-border);
+  padding: 0.3em 0.7em;
+}
+.md-body th {
+  background: rgb(243, 244, 246);
+  color: rgb(0, 128, 116);
+}
+/* 同上：条纹表格由渲染层打 .row-even */
+.md-body tbody tr.row-even {
+  background: rgb(248, 249, 250);
+}
+
+/* 代码块：语言标签 + highlight.js 亮色配色（GitHub-light 取向） */
+.code-block {
+  position: relative;
+  margin: 0.6em 0;
+}
+.code-block pre {
+  margin: 0;
+}
+.code-block::before {
+  content: attr(data-lang);
+  position: absolute;
+  top: 6px;
+  right: 10px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: rgb(154, 159, 164);
+}
+.hljs-comment, .hljs-quote { color: rgb(138, 144, 149); font-style: italic; }
+.hljs-keyword, .hljs-selector-tag, .hljs-literal { color: rgb(109, 65, 169); }
+.hljs-string, .hljs-addition { color: rgb(9, 103, 46); }
+.hljs-number, .hljs-regexp, .hljs-template-variable { color: rgb(168, 55, 42); }
+.hljs-title, .hljs-title.function_, .hljs-section { color: rgb(0, 79, 139); }
+.hljs-variable, .hljs-params, .hljs-attr, .hljs-selector-class { color: rgb(0, 100, 105); }
+.hljs-built_in, .hljs-type { color: rgb(0, 112, 142); }
+.hljs-symbol, .hljs-bullet, .hljs-link { color: rgb(0, 128, 116); }
+.hljs-deletion { color: var(--color-destructive); }
+.hljs-meta { color: rgb(124, 129, 134); }
+
+/* highlight.js 夜色档（GitHub-dark 取向） */
+.dark .code-block::before { color: rgb(107, 114, 122); }
+.dark .hljs-comment, .dark .hljs-quote { color: rgb(107, 114, 122); }
+.dark .hljs-keyword, .dark .hljs-selector-tag, .dark .hljs-literal { color: rgb(209, 159, 245); }
+.dark .hljs-string, .dark .hljs-addition { color: rgb(118, 207, 138); }
+.dark .hljs-number, .dark .hljs-regexp, .dark .hljs-template-variable { color: rgb(244, 162, 92); }
+.dark .hljs-title, .dark .hljs-title.function_, .dark .hljs-section { color: rgb(133, 188, 245); }
+.dark .hljs-variable, .dark .hljs-params, .dark .hljs-attr, .dark .hljs-selector-class { color: rgb(83, 193, 199); }
+.dark .hljs-built_in, .dark .hljs-type { color: rgb(78, 190, 222); }
+.dark .hljs-symbol, .dark .hljs-bullet, .dark .hljs-link { color: rgb(74, 197, 182); }
+.dark .hljs-meta { color: rgb(122, 129, 137); }
+
+/* ---------- 寻宝鼠桌宠 ---------- */
+
+@keyframes pet-bob {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  50% { transform: translateY(-4px) rotate(-1.5deg); }
+}
+.pet-idle { animation: pet-bob 2.8s ease-in-out infinite; }
+
+@keyframes pet-wiggle {
+  0%, 100% { transform: rotate(0deg); }
+  25% { transform: rotate(-7deg); }
+  75% { transform: rotate(7deg); }
+}
+.pet-poke { animation: pet-wiggle 0.35s ease-in-out 2; }
+
+@keyframes pet-dig {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  30% { transform: translateY(3px) rotate(10deg); }
+  60% { transform: translateY(1px) rotate(4deg); }
+}
+.pet-digging { animation: pet-dig 0.5s ease-in-out infinite; }
+
+@keyframes pet-hop {
+  0%, 100% { transform: translateY(0) scale(1, 1); }
+  30% { transform: translateY(-14px) scale(0.96, 1.05); }
+  55% { transform: translateY(0) scale(1.06, 0.94); }
+  75% { transform: translateY(-6px) scale(1, 1); }
+}
+.pet-reveal { animation: pet-hop 0.7s cubic-bezier(0.34, 1.56, 0.64, 1) 2; }
+
+@keyframes pet-sag {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  40% { transform: translateY(2px) rotate(-3deg); }
+}
+.pet-miss { animation: pet-sag 1.6s ease-in-out infinite; }
+
+@keyframes dust-puff {
+  0% { opacity: 0; transform: translate(0, 0) scale(0.4); }
+  25% { opacity: 0.9; }
+  100% { opacity: 0; transform: translate(var(--dx, 10px), -18px) scale(1.4); }
+}
+.pet-dust {
+  position: absolute;
+  bottom: 6px;
+  left: 50%;
+  width: 7px;
+  height: 7px;
+  border-radius: 9999px;
+  background: rgba(185, 160, 131, 0.7);
+  animation: dust-puff 0.6s ease-out infinite;
+}
+.dark .pet-dust {
+  background: rgba(152, 122, 89, 0.8);
+}
+
+@keyframes gem-rise {
+  0% { opacity: 0; transform: translateY(14px) scale(0.5) rotate(-20deg); }
+  60% { opacity: 1; transform: translateY(-6px) scale(1.15) rotate(8deg); }
+  100% { opacity: 1; transform: translateY(0) scale(1) rotate(0deg); }
+}
+.pet-gem { animation: gem-rise 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) both; }
+
+@keyframes bubble-in {
+  from { opacity: 0; transform: translateY(6px) scale(0.85); }
+  to { opacity: 1; transform: none; }
+}
+.pet-bubble {
+  animation: bubble-in 0.25s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+/* 桌宠脚下土堆 */
+.pet-mound {
+  position: absolute;
+  bottom: -2px;
+  left: 50%;
+  width: 46px;
+  height: 13px;
+  margin-left: -23px;
+  border-radius: 9999px 9999px 6px 6px;
+  background: linear-gradient(180deg, rgb(201, 155, 101), rgb(152, 100, 56));
+  box-shadow: inset 0 -2px 3px rgba(104, 59, 24, 0.4);
+}
+
+@keyframes think-dot {
+  0%, 60%, 100% { opacity: 0.25; transform: translateY(0); }
+  30% { opacity: 1; transform: translateY(-2px); }
+}
+.pet-think i {
+  display: inline-block;
+  width: 3px;
+  height: 3px;
+  margin: 0 1px;
+  border-radius: 9999px;
+  background: currentColor;
+  animation: think-dot 1.1s ease-in-out infinite;
+}
+/* :nth-child(2)/(3) 是带参伪类，WXSS 不支持，改为显式类名 .dot-2 / .dot-3 */
+.pet-think .dot-2 { animation-delay: 0.15s; }
+.pet-think .dot-3 { animation-delay: 0.3s; }
+
+@keyframes mound-open {
+  0% { transform: scaleY(1); }
+  40% { transform: scaleY(0.72); }
+  100% { transform: scaleY(1); }
+}
+.pet-mound-pop { animation: mound-open 0.5s ease-out; transform-origin: bottom center; }
+
+/* 宝箱入袋（reveal 收尾时飞向身旁宝箱） */
+@keyframes gem-stow {
+  0% { opacity: 1; transform: translateY(0) scale(1); }
+  100% { opacity: 0; transform: translate(26px, 34px) scale(0.3); }
+}
+.pet-gem-stow { animation: gem-stow 0.5s ease-in both; }
+
+/* 连击转圈 */
+@keyframes pet-spin {
+  0% { transform: rotate(0deg) scale(1); }
+  40% { transform: rotate(200deg) scale(1.06); }
+  100% { transform: rotate(360deg) scale(1); }
+}
+.pet-spin { animation: pet-spin 0.7s cubic-bezier(0.45, 0, 0.55, 1) 1; }
+
+/* 散步左右挪步 */
+@keyframes pet-waddle {
+  0%, 100% { transform: rotate(0deg) translateX(0); }
+  25% { transform: rotate(-4deg) translateX(-2px); }
+  75% { transform: rotate(4deg) translateX(2px); }
+}
+.pet-walk { animation: pet-waddle 0.5s ease-in-out infinite; }
+
+/* 张望探头 */
+@keyframes pet-peek {
+  0%, 100% { transform: translateX(0) rotate(0deg); }
+  30% { transform: translateX(-6px) rotate(-4deg); }
+  70% { transform: translateX(6px) rotate(4deg); }
+}
+.pet-look { animation: pet-peek 1.6s ease-in-out 2; }
+
+/* 爱心/星星飘起 */
+@keyframes heart-float {
+  0% { opacity: 0; transform: translate(0, 0) scale(0.4); }
+  20% { opacity: 1; }
+  100% { opacity: 0; transform: translate(var(--hx, 8px), -34px) scale(1.1); }
+}
+.pet-heart {
+  position: absolute;
+  top: 6px;
+  left: 50%;
+  font-size: 13px;
+  line-height: 1;
+  color: var(--color-pet-amber);
+  animation: heart-float 0.9s ease-out both;
+}
+
+/* 宝箱计数徽章弹跳 */
+@keyframes chest-pop {
+  0% { transform: scale(0.4) rotate(-8deg); }
+  60% { transform: scale(1.18) rotate(3deg); }
+  100% { transform: scale(1) rotate(0deg); }
+}
+.pet-chest-pop { animation: chest-pop 0.45s cubic-bezier(0.34, 1.56, 0.64, 1) both; }
+
+/* 空态金色装饰光斑 */
+.gold-glow {
+  box-shadow: 0 6px 20px -8px rgba(218, 149, 11, 0.55), 0 1px 3px 0 rgb(0 0 0 / 0.05);
+}
+.dark .gold-glow {
+  box-shadow: 0 6px 24px -6px rgba(235, 170, 45, 0.45), 0 1px 3px 0 rgb(0 0 0 / 0.3);
+}
+
+/* ---------- 夜探矿洞：暗色下装饰覆盖 ---------- */
+.dark .bg-grid {
+  background-image:
+    linear-gradient(rgba(144, 161, 177, 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(144, 161, 177, 0.05) 1px, transparent 1px);
+}
+.dark .ambient-glow {
+  background:
+    radial-gradient(60% 45% at 18% 0%, rgba(20, 189, 173, 0.08) 0%, transparent 60%),
+    radial-gradient(50% 40% at 85% 8%, rgba(87, 172, 197, 0.07) 0%, transparent 65%);
+}
+.dark .scan-line::after {
+  background: linear-gradient(90deg, transparent, rgba(20, 189, 173, 0.16), transparent);
+}
+.dark .hover-lift:hover {
+  box-shadow: 0 10px 24px -12px rgb(0 0 0 / 0.55), 0 2px 6px -2px rgb(0 0 0 / 0.35);
+}
+.dark .pet-mound {
+  background: linear-gradient(180deg, rgb(134, 96, 50), rgb(93, 57, 23));
+  box-shadow: inset 0 -2px 3px rgba(52, 26, 7, 0.5);
+}
+.dark .pet-bubble {
+  box-shadow: 0 2px 10px rgb(0 0 0 / 0.4);
+}
+
+/* ---------- 成就里程碑庆祝 ---------- */
+@keyframes milestone-burst {
+  0% { opacity: 0; transform: translate(-50%, -50%) scale(0.2); }
+  30% { opacity: 1; }
+  100% { opacity: 0; transform: translate(calc(-50% + var(--mx, 0px)), calc(-50% + var(--my, -30px))) scale(1.1); }
+}
+.pet-burst {
+  position: absolute;
+  top: 40%;
+  left: 50%;
+  font-size: 14px;
+  line-height: 1;
+  color: var(--color-pet-amber);
+  animation: milestone-burst 1.1s ease-out both;
+}
+
+@keyframes celebrate-jump {
+  0%, 100% { transform: translateY(0) rotate(0deg) scale(1); }
+  25% { transform: translateY(-16px) rotate(-6deg) scale(1.05); }
+  50% { transform: translateY(0) rotate(0deg) scale(0.98, 1.04); }
+  75% { transform: translateY(-12px) rotate(6deg) scale(1.05); }
+}
+.pet-celebrate { animation: celebrate-jump 0.9s ease-in-out infinite; }
+
+@keyframes halo-ring {
+  0% { opacity: 0.8; transform: translate(-50%, -50%) scale(0.3); }
+  100% { opacity: 0; transform: translate(-50%, -50%) scale(1.6); }
+}
+.pet-halo {
+  position: absolute;
+  top: 45%;
+  left: 50%;
+  width: 90px;
+  height: 90px;
+  border-radius: 9999px;
+  border: 2px solid var(--color-pet-amber);
+  animation: halo-ring 1.2s ease-out infinite;
+}
+
+@keyframes banner-in {
+  0% { opacity: 0; transform: translateY(10px) scale(0.8); }
+  12% { opacity: 1; transform: none; }
+  88% { opacity: 1; transform: none; }
+  100% { opacity: 0; transform: translateY(-8px) scale(0.9); }
+}
+.pet-banner {
+  animation: banner-in 4.2s ease-in-out both;
+}
+
+@keyframes badge-in {
+  0% { opacity: 0; transform: scale(0.3) rotate(-30deg); }
+  60% { transform: scale(1.25) rotate(6deg); }
+  100% { opacity: 1; transform: scale(1) rotate(0deg); }
+}
+.pet-badge-in { animation: badge-in 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) both; }
+
+@media (prefers-reduced-motion: reduce) {
+  .pet-idle, .pet-digging, .pet-reveal, .pet-miss, .pet-dust, .pet-poke,
+  .pet-spin, .pet-walk, .pet-look, .pet-heart, .pet-chest-pop,
+  .pet-burst, .pet-celebrate, .pet-halo, .pet-banner, .pet-badge-in { animation: none; }
+}
+
+/* ---------- 移动端适配 ---------- */
+
+/* 安全区（全面屏 / 刘海屏）：需 index.html 的 viewport-fit=cover 才生效。
+   用 max(设计基线, env) 而非纯 env：无刘海设备取基线（与 py-2.5 / py-3 一致，视觉不变），
+   有刘海时才多出让位空间。基线值与对应元素的原 padding 保持一致。
+   横向（safe-x）不单独处理：竖屏无影响，横屏时内容区自身已有 px-4 缓冲。 */
+.safe-t { padding-top: max(0.625rem, env(safe-area-inset-top)); }    /* header 原 py-2.5 */
+.safe-b { padding-bottom: max(0.75rem, env(safe-area-inset-bottom)); } /* composer 原 py-3 */
+
+/* 触摸端禁用点击高亮与长按系统菜单，避免对话气泡被选中弹菜单 */
+@media (hover: none) {
+  .touch-clean {
+    -webkit-tap-highlight-color: transparent;
+    -webkit-touch-callout: none;
+  }
+}
