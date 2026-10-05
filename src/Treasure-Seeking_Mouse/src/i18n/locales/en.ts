@@ -27,11 +27,16 @@ export const en = {
 
   // ---- 会话栏 ----
   "sidebar.newChat": "New chat",
+  "sidebar.compass": "compass ready",
+  "sidebar.visualMode": "Appearance",
+  "sidebar.day": "Daylight",
+  "sidebar.night": "Night dig",
+  "sidebar.uiLang": "Language",
+  "sidebar.guestContinue": "Continue as guest",
   "sidebar.empty": "No sessions yet",
   "sidebar.rename": "Rename",
   "sidebar.delete": "Delete",
   "sidebar.logout": "Sign out",
-  "sidebar.login": "Sign in / Sign up (sync history)",
   "sidebar.listTitle": "Sessions",
   "sidebar.guestNote":
     "Guest records are saved in this browser only: up to {n} chats, kept for {d} days{loginSuffix}",

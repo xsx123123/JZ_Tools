@@ -26,11 +26,16 @@ export const zh = {
 
   // ---- 会话栏 ----
   "sidebar.newChat": "新建对话",
+  "sidebar.compass": "探矿罗盘已就位",
+  "sidebar.visualMode": "视觉模式",
+  "sidebar.day": "白昼",
+  "sidebar.night": "夜探矿洞",
+  "sidebar.uiLang": "界面语言",
+  "sidebar.guestContinue": "以游客身份继续",
   "sidebar.empty": "暂无历史会话",
   "sidebar.rename": "重命名",
   "sidebar.delete": "删除",
   "sidebar.logout": "退出",
-  "sidebar.login": "登录 / 注册（同步历史）",
   "sidebar.listTitle": "会话列表",
   "sidebar.guestNote":
     "游客记录仅保存在本浏览器：最多 {n} 条会话，保留 {d} 天{loginSuffix}",
