@@ -85,6 +85,16 @@ function AboutPage(): React.ReactElement {
           <img src={introImg} alt={t("brand.full")} loading="lazy" className="block w-full" draggable={false} />
         </div>
 
+        {/* 立意（与 README「为什么做这只寻宝鼠」一节对齐） */}
+        <section className={sectionCls}>
+          <h2 className={h2Cls}>
+            <PawPrint size={16} className="text-pet-amber-deep" /> {t("about.why")}
+          </h2>
+          <p className="mt-2 text-[13px] font-medium leading-relaxed text-foreground/85">{t("about.why.1")}</p>
+          <p className="mt-2 text-[12.5px] leading-relaxed text-muted-foreground">{t("about.why.2")}</p>
+          <p className="mt-2 text-[12.5px] leading-relaxed text-muted-foreground">{t("about.why.3")}</p>
+        </section>
+
         {/* 核心亮点（与 README 功能一览逐条对齐） */}
         <section className={sectionCls}>
           <h2 className={h2Cls}>

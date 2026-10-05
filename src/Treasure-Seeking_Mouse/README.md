@@ -19,6 +19,14 @@
 
 ![Cover · Night in the mine](docs/寻宝鼠.png)
 
+### Why we built the treasure mouse
+
+**OmicsTreasure Hunter** helps research newcomers leave behind the cold, labyrinthine bioinformatics databases of the past — through a personified "prospecting for treasure" interaction, it punches through the GEO / SRA / ENA / GSA data universe in one step.
+
+For first-year graduate students, what drains their passion for science is usually not the experiments — it's the blind wandering through icy, hostile database mazes at the very start: can't find the right samples, can't decode the accessions, can't locate the literature. Step one becomes self-doubt and burnout. OmicsTreasure Hunter exists to rescue researchers from that dreary, oppressive first step of data hunting.
+
+Here, research is no longer a lonely solo grind, and there is no cold wall of code between you and the data. Just chat about your project ideas the way you'd talk with a labmate — the desk pet "A-Xun" (阿寻) puts on its miner's helmet, dives into the data lodes, and gleefully digs out the golden datasets and key papers that best match your direction, delivering tidy sample cards right to your hands. Every search is a small adventure — less anxiety at the start of your research journey, more of the pure joy of exploration and steady companionship.
+
 **UI preview** (self-hosted mode + DeepSeek model, running as a guest):
 
 ![UI](docs/geo寻宝鼠.gif)
