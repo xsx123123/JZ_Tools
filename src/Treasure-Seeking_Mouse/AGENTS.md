@@ -9,9 +9,10 @@
 - **关于页跟 README**：`src/routes/about.tsx` 是 README 的应用内镜像（核心亮点 / seqout-mcp 后端 / 自托管 / 技术栈 / 致谢）。README 改了这几节，关于页对应改，文案落在 `src/i18n/locales/{zh,en}.ts` 的 `about.*` 键，**中英两份字典同时加**（zh 是键的权威来源，缺 en 键会静默回退中文）。seqout-mcp 段与致谢图标行（`src/assets/badges/`，拷贝自 `docs/badges/`）易漏。
 - **i18n 键约定**：新增界面文案一律走 `t("key")`，不写死在组件里；错误提示若在 service 层（非组件）用 `translate(readLang(), "key")`。改完跑 `npx tsc --noEmit`（键名打错会报错）+ `npx vite build`，并核对 zh/en 键数一致。
 
-## 微信小程序版（调研中，无代码）
-- `weixin/` 是**微信小程序版**的工作区，目前**只有调研文档、尚未落地代码**。可行性判断见 `weixin/README.md`（平台约束、Taro 选型、资产映射、实施步骤、待确认清单），开发约束见 `weixin/AGENTS.md`。
-- 关键结论：小程序**无 DOM**，`src/components/**`、`src/routes/**`、`src/components/ui/`（46 个 shadcn + 26 个 `@radix-ui/*`）**不能复用**；`src/i18n/`、`src/lib/linkify.ts` 等纯逻辑层可原样搬。动手前先复核 `weixin/README.md` 第九节的「待确认清单」。
+## 微信小程序版（Taro + React，首轮已落地）
+- `weixin/` 是**微信小程序版**工作区，已落地首轮可编译工程（Taro 4.3 + React 18）。可行性调研见 `weixin/README.md`，文件级映射与踩坑见 `weixin/MIGRATION.md`，开发硬约束见 `weixin/AGENTS.md`。
+- 关键结论：小程序**无 DOM**，`src/components/**`、`src/routes/**`、`src/components/ui/`（46 个 shadcn + 26 个 `@radix-ui/*`）**不能复用**；`src/i18n/`、`src/lib/linkify.ts` 等纯逻辑层已原样搬入（i18n 仅 3 个平台函数有差异）。
+- ⚠️ **尚未在微信开发者工具/真机验证**：`onChunkReceived` 流式是最关键未验证项（见 `weixin/README.md` 第九节）。扩展前先实测。
 
 ## 依赖
 - `@supabase/supabase-js`：云服务客户端（Auth / Database），仅通过 `src/supabase/client.ts` 生成的单例使用。

@@ -1,31 +1,53 @@
 # AGENTS.md · weixin（微信小程序版）
 
-本目录是 **GEO寻宝鼠微信小程序版**的工作区。**当前状态：仅有调研文档，尚未落地代码。**
-落地方案见 [`README.md`](README.md)，本文件是给后续开发者的**硬约束**。
+本目录是 **GEO寻宝鼠微信小程序版**的工作区。
+落地方案见 [`README.md`](README.md)；**已落地的内容与踩坑见 [`MIGRATION.md`](MIGRATION.md)**；
+本文件是给后续开发者的**硬约束**。
 
 ## 状态
 
 - `README.md` — 可行性调研报告（平台约束 / 选型 / 资产映射 / 步骤 / 待确认清单）
-- 代码：**尚未创建**。动手前请先复核 README 第九节「待确认清单」中的项，尤其是流式与 `oklch` 两项。
+- `MIGRATION.md` — **迁移记录**：文件级映射、已做/未做清单、实测结果、踩坑
+- 代码：**已落地首轮**（Taro 4.3 + React 18），可 `npm run typecheck` / `npm run build:weapp`
+- ⚠️ **尚未在微信开发者工具/真机跑过**：`onChunkReceived` 流式是最关键的未验证项
+  （见 README 第九节），动手扩展前先跑一次。
+
+## 常用命令
+
+```bash
+npm install
+npm run build:weapp   # 编译到 dist/，再用微信开发者工具打开本目录
+npm run dev:weapp     # watch 模式
+npm run typecheck     # 必跑：键名/API 名写错会直接报错
+```
 
 ## 与主仓库的关系
 
 - 主仓库（`../`）仍在迭代，小程序版是其**平台适配副本**，性质等同于 `../qmuse/`。
-- 主仓库改动是否需要同步到小程序版，按 [`README.md`](README.md) 第四节的**资产映射表**判断：
-  - **纯逻辑层可原样复用**：`src/i18n/`、`src/lib/linkify.ts`、`src/lib/evidenceBus.ts`
-  - **需适配**：`src/services/*`（请求层 / 存储层）
-  - **必须重写**：`src/components/**`、`src/routes/**`、`src/styles.css`、`src/components/ui/`
+- 同步时按 [`MIGRATION.md`](MIGRATION.md) 的文件级映射表判断「原样复制 / 改写 / 不迁移」。
+- `src/i18n/locales/`、`src/lib/linkify.ts`、`src/lib/evidenceBus.ts` 是**可直接覆盖**的；
+  `src/i18n/index.ts` 仅 3 个平台函数有差异，覆盖后需**回改这 3 处**（见 MIGRATION.md）。
 - ⚠️ **不要把主仓库的 React/DOM 组件直接拷进来**——小程序无 DOM，`@radix-ui/*` 全部不可用。
+- 每轮同步在 `MIGRATION.md` 追加一条 `R<n> — 日期 — 源 commit`。
 
 ## 硬约束（动手后必须遵守）
 
-1. **禁止 `oklch()`**：`src/styles.css` 现有 115 处，小程序低版本 WebView 不认，会整条声明失效。新增样式一律用 hex/rgb，亮暗双套走 CSS 自定义属性。
-2. **禁止属性选择器 `[attr]` 与带参伪类**：官方明确不支持。只用类选择器。
-3. **禁止 `window` / `document` / `localStorage`**：改用 `wx.*` 等价 API。存储用 `wx.getStorageSync` / `wx.setStorageSync`。
-4. **网络**：合法域名必须 **HTTPS + 已备案**；不存在「同源反代」，接口需独立域名。
-5. **分包意识**：主包上限 2MB。Markdown 渲染、高亮库等重依赖必须分包/按需加载。
-6. **i18n 沿用主仓库约定**：文案走 `t("key")`，中英字典同步加，键数保持一致（主仓库现为 218 键，见 `../AGENTS.md`）。
+1. **禁止 `oklch()` / `color-mix()`**：⚠️ 不只在 CSS——`petStore.ts` 的成就渐变是**内联 JS 字符串**，
+   容易漏（首次迁移就漏过一次）。改完用 `grep -rn "oklch(\|color-mix(" src/` 全类型扫一遍。
+2. **禁止属性选择器 `[attr]` 与带参伪类**：官方明确不支持。只用类选择器；
+   `:nth-child(even)` 这类改成渲染层打显式类名（如 `.row-even`）。
+3. **禁止 `window` / `document` / `localStorage`**：存储一律走 `src/services/device.ts`；
+   主题切换走 `applyTheme`（不要直接操作 DOM）。
+4. **禁止 `fetch` / `getReader`**：网络走 `Taro.request`；流式走 `enableChunked` + `onChunkReceived`。
+   注意请求头字段是 **`header`**（单数）。
+5. **网络**：合法域名必须 **HTTPS + 已备案**；不存在「同源反代」，接口需独立域名。
+6. **分包意识**：主包上限 2MB。当前 dist 约 444KB，接 Markdown 渲染库后需重新评估。
+7. **i18n 沿用主仓库约定**：文案走 `t("key")`，中英字典同步加，键数保持一致（当前 218 键）。
 
-## 体例参考
+## 踩坑速查（详见 MIGRATION.md「踩坑记录」）
 
-平台迁移的写法与「同步记录」体例，参照 `../qmuse/MIGRATION.md`：每轮同步记一条 `R<n> — 日期 — 源 commit`。
+- `babel-preset-taro` 未声明 `@babel/preset-react` 依赖 → 需手动装 **7.x**（8.x 会 ERESOLVE）
+- 含 JSX 的文件必须是 `.tsx`（`app.ts` → `app.tsx`）
+- Taro 不认 tsconfig `paths` → 需在 `config/index.ts` 配 `alias`
+- 从主仓库拷 CSS 时，必须剥离 Tailwind v4 指令与 `@fontsource` 导入
+
