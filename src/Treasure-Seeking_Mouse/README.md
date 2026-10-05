@@ -87,3 +87,10 @@ This app is built and deployed on QMuse, and was developed with assistance from 
   <a href="https://www.kimi.com/" target="_blank" rel="noreferrer"><img src="docs/badges/kimi.svg" height="24" alt="Kimi" /></a>&nbsp;&nbsp;
   <a href="https://chat.z.ai/" target="_blank" rel="noreferrer"><img src="docs/badges/zhipu.svg" height="20" alt="GLM · Z.AI" /></a>
 </p>
+
+---
+**Author**: JZHANG | **Version**: GeoMuse_v0.1.0
+
+## 🔗 Links
+- GitHub: [repository](https://github.com/xsx123123/JZ_Tools)
+- LINUX DO: [Announcement](https://linux.do/)
