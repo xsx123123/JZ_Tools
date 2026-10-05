@@ -72,10 +72,13 @@ export function ChatMessage({
   msg,
   onRegenerate,
   onPickSuggestion,
+  linkHint = false,
 }: {
   msg: ChatUIMessage;
   onRegenerate?: (id: string) => void;
   onPickSuggestion?: (q: string) => void;
+  /** 本消息是否参与「任务感叹号」抽签（仅最后一条定稿的助手消息应为 true，历史消息不参与） */
+  linkHint?: boolean;
 }): React.ReactElement {
   const { t } = useI18n();
   const [copied, copy] = useCopy();
@@ -129,7 +132,7 @@ export function ChatMessage({
         ) : null}
         {hasBody ? (
           <div className="rounded-xl rounded-tl-sm border border-border bg-card px-4 py-3 shadow-soft">
-            {main ? <Markdown text={main} hostMessageId={msg.id} allowLinkHint={!msg.streaming} /> : null}
+            {main ? <Markdown text={main} hostMessageId={msg.id} allowLinkHint={linkHint && !msg.streaming} /> : null}
             {!msg.content && msg.streaming ? (
               <span className="text-[13px] text-muted-foreground">{t("msg.thinking")}</span>
             ) : null}

@@ -17,7 +17,9 @@ export type PetEvent =
   | { type: "tool_start"; seq: number }
   | { type: "cards"; count: number; seq: number }
   | { type: "done"; cards: number; seq: number }
-  | { type: "error"; seq: number };
+  | { type: "error"; seq: number }
+  | { type: "hint"; seq: number }
+  | { type: "hint_end"; seq: number };
 
 let petSeq = 0;
 /** 发送方调用：产生带唯一序号的事件，保证同类事件连续触发也能被消费 */
@@ -90,6 +92,7 @@ export function TreasureMouse({ event }: { event: PetEvent | null }): React.Reac
   const stateTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const idleTimer = useRef<ReturnType<typeof setInterval> | null>(null);
   const lastSeq = useRef(0);
+  const hintActiveRef = useRef(false); // hint 剧场是否进行中（hint_end 只收尾 hint，不打扰别的剧场）
   const pokeStreak = useRef<{ n: number; at: number }>({ n: 0, at: 0 });
   const busyRef = useRef(false); // 有剧情在演时，闲置行为让路
   busyRef.current = state !== "idle";
@@ -200,6 +203,23 @@ export function TreasureMouse({ event }: { event: PetEvent | null }): React.Reac
         break;
       case "error":
         transient("miss", pick(L.miss), 2400);
+        break;
+      case "hint":
+        // 新用户发现性提示（lib/hintBus 联动）：阿寻兴奋地挖宝并喊话「那里有宝藏」，
+        // 引导用户去悬停带感叹号的编号；6.5s 兜底回 idle，用户悬停/点开（hint_end）立即收尾
+        hintActiveRef.current = true;
+        transient("digging", t("pet.hintBubble"), 6500, () => {
+          hintActiveRef.current = false;
+        });
+        break;
+      case "hint_end":
+        // 用户已响应提示（悬停/点开编号）：立即收起台词与动作，形成「对话感」
+        if (hintActiveRef.current) {
+          hintActiveRef.current = false;
+          if (stateTimer.current) clearTimeout(stateTimer.current);
+          setState("idle");
+          setBubble(null);
+        }
         break;
       default:
         break;

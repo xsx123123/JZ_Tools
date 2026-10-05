@@ -7,16 +7,19 @@ let fired = false;
 /** 触发一次全屏宝藏烟花（重复调用与已放过的浏览器均为 no-op；?reshow-hint=1 可重置） */
 export function fireTreasureBurst(): void {
   if (fired || typeof document === "undefined") return;
+  let demoMode = false;
   try {
     if (/[?&]reshow-hint=1/.test(location.search)) {
+      // 演示模式：每次都放、不落盘
       localStorage.removeItem("geo-treasure-burst-fired");
       fired = false;
+      demoMode = true;
     }
-    if (localStorage.getItem("geo-treasure-burst-fired")) {
+    if (!demoMode && localStorage.getItem("geo-treasure-burst-fired")) {
       fired = true;
       return;
     }
-    localStorage.setItem("geo-treasure-burst-fired", "1");
+    if (!demoMode) localStorage.setItem("geo-treasure-burst-fired", "1");
   } catch {
     /* 隐私模式下静默失败，但至少本次会话不再放 */
   }

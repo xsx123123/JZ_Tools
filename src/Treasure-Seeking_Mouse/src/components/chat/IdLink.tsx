@@ -9,7 +9,8 @@ import { HoverCard, HoverCardTrigger, HoverCardContent } from "@/components/ui/h
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { linkTypeLabel, type IdMatch } from "@/lib/linkify";
 import { requestEvidence } from "@/lib/evidenceBus";
-import { consumeIdLinkHint } from "@/lib/linkHint";
+import { claimIdLinkHint } from "@/lib/linkHint";
+import { emitHintShown, emitHintDismissed } from "@/lib/hintBus";
 import { fireTreasureBurst } from "@/lib/treasureBurst";
 import { AllowLinkHintContext } from "@/components/chat/Markdown";
 import { copyText } from "@/lib/clipboard";
@@ -33,17 +34,28 @@ export function IdLink({
   const isTouch = useIsTouch();
   // 新用户发现性提示：全站只展示一次（见 lib/linkHint）。消费必须走 effect 且受 AllowLinkHintContext
   // 门控——流式期间 Markdown 树反复重建会卸载重建本组件，useState 初始器会把提示「吃掉」（闪一下就没了）。
+  // 亮起时经 hintBus 通知桌宠讲台词（阿寻：那里有宝藏），不再在链接旁挂独立提示牌。
   const allowHint = useContext(AllowLinkHintContext);
   const [hintOn, setHintOn] = useState(false);
   useEffect(() => {
-    if (!allowHint || hintOn) return;
-    setHintOn(consumeIdLinkHint());
-  }, [allowHint, hintOn]);
+    if (!allowHint || hintOn) return
+    // 参与本轮抽签：消息定稿后由 lib/linkHint 随机选中一个编号点亮（可能不是本组件）
+    claimIdLinkHint(() => {
+      emitHintShown()
+      setHintOn(true)
+    })
+  }, [allowHint, hintOn])
+  const dismissHint = useCallback(() => {
+    setHintOn((cur) => {
+      if (cur) emitHintDismissed()
+      return false
+    })
+  }, [])
   useEffect(() => {
     if (!hintOn) return;
-    const id = setTimeout(() => setHintOn(false), 6000);
+    const id = setTimeout(dismissHint, 6000);
     return () => clearTimeout(id);
-  }, [hintOn]);
+  }, [hintOn, dismissHint]);
   // 浮层自动预取的论文元数据（loading 骨架 → 标题/期刊/年份；not_found 显示提示）
   const [lit, setLit] = useState<LiteratureCardDTO | null>(null);
   const [litState, setLitState] = useState<"idle" | "loading" | "done">("idle");
@@ -70,7 +82,7 @@ export function IdLink({
     loadLiterature();
     if (hintOn) {
       hintedRef.current = true;
-      setHintOn(false);
+      dismissHint();
     }
   };
 
@@ -106,7 +118,7 @@ export function IdLink({
       >
         {match.id}
       </a>
-      {hintOn ? <span className="id-link-hint-bubble">{t("idlink.hint")}</span> : null}
+      {hintOn ? <span className="id-link-quest" aria-hidden>!</span> : null}
     </span>
   );
 

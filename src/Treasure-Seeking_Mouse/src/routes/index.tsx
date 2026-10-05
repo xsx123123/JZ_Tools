@@ -11,6 +11,7 @@ import { SessionSidebar, MobileDrawerHeader } from "@/components/chat/SessionSid
 import { BrandMark } from "@/components/BrandMark";
 import { AuthDialog } from "@/components/auth/AuthDialog";
 import { TreasureMouse, makePetEvent, type PetEvent } from "@/components/pet/TreasureMouse";
+import { onHintShown, onHintDismissed } from "@/lib/hintBus";
 import { useIsTouch } from "@/hooks/use-touch";
 import { useVisualViewport } from "@/hooks/use-visual-viewport";
 import { readTheme, writeTheme, applyTheme, type Theme } from "@/services/petStore";
@@ -101,6 +102,16 @@ function ChatPage(): React.ReactElement {
     });
   }, []);
   const [petEvent, setPetEvent] = useState<PetEvent | null>(null); // 桌宠事件流（仅 UI 反馈，不影响消息逻辑）
+  // 编号发现提示 ⇆ 桌宠联动：抽签点亮某个编号时让阿寻喊话「那里有宝藏」；
+  // 用户悬停/点开该编号（提示消失）时立即收起台词，形成一来一回的对话感
+  useEffect(() => {
+    const offShown = onHintShown(() => setPetEvent(makePetEvent({ type: "hint" })));
+    const offDismiss = onHintDismissed(() => setPetEvent(makePetEvent({ type: "hint_end" })));
+    return () => {
+      offShown();
+      offDismiss();
+    };
+  }, []);
   const petCardsRef = useRef(0);
   const [boardOpen, setBoardOpen] = useState(false); // 排行榜抽屉
   const [statsOpen, setStatsOpen] = useState(false); // 使用统计弹窗
@@ -580,12 +591,13 @@ function ChatPage(): React.ReactElement {
             <EmptyState onPick={(q) => void handleSend(q)} />
           ) : (
             <div className="mx-auto max-w-3xl space-y-6 px-4 py-6 sm:px-6">
-              {messages.map((m) => (
+              {messages.map((m, idx) => (
                 <ChatMessage
                   key={m.id}
                   msg={m}
                   onRegenerate={handleRegenerate}
                   onPickSuggestion={(q) => void handleSend(q)}
+                  linkHint={m.role === "assistant" && idx === messages.length - 1}
                 />
               ))}
               <div ref={bottomRef} />

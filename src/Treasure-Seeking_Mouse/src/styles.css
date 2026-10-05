@@ -287,53 +287,38 @@
   border-bottom-style: solid;
 }
 
-/* 新用户发现性提示：首个编号的高亮扫光 + 上方气泡（由 IdLink 挂载 .id-link--hint 触发，6s 自动消失） */
-@keyframes idlink-shine {
-  from { background-position: -120% 0; }
-  to { background-position: 220% 0; }
-}
-@keyframes idlink-bubble-in {
-  from { opacity: 0; transform: translate(-50%, 4px); }
-  to { opacity: 1; transform: translate(-50%, 0); }
+/* 新用户发现性提示：游戏式「任务感叹号」标记（由 IdLink 在 hintOn 时挂载 .id-link-quest，
+   6s 自动消失）。学习 MMO 的任务指示语言：黄色 "!" = 这里有宝藏可领，不破坏排版、不像外挂 UI。
+   台词由桌宠阿寻承担（lib/hintBus → TreasureMouse hint 事件）。 */
+@keyframes idlink-quest-bounce {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-3px); }
 }
 .id-link--hint {
-  border-bottom-color: transparent;
-  background-image: linear-gradient(
-    100deg,
-    color-mix(in oklch, var(--color-helix) 45%, transparent) 40%,
-    var(--color-helix) 50%,
-    color-mix(in oklch, var(--color-helix) 45%, transparent) 60%
-  );
-  background-repeat: no-repeat;
-  background-size: 220% 1px;
-  background-position: -120% 100%;
-  animation: idlink-shine 1.6s ease-in-out 3;
+  border-bottom-style: solid;
+  border-bottom-color: var(--color-helix);
+  text-shadow: 0 0 12px color-mix(in oklch, var(--color-helix) 55%, transparent);
 }
-.id-link-hint-bubble {
+.id-link-quest {
   position: absolute;
-  bottom: calc(100% + 6px);
-  left: 50%;
-  transform: translate(-50%, 0);
-  z-index: 30;
-  white-space: nowrap;
-  border-radius: 7px;
-  background: var(--color-foreground);
-  color: var(--color-background);
-  padding: 4px 9px;
-  font-size: 11px;
-  line-height: 1.4;
+  top: -0.85em;
+  right: -0.45em;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 13px;
+  height: 13px;
+  border-radius: 999px;
+  background: linear-gradient(180deg, #ffd34d, #f5a623);
+  color: #5a3a00;
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 1;
   font-family: var(--font-sans);
+  box-shadow: 0 1px 4px rgb(0 0 0 / 0.28), 0 0 0 2px rgb(255 255 255 / 0.65);
   pointer-events: none;
-  animation: idlink-bubble-in 0.25s ease-out both;
-}
-.id-link-hint-bubble::after {
-  content: "";
-  position: absolute;
-  top: 100%;
-  left: 50%;
-  transform: translateX(-50%);
-  border: 4px solid transparent;
-  border-top-color: var(--color-foreground);
+  animation: idlink-quest-bounce 0.9s ease-in-out infinite;
 }
 
 /* Markdown 消息排版（亮色档） */
