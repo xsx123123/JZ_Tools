@@ -38,8 +38,8 @@ const TOOL_DEFS = [
   tool('seqout_get_experiments', '列出研究的实验。支持 GSE（自动解析为 SRA/BioProject 编号）。', { study_accession: reqStr('研究编号，GSE 或 SRA/PRJ 编号') }, ['study_accession']),
   tool('seqout_get_runs', '列出研究的测序运行（SRR 编号列表）。支持 GSE 自动解析。', { study_accession: reqStr('研究编号') }, ['study_accession']),
   tool('seqout_get_run_download', '获取单个测序运行的下载链接。', { run_accession: reqStr('运行编号，如 SRR 开头') }, ['run_accession']),
-  tool('seqout_get_download_links', '获取研究全部运行的下载链接（TSV）。支持 GSE 自动解析。', { study_accession: reqStr('研究编号') }, ['study_accession']),
-  tool('seqout_get_metadata_csv', '获取研究合并元数据 CSV 的下载信息。支持 GSE 自动解析。', { study_accession: reqStr('研究编号') }, ['study_accession']),
+  tool('seqout_get_download_links', '获取研究全部运行的下载链接表（含 fastq/sra 直链、大小、MD5）。支持 GSE 自动解析。', { study_accession: reqStr('研究编号') }, ['study_accession']),
+  tool('seqout_get_metadata_csv', '获取研究合并样本/运行元数据表（测序策略、平台、样本属性等）。支持 GSE 自动解析。', { study_accession: reqStr('研究编号') }, ['study_accession']),
   tool('seqout_get_sample_metadata', '获取样本元数据；GSM 编号自动使用 sample-detail 通道。', { accession: reqStr('样本编号，如 GSM4581240') }, ['accession']),
   tool('seqout_get_sample_detail', '获取完整样本详细信息。', { accession: reqStr('样本编号，如 GSM4581240') }, ['accession']),
   tool('seqout_get_sample_manifest', '获取 GEO 项目（GSE）的样本清单预览。', { accession: reqStr('GSE 项目编号'), max_samples: intOpt('最多展示的样本数，默认20') }, ['accession']),
@@ -83,6 +83,80 @@ async function seqoutGet(path, params) {
   }
 }
 
+/** TSV 类端点专用（runs/download 返回 text/tab-separated-values；metadata/download 返回 text/csv） */
+async function seqoutGetText(path, params) {
+  const url = new URL(SEQOUT_BASE_URL + path);
+  if (params) for (const [k, v] of Object.entries(params)) url.searchParams.set(k, v);
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 25000);
+  try {
+    const resp = await fetch(url.toString(), { signal: controller.signal, headers: { Accept: 'text/tab-separated-values,text/csv,*/*' } });
+    const text = await resp.text();
+    if (!resp.ok) throw new Error(`seqout HTTP ${resp.status}: ${text.slice(0, 300)}`);
+    return text;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/** 分隔符嗅探：取首个非空行，比较 Tab 与逗号出现次数（seqout 的 runs/download 是 TSV、metadata/download 是 CSV） */
+function sniffDelimiter(text) {
+  for (const line of text.split('\n')) {
+    if (!line.trim()) continue;
+    const tabs = (line.match(/\t/g) || []).length;
+    const commas = (line.match(/,/g) || []).length;
+    return commas > tabs ? ',' : '\t';
+  }
+  return '\t';
+}
+
+/** 解析一行定界文本，支持双引号包裹与 "" 转义（零依赖 CSV/TSV 解析） */
+function splitDelimitedLine(line, delim) {
+  const out = [];
+  let cur = '', quoted = false;
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i];
+    if (quoted) {
+      if (ch === '"') { if (line[i + 1] === '"') { cur += '"'; i++; } else quoted = false; }
+      else cur += ch;
+    } else if (ch === '"') quoted = true;
+    else if (ch === delim) { out.push(cur); cur = ''; }
+    else cur += ch;
+  }
+  out.push(cur);
+  return out;
+}
+
+/** 定界文本 → 结构化行（首行作表头；丢弃整列为空或恒定的字段，最多保留 200 行并标注 total_rows） */
+function parseDelimited(text) {
+  const delim = sniffDelimiter(text);
+  const lines = text.split('\n').filter((l) => l.length > 0 && l.trim() !== '');
+  if (lines.length === 0) return { columns: [], rows: [], total_rows: 0 };
+  const columns = splitDelimitedLine(lines[0], delim).map((c) => c.trim().replace(/^﻿/, ''));
+  const total = lines.length - 1;
+  const records = [];
+  for (let i = 1; i < lines.length && records.length < 200; i++) records.push(splitDelimitedLine(lines[i], delim));
+
+  // 丢掉恒为空白、或所有行取值都相同的列——下载表里有大量 NCBI/EBI 镜像链接列为空，全留着会白占 LLM 预算
+  const keptIdx = [];
+  columns.forEach((_, idx) => {
+    const vals = records.map((r) => (r[idx] ?? '').trim());
+    const constant = vals.length > 1 && vals.every((v) => v === vals[0]);
+    if (vals.every((v) => v === '') || constant) return;
+    keptIdx.push(idx);
+  });
+  const rows = [];
+  for (const rec of records) {
+    const row = {};
+    for (const idx of keptIdx) {
+      const v = (rec[idx] ?? '').trim();
+      if (v !== '') row[columns[idx]] = v; // 空单元格直接省略：runs/download 每行有大半是空的镜像链接列
+    }
+    rows.push(row);
+  }
+  return { columns: keptIdx.map((i) => columns[i]), rows, total_rows: total };
+}
+
 function findStudyAccession(data) {
   if (!data || typeof data !== 'object') return null;
   if (Array.isArray(data)) {
@@ -108,6 +182,21 @@ async function resolveStudy(accession) {
   return acc;
 }
 
+/** 研究编号 → BioProject 编号（PRJNA…）。下载工具用它给前端「下载加速」卡片提供 -A 参数；
+ *  SRP 研究不直接暴露 PRJ 字段，但项目详情的 alias 字段通常就是 PRJNA。 */
+async function resolveBioproject(studyAccession) {
+  if (/^PRJ(NA|EB|DB)\d+$/i.test(studyAccession)) return studyAccession.toUpperCase();
+  try {
+    const project = await seqoutGet(`/project/${encodeURIComponent(studyAccession)}`);
+    const alias = project?.alias;
+    if (typeof alias === 'string' && /^PRJ(NA|EB|DB)\d+$/i.test(alias.trim())) return alias.trim().toUpperCase();
+    const found = findStudyAccession(project);
+    return found && /^PRJ/i.test(found) ? found : null;
+  } catch {
+    return null;
+  }
+}
+
 function validateSample(accession) {
   const acc = accession.trim().toUpperCase();
   if (!SAMPLE_PATTERN.test(acc)) throw new Error(`样本编号格式不正确：${acc}（应为 GSM/SAMN/SAMD + 数字）`);
@@ -130,10 +219,10 @@ async function executeTool(name, args) {
     case 'seqout_get_project_citation': return wrap(await seqoutGet(`/project/${encodeURIComponent(String(args.accession).toUpperCase())}/cite`));
     case 'seqout_get_project_enriched': return wrap(await seqoutGet(`/project/${encodeURIComponent(String(args.accession).toUpperCase())}/enriched`));
     case 'seqout_get_experiments': { const s = await resolveStudy(String(args.study_accession)); return wrap(await seqoutGet(`/project/${encodeURIComponent(s)}/experiments`)); }
-    case 'seqout_get_runs': { const s = await resolveStudy(String(args.study_accession)); return wrap(await seqoutGet(`/project/${encodeURIComponent(s)}/runs`)); }
+    case 'seqout_get_runs': { const s = await resolveStudy(String(args.study_accession)); return wrap({ ...(await seqoutGet(`/project/${encodeURIComponent(s)}/runs`)), study_accession: s, bioproject: await resolveBioproject(s) }); }
     case 'seqout_get_run_download': return wrap(await seqoutGet(`/run/${encodeURIComponent(String(args.run_accession).toUpperCase())}`));
-    case 'seqout_get_download_links': { const s = await resolveStudy(String(args.study_accession)); return wrap(await seqoutGet(`/project/${encodeURIComponent(s)}/runs/download`)); }
-    case 'seqout_get_metadata_csv': { const s = await resolveStudy(String(args.study_accession)); return wrap(await seqoutGet(`/project/${encodeURIComponent(s)}/metadata/download`)); }
+    case 'seqout_get_download_links': { const s = await resolveStudy(String(args.study_accession)); const tsv = await seqoutGetText(`/project/${encodeURIComponent(s)}/runs/download`); return wrap({ ...parseDelimited(tsv), study_accession: s, bioproject: await resolveBioproject(s) }); }
+    case 'seqout_get_metadata_csv': { const s = await resolveStudy(String(args.study_accession)); const csv = await seqoutGetText(`/project/${encodeURIComponent(s)}/metadata/download`); return wrap({ ...parseDelimited(csv), study_accession: s }); }
     case 'seqout_get_sample_metadata': { const a = validateSample(String(args.accession)); const path = /^GSM/i.test(a) ? `/sample-detail/${a}` : `/sample/${a}`; return wrap(await seqoutGet(path)); }
     case 'seqout_get_sample_detail': { const a = validateSample(String(args.accession)); return wrap(await seqoutGet(`/sample-detail/${encodeURIComponent(a)}`)); }
     case 'seqout_get_sample_manifest': { const a = String(args.accession).toUpperCase(); return wrap(await seqoutGet(`/geo/series/${encodeURIComponent(a)}/samples`, args.max_samples ? { max_samples: String(args.max_samples) } : undefined)); }
@@ -420,6 +509,17 @@ function trimForLLM(payload) {
       });
       const trimmed = { ...payload, data: { ...obj.data, results, truncated: true } };
       return JSON.stringify(trimmed).slice(0, 100000);
+    }
+    // 表格类结果（下载表/元数据表）：按行二分切，绝不从中间截断 JSON——否则模型收到的是半截原始文本
+    if (obj && typeof obj === 'object' && obj.data && !Array.isArray(obj.data) && Array.isArray(obj.data.rows)) {
+      const rows = obj.data.rows;
+      let lo = 0, hi = rows.length; // 找最大可行前缀
+      while (lo < hi) {
+        const mid = Math.ceil((lo + hi) / 2);
+        const test = JSON.stringify({ ...payload, data: { ...obj.data, rows: rows.slice(0, mid), truncated: true } });
+        if (test.length <= 100000) lo = mid; else hi = mid - 1;
+      }
+      return JSON.stringify({ ...payload, data: { ...obj.data, rows: rows.slice(0, lo), truncated: true } });
     }
   } catch { /* fallthrough */ }
   return text.slice(0, 100000) + '…(truncated)';

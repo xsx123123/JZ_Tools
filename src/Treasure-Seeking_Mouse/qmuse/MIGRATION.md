@@ -120,3 +120,19 @@ qmuse import .          # 首次或更新云资源；密钥：qmuse-cli cloud se
 
 **验证**：`npm run check` 0 error（2 条 warning 为 R1 既有）、`npm run build` 通过、产物校验器通过。
 **未执行（需平台环境）**：`qmuse import .`（重新导入云函数使 literature action 生效）、`qmuse-cli cloud set-secret "NCBI_API_KEY"`（可选，提升限速）、真实云资源联调。
+
+### R3 — 2026-10-05 同步「下载总表 TSV 解析」修复（源：主仓库未提交工作区改动）
+
+**背景**：主仓库与 QMuse 版的 `seqout_get_download_links` / `seqout_get_metadata_csv` 都直接用 JSON 解析去 `seqoutGet` 定界端点——`runs/download` 返回 `text/tab-separated-values`、`metadata/download` 返回 `text/csv`，自 R1 起两工具必然抛「seqout 非 JSON 响应」。修复后按 TSV/CSV 结构化解析，避免大表被 `trimForLLM` 从中间硬截断（实测 1402 行项目原样 JSON 788 991 字符，只能留下 183 行半截文本）。
+
+**同步内容（`functions/seqout-chat/src/main.js`，node-22 ESM 改写）：**
+
+- 新增 `seqoutGetText`（Accept 同时声明 `text/tab-separated-values,text/csv`）+ `sniffDelimiter` + `splitDelimitedLine` + `parseDelimited`（表头 + 200 行上限 + 丢弃全空/恒定列 + 省略空单元格 + `total_rows`）。
+- `seqout_get_download_links` / `seqout_get_metadata_csv` 改为返回 `{columns, rows, total_rows, study_accession, bioproject?}`（不再是 `{format:'tsv', text}`）。
+- 新增 `resolveBioproject`：项目详情 `alias` 字段即 PRJNA（实测 SRP426032 → PRJNA941834）；`seqout_get_runs` 也附 `study_accession`/`bioproject`，供前端卡片取真实 `-A`。
+- `trimForLLM` 增表格分支：命中 `data.rows` 时按行**二分切**并置 `truncated`，绝不再从 JSON 中间硬切出半截文本。
+
+**未迁移（主仓库侧前端，QMuse 尚无对应文件）**：`DownloadBoostCard.tsx` 的「下载总表」直链按钮、`boost.noteKnown` 精确编号文案、i18n 的 `boost.download` 两键。R4+ 若把 polariseq 卡片迁移到 QMuse，需一并带入。
+
+**验证**：`node --check` 通过；对真实 `SRP426032`（TSV）/`SRP275550`（CSV）离线跑 `parseDelimited`+`trimForLLM`，输出 99 774 / 85 530 字符且均为合法 JSON（200/131、200/200 行）。`npm run check` 无新增报错。
+**未执行（需平台环境）**：`qmuse import .` 重新导入云函数使修复生效。
