@@ -4,7 +4,9 @@
 
 .md-body {
   line-height: 1.75;
-  word-break: break-word;
+  /* 英文模式：优先按词边界换行，只在长 token（URL/编号）确实溢出时才断，避免单词被拦腰折断 */
+  word-break: normal;
+  overflow-wrap: break-word;
   font-size: 28rpx;
   color: var(--foreground);
 }

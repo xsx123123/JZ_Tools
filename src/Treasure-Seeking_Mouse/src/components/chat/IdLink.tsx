@@ -3,7 +3,7 @@
 // HoverCard 在触屏上点击会直接跳转、浮层永不出现，故按输入设备自动切换容器，浮层内容完全共用。
 // 浮层打开时经 T2 fetchLiterature 自动拉论文元数据（前端 TTL 缓存，反复 hover 不重复请求）；
 // 「查看证据链」经 evidenceBus 抛给消息列表层，渲染完整文献卡片
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useContext, useEffect, useRef, useState } from "react";
 import { BookOpen, Copy, Check, ExternalLink } from "lucide-react";
 import { HoverCard, HoverCardTrigger, HoverCardContent } from "@/components/ui/hover-card";
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
@@ -11,6 +11,7 @@ import { linkTypeLabel, type IdMatch } from "@/lib/linkify";
 import { requestEvidence } from "@/lib/evidenceBus";
 import { consumeIdLinkHint } from "@/lib/linkHint";
 import { fireTreasureBurst } from "@/lib/treasureBurst";
+import { AllowLinkHintContext } from "@/components/chat/Markdown";
 import { copyText } from "@/lib/clipboard";
 import { useIsTouch } from "@/hooks/use-touch";
 import { useI18n } from "@/i18n/provider";
@@ -30,8 +31,14 @@ export function IdLink({
   const { t, lang } = useI18n();
   const [copied, setCopied] = useState(false);
   const isTouch = useIsTouch();
-  // 新用户发现性提示：全站只展示一次（见 lib/linkHint），6s 自动消失或打开浮层即消失
-  const [hintOn, setHintOn] = useState(() => consumeIdLinkHint());
+  // 新用户发现性提示：全站只展示一次（见 lib/linkHint）。消费必须走 effect 且受 AllowLinkHintContext
+  // 门控——流式期间 Markdown 树反复重建会卸载重建本组件，useState 初始器会把提示「吃掉」（闪一下就没了）。
+  const allowHint = useContext(AllowLinkHintContext);
+  const [hintOn, setHintOn] = useState(false);
+  useEffect(() => {
+    if (!allowHint || hintOn) return;
+    setHintOn(consumeIdLinkHint());
+  }, [allowHint, hintOn]);
   useEffect(() => {
     if (!hintOn) return;
     const id = setTimeout(() => setHintOn(false), 6000);
@@ -127,11 +134,11 @@ export function IdLink({
       {summary && !litTitle ? (
         <p className="line-clamp-4 text-[12px] leading-relaxed text-foreground/85">{summary}</p>
       ) : null}
-      <div className="flex items-center gap-1.5 pt-1">
+      <div className="flex flex-wrap items-center gap-1.5 pt-1">
         <button
           type="button"
           onClick={copyId}
-          className="flex items-center gap-1 rounded-md border border-border bg-secondary px-2 py-1 text-[11px] text-secondary-foreground transition-colors hover:bg-accent"
+          className="flex shrink-0 items-center gap-1 whitespace-nowrap rounded-md border border-border bg-secondary px-2 py-1 text-[11px] text-secondary-foreground transition-colors hover:bg-accent"
         >
           {copied ? <Check size={11} className="text-helix" /> : <Copy size={11} />}
           {copied ? t("idlink.copied") : t("idlink.copyId")}
@@ -139,7 +146,7 @@ export function IdLink({
         <button
           type="button"
           onClick={showEvidence}
-          className="flex items-center gap-1 rounded-md border border-border bg-secondary px-2 py-1 text-[11px] text-secondary-foreground transition-colors hover:bg-accent"
+          className="flex shrink-0 items-center gap-1 whitespace-nowrap rounded-md border border-border bg-secondary px-2 py-1 text-[11px] text-secondary-foreground transition-colors hover:bg-accent"
         >
           <BookOpen size={11} />
           {t("idlink.viewEvidence")}
@@ -148,7 +155,7 @@ export function IdLink({
           href={match.url}
           target="_blank"
           rel="noreferrer noopener"
-          className="ml-auto flex items-center gap-1 rounded-md px-2 py-1 text-[11px] text-muted-foreground transition-colors hover:text-helix"
+          className="ml-auto flex shrink-0 items-center gap-1 whitespace-nowrap rounded-md px-2 py-1 text-[11px] text-muted-foreground transition-colors hover:text-helix"
         >
           <ExternalLink size={11} />
           {t("idlink.original")}

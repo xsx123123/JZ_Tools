@@ -275,6 +275,10 @@
   text-decoration: none;
   border-bottom: 1px dashed color-mix(in oklch, var(--color-helix) 45%, transparent);
   transition: color 0.2s ease, border-color 0.2s ease;
+  /* 编号是原子 token（GSE123/SRR456/PRJNA…），绝不允许从中间折断换行 */
+  word-break: normal;
+  overflow-wrap: normal;
+  white-space: nowrap;
 }
 .id-link:hover,
 .id-link:focus-visible {
@@ -335,7 +339,9 @@
 /* Markdown 消息排版（亮色档） */
 .md-body {
   line-height: 1.75;
-  word-break: break-word;
+  /* 英文模式：优先按词边界换行，只在长 token（URL/编号）确实溢出时才断，避免单词被拦腰折断 */
+  word-break: normal;
+  overflow-wrap: break-word;
 }
 .md-body p { margin: 0.35em 0; }
 .md-body p:first-child { margin-top: 0; }
