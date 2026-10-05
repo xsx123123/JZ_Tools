@@ -35,6 +35,7 @@ export interface StreamHandlers {
   onDelta: (text: string) => void;
   onTool: (evt: { name: string; label: string; status: "running" | "done" | "error"; ms?: number; error?: string }) => void;
   onCards: (cards: DatasetCard[]) => void;
+  onPolariseq?: (accession: string | null) => void;
   onEnd: (payload: { cards: DatasetCard[]; tools: ToolLog[] }) => void;
   onError: (message: string) => void;
 }
@@ -161,6 +162,7 @@ export async function requestSeqoutChat(
           if (typeof obj.delta === "string" && obj.delta) handlers.onDelta(obj.delta);
           else if (obj.event === "tool") handlers.onTool(obj);
           else if (obj.event === "cards" && Array.isArray(obj.cards)) handlers.onCards(obj.cards);
+          else if (obj.event === "polariseq") handlers.onPolariseq?.(typeof obj.accession === "string" ? obj.accession : null);
           else if (obj.event === "end") handlers.onEnd({ cards: obj.cards ?? [], tools: obj.tools ?? [] });
           else if (typeof obj.error === "string") handlers.onError(obj.error);
         } catch {

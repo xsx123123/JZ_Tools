@@ -6,6 +6,7 @@ import { BrandMark } from "@/components/BrandMark";
 import { Markdown } from "./Markdown";
 import { ToolTrace, type LiveToolEvent } from "./ToolTrace";
 import { DatasetCardGrid } from "./DatasetCard";
+import { DownloadBoostCard } from "./DownloadBoostCard";
 import { SuggestionBlock, extractFollowups } from "./SuggestionBlock";
 import { LiteratureCardPanel } from "./LiteratureCard";
 import { addEvidenceListener, type EvidenceRequest } from "@/lib/evidenceBus";
@@ -26,6 +27,8 @@ export interface ChatUIMessage {
   content: string;
   cards?: DatasetCard[] | null;
   toolLogs?: ToolLog[] | null;
+  /** 本轮调用过下载链接工具 → 推送 polariseq「下载加速」卡片；accession 为 null 表示未解析到 BioProject 编号 */
+  boost?: { accession: string | null } | null;
   streaming?: boolean;
   liveTools?: LiveToolEvent[];
   error?: string | null;
@@ -139,6 +142,7 @@ export function ChatMessage({
         {!msg.streaming && msg.cards && msg.cards.length > 0 ? (
           <DatasetCardGrid cards={msg.cards} hostMessageId={msg.id} />
         ) : null}
+        {!msg.streaming && msg.boost ? <DownloadBoostCard accession={msg.boost.accession} /> : null}
         {evidence ? (
           <LiteratureCardPanel kind={evidence.kind} id={evidence.id} onClose={() => setEvidence(null)} />
         ) : null}

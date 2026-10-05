@@ -314,6 +314,9 @@ function ChatPage(): React.ReactElement {
           petCardsRef.current = Math.max(petCardsRef.current, cards.length);
           patch((m) => ({ ...m, cards }));
         },
+        onPolariseq: (accession) => {
+          patch((m) => ({ ...m, boost: { accession } }));
+        },
         onEnd: (p) => {
           finalCards = p.cards.length > 0 ? p.cards : finalCards;
           finalTools.push(...p.tools);
