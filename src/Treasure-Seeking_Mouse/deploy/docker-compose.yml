@@ -32,6 +32,8 @@ services:
       # 覆盖 server/.env 的值：容器内固定监听 8787，与 nginx 的 proxy_pass 对齐
       # （server/.env 里通常写 8788，那是本地 `pnpm run server` 的端口）
       CHAT_API_PORT: "8787"
+      # local.mjs 默认只绑 127.0.0.1；容器内必须绑 0.0.0.0 才能被同网络的 web(nginx) 访问
+      CHAT_API_HOST: "0.0.0.0"
       NODE_ENV: production
       # 使用统计快照写到命名卷，容器重建/重启不丢（server/local.mjs 每 15s 落盘）
       STATS_FILE: /app/data/stats.json

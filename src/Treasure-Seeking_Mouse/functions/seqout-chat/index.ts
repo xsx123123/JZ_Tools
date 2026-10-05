@@ -708,6 +708,13 @@ export const handler = async (req: Request): Promise<Response> => {
       return new Response(JSON.stringify({ error: '当前项目的 AI 服务凭证未就绪，请稍后重试' }), { status: 503, headers: { 'Content-Type': 'application/json' } });
     }
 
+    // 可选共享密钥：配置 CHAT_SHARED_SECRET 后，对话接口要求请求头 X-Chat-Key 匹配（防 casual 滥用）。
+    // 文献/统计等公共分支在前面已 return，不受此约束；未配置时完全兼容旧行为。
+    const sharedSecret = envGet('CHAT_SHARED_SECRET');
+    if (sharedSecret && req.headers.get('X-Chat-Key') !== sharedSecret) {
+      return new Response(JSON.stringify({ error: 'unauthorized' }), { status: 401, headers: { 'Content-Type': 'application/json' } });
+    }
+
     // GET：模型目录（注入 defaultModel：优先本地 LLM_MODEL 配置，让前端默认选中它）
     // 超时放宽到 8s：网关冷启动/跨网较慢时前端仍能拿到目录，避免回退到无效的兜底模型
     if (req.method === 'GET') {
@@ -769,11 +776,17 @@ export const handler = async (req: Request): Promise<Response> => {
           try { controller.enqueue(encoder.encode(`data: ${JSON.stringify(obj)}\n\n`)); } catch { /* closed */ }
         };
         try {
-          for (let round = 0; round < 40; round++) {
+          for (let round = 0; round < 40 && !aborted; round++) {
             usageStats.llmCalls += 1;
             touchStats();
+            // 90s 超时 + 客户端断连信号：任一触发都会中断上游请求，避免挂死/断连后继续烧 token
+            const llmSignal =
+              typeof AbortSignal.any === 'function'
+                ? AbortSignal.any([req.signal, AbortSignal.timeout(90_000)])
+                : req.signal;
             const llmResp = await fetch(`${LLM_BASE_URL}/chat/completions`, {
               method: 'POST',
+              signal: llmSignal,
               headers: { Authorization: `Bearer ${projectServiceAK}`, 'Content-Type': 'application/json' },
               // stream_options.include_usage：让网关在流末尾回传 token 用量（统计面板数据源）
               body: JSON.stringify({ model, messages, stream: true, stream_options: { include_usage: true }, tools: TOOL_DEFS, tool_choice: 'auto' }),
@@ -792,6 +805,7 @@ export const handler = async (req: Request): Promise<Response> => {
             const toolCalls: Record<number, ToolCall> = {};
             let sawDone = false;
             while (true) {
+              if (aborted) break; // 客户端断连：立即停止读取上游流
               const { done, value } = await reader.read();
               if (done) break;
               buffer += decoder.decode(value, { stream: true });
@@ -822,6 +836,7 @@ export const handler = async (req: Request): Promise<Response> => {
                 } catch { /* ignore partial */ }
               }
             }
+            if (aborted) break; // 断连后不再执行工具、不进入下一轮
             const callsArr = Object.values(toolCalls).filter((c) => c.function.name);
             if (!callsArr.length) {
               if (!sawDone) send({ delta: '' });
@@ -873,7 +888,7 @@ export const handler = async (req: Request): Promise<Response> => {
       },
     });
 
-    return new Response(readable, { headers: { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache' } });
+    return new Response(readable, { headers: { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache', 'X-Accel-Buffering': 'no' } });
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Internal Server Error';
     console.error(`[${FUNCTION_NAME}] failed ${requestId}: ${message}`);

@@ -52,6 +52,9 @@ setInterval(() => {
 }, 15_000).unref();
 
 const PORT = Number(process.env.CHAT_API_PORT || 8787);
+// 监听地址：默认仅本机回环（宿主机裸跑 + 宿主机 nginx 反代时不暴露公网）；
+// Docker 容器内必须显式设 CHAT_API_HOST=0.0.0.0（compose 已配），否则容器间网络不可达
+const HOST = process.env.CHAT_API_HOST || '127.0.0.1';
 const CORS = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'GET,POST,OPTIONS',
@@ -102,8 +105,8 @@ createServer(async (req, res) => {
     res.writeHead(500, { 'Content-Type': 'application/json', ...CORS });
     res.end(JSON.stringify({ error: String(err?.message || err) }));
   }
-}).listen(PORT, () => {
-  console.log(`[seqout-chat] 本地服务已启动: http://localhost:${PORT}`);
+}).listen(PORT, HOST, () => {
+  console.log(`[seqout-chat] 本地服务已启动: http://${HOST}:${PORT}`);
   console.log(`[seqout-chat] LLM_BASE_URL=${process.env.LLM_BASE_URL || 'https://api.meoo.host/meoo-ai/compatible-mode/v1'}`);
   if (!process.env.LLM_API_KEY && !process.env.MEOO_PROJECT_API_KEY) {
     console.warn('[seqout-chat] 警告：未设置 LLM_API_KEY，请求将返回 503');
