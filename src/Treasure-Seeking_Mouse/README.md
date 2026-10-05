@@ -21,7 +21,7 @@
 
 **UI preview** (self-hosted mode + DeepSeek model, running as a guest):
 
-![UI](docs/使用页面.png)
+![UI](docs/geo寻宝鼠.gif)
 
 ---
 
