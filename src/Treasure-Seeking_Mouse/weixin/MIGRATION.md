@@ -3,6 +3,40 @@
 > 记录每轮从主仓库到小程序版的同步。体例参照 `../qmuse/MIGRATION.md`：
 > 每条记 `R<n> — 日期 — 源 commit`。
 
+## R5 — 2026-10-05 IdLink 新用户发现性提示（源：主仓库 lib/linkHint.ts + IdLink.tsx 同款）
+
+### 本轮做了什么
+
+对齐 Web 版刚实现的编号链接发现性提示：首个挂载的 IdLink 加下划线扫光动画（1.6s×3）+
+上方气泡（6s 自动消失 / 点出 ActionSheet 即消失 / 全设备只出现一次）。i18n 新增 1 键
+`idlink.hint`（中英各 224 → 225），小程序无 hover 故文案改为「点编号看对应文献 · 可追证据链」。
+
+### 文件级结果
+
+| 文件 | 处理 |
+|---|---|
+| `src/lib/linkHint.ts` | 新增：`consumeIdLinkHint()` 同款语义（会话内一次 + 本机永久一次），存储 key 与 Web 版一致（`geo-idlink-hint-shown`），走 device.ts 存储层 |
+| `src/components/Markdown.tsx` | Markdown 层持 hint 状态（6s 定时器 + dismiss）；`hint`/`shineRef` 透传 InlineNodes → TextNodes；首个编号（一次渲染内先到先得）挂 `.id-link--hint`；点编号出 ActionSheet 即 dismiss |
+| `src/components/markdown.css` | 加 `idlink-shine`/`idlink-bubble-in` keyframes、`.id-link--hint` 扫光（Web 版 color-mix 渐变 → rgba 等价色 + `.dark` 覆盖）、`.id-link-hint-bubble` 气泡（深色底白字 + 小三角，锚在 .md-body 顶部） |
+| `src/i18n/locales/{zh,en}.ts` | 各加 1 键 `idlink.hint` |
+
+### 验证结果（本轮实测）
+
+| 项 | 结果 |
+|---|---|
+| `npm run typecheck` | ✅ 通过 |
+| `npm run build:weapp` | ✅ Compiled successfully，dist **596KB**（+8KB < 10KB 验收线） |
+| `node scripts/verify-stream.mjs` | ✅ 仍 11 case 全过 |
+| `grep oklch(/color-mix(` | ✅ 0 |
+| i18n 字典 | ✅ zh/en 各 225 键，diff 为空 |
+
+### 踩坑记录（本轮新增）
+
+- ⚠️ 小程序 Text 内不能嵌 View，气泡无法像 Web 版那样贴着行内 `<span>` 定位 →
+  锚在 `.md-body`（View，position:relative）顶部，视觉仍在首个编号附近。
+- ⚠️ 「一次渲染内只给第一个编号挂扫光」不能用 state（循环中不触发重渲染），
+  用 `useRef` 先到先得标记；dismiss 只发生在点击时，不能在渲染时调。
+
 ## R4 — 2026-10-05 下载加速推荐卡片（源：主仓库后端 seqout-chat 新增 polariseq SSE 事件）
 
 ### 本轮做了什么

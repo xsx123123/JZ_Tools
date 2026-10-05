@@ -3,12 +3,13 @@
 //   网页版用 react-markdown + rehype 插件注入 <idlink>；小程序主包 2MB 限制，不引第三方
 //   渲染库，这里手写「块级切分 + 行内递归解析」的最小实现，输出 Taro View/Text。
 //   样式壳沿用 theme.css 的 .md-body / .id-link（本文件的 .md-* 显式类名见 markdown.css）。
-import { memo, useMemo, type ReactNode } from 'react'
+import { memo, useEffect, useMemo, useRef, useState, type MutableRefObject, type ReactNode } from 'react'
 import { View, Text } from '@tarojs/components'
 import Taro from '@tarojs/taro'
 import { scanText, linkTypeLabel, type IdMatch } from '@/lib/linkify'
 import { requestEvidence } from '@/lib/evidenceBus'
 import { copyLinkWithConfirm } from '@/lib/copyLink'
+import { consumeIdLinkHint } from '@/lib/linkHint'
 import { useI18n } from '@/i18n/provider'
 import './markdown.css'
 
@@ -196,15 +197,22 @@ function useCopyLink() {
 
 // ---------- 编号点击交互 ----------
 
+/** 发现性提示开关：全程只出现一次（consumeIdLinkHint 保证），dismiss 即点出 ActionSheet 时立即消失 */
+interface HintState {
+  on: boolean
+  dismiss: () => void
+}
+
 /**
  * 点击编号 → ActionSheet 两个动作：
  *   1) 复制链接：沿用「弹窗确认 → 复制」（小程序不能用网页版的新窗口打开跳外站，
  *      web-view 又需配置业务域名；复制链接是当前最小可用方案）
  *   2) 查看证据链：经 evidenceBus 抛给页面层，在宿主消息下方渲染文献卡片（R3）
  */
-function useIdAction() {
+function useIdAction(hint?: HintState) {
   const { t, lang } = useI18n()
   return (hit: IdMatch, hostMessageId?: string) => {
+    hint?.dismiss()
     void Taro.showActionSheet({
       itemList: [t('idlink.copyId'), t('idlink.viewEvidence')],
       success: ({ tapIndex }) => {
@@ -221,24 +229,36 @@ function useIdAction() {
 
 // ---------- 渲染 ----------
 
-function InlineNodes({ nodes, budget, hostMessageId }: { nodes: Inline[]; budget: { left: number }; hostMessageId?: string }) {
+function InlineNodes({
+  nodes,
+  budget,
+  hostMessageId,
+  hint,
+  shineRef,
+}: {
+  nodes: Inline[]
+  budget: { left: number }
+  hostMessageId?: string
+  hint?: HintState
+  shineRef?: MutableRefObject<boolean>
+}) {
   const { lang } = useI18n()
   const copyLink = useCopyLink()
-  const idAction = useIdAction()
+  const idAction = useIdAction(hint)
   return (
     <>
       {nodes.map((n, idx) => {
         if (n.kind === 'bold') {
           return (
             <Text key={idx} style={{ fontWeight: 600 }}>
-              <InlineNodes nodes={n.children} budget={budget} hostMessageId={hostMessageId} />
+              <InlineNodes nodes={n.children} budget={budget} hostMessageId={hostMessageId} hint={hint} shineRef={shineRef} />
             </Text>
           )
         }
         if (n.kind === 'italic') {
           return (
             <Text key={idx} style={{ fontStyle: 'italic' }}>
-              <InlineNodes nodes={n.children} budget={budget} hostMessageId={hostMessageId} />
+              <InlineNodes nodes={n.children} budget={budget} hostMessageId={hostMessageId} hint={hint} shineRef={shineRef} />
             </Text>
           )
         }
@@ -258,7 +278,17 @@ function InlineNodes({ nodes, budget, hostMessageId }: { nodes: Inline[]; budget
           )
         }
         // 纯文本：扫描 GSE/GSM/GO:/PMID 编号渲染成可点 IdLink
-        return <TextNodes key={idx} text={n.text} budget={budget} lang={lang} hostMessageId={hostMessageId} />
+        return (
+          <TextNodes
+            key={idx}
+            text={n.text}
+            budget={budget}
+            lang={lang}
+            hostMessageId={hostMessageId}
+            hint={hint}
+            shineRef={shineRef}
+          />
+        )
       })}
     </>
   )
@@ -269,13 +299,17 @@ function TextNodes({
   budget,
   lang,
   hostMessageId,
+  hint,
+  shineRef,
 }: {
   text: string
   budget: { left: number }
   lang: 'zh' | 'en'
   hostMessageId?: string
+  hint?: HintState
+  shineRef?: MutableRefObject<boolean>
 }) {
-  const idAction = useIdAction()
+  const idAction = useIdAction(hint)
   const hits = scanText(text)
   if (hits.length === 0 || budget.left <= 0) return <>{text}</>
   const out: ReactNode[] = []
@@ -285,8 +319,16 @@ function TextNodes({
     const idx = locateRaw(text, hit, cursor)
     if (idx < 0) continue
     if (idx > cursor) out.push(text.slice(cursor, idx))
+    // 本条消息只给第一个编号挂扫光：shineRef 在一次渲染内先到先得
+    //（hint.on 本身已由 consumeIdLinkHint 保证全局只有一次）
+    const shine = !!hint?.on && shineRef !== undefined && !shineRef.current
+    if (shine && shineRef) shineRef.current = true
     out.push(
-      <Text key={`id-${idx}`} className='id-link' onClick={() => idAction(hit, hostMessageId)}>
+      <Text
+        key={`id-${idx}`}
+        className={`id-link ${shine ? 'id-link--hint' : ''}`}
+        onClick={() => idAction(hit, hostMessageId)}
+      >
         {text.slice(idx, idx + rawLength(text, hit, idx))}
       </Text>,
     )
@@ -298,17 +340,33 @@ function TextNodes({
 }
 
 export const Markdown = memo(function Markdown({ text, hostMessageId }: { text: string; hostMessageId?: string }) {
+  const { t } = useI18n()
   const blocks = useMemo(() => parseBlocks(text), [text])
   // 每条消息一个链接预算（对齐网页版 MAX_LINKS_PER_MESSAGE）
   const budget = useMemo(() => ({ left: MAX_LINKS_PER_MESSAGE }), [text])
+  // 新用户发现性提示：全设备只展示一次（lib/linkHint），6s 自动消失或点出 ActionSheet 即消失
+  const [hintOn, setHintOn] = useState(consumeIdLinkHint)
+  useEffect(() => {
+    if (!hintOn) return
+    const id = setTimeout(() => setHintOn(false), 6000)
+    return () => clearTimeout(id)
+  }, [hintOn])
+  const hint = useMemo<HintState>(() => ({ on: hintOn, dismiss: () => setHintOn(false) }), [hintOn])
+  // 一次渲染内只有第一个编号挂扫光（先到先得，渲染期间改 ref 不触发重渲染）
+  const shineRef = useRef(false)
   return (
     <View className='md-body'>
+      {hint.on ? (
+        <View className='id-link-hint-bubble'>
+          <Text>{t('idlink.hint')}</Text>
+        </View>
+      ) : null}
       {blocks.map((b, i) => {
         switch (b.kind) {
           case 'h':
             return (
               <View key={i} className={`md-h md-h--${b.level}`}>
-                <InlineNodes nodes={parseInline(b.text)} budget={budget} hostMessageId={hostMessageId} />
+                <InlineNodes nodes={parseInline(b.text)} budget={budget} hostMessageId={hostMessageId} hint={hint} shineRef={shineRef} />
               </View>
             )
           case 'code':
@@ -325,7 +383,7 @@ export const Markdown = memo(function Markdown({ text, hostMessageId }: { text: 
                   <View key={j} className='md-li'>
                     <Text>
                       <Text className='md-li__marker'>•</Text>
-                      <InlineNodes nodes={parseInline(item)} budget={budget} hostMessageId={hostMessageId} />
+                      <InlineNodes nodes={parseInline(item)} budget={budget} hostMessageId={hostMessageId} hint={hint} shineRef={shineRef} />
                     </Text>
                   </View>
                 ))}
@@ -338,7 +396,7 @@ export const Markdown = memo(function Markdown({ text, hostMessageId }: { text: 
                   <View key={j} className='md-li'>
                     <Text>
                       <Text className='md-li__marker'>{j + 1}. </Text>
-                      <InlineNodes nodes={parseInline(item)} budget={budget} hostMessageId={hostMessageId} />
+                      <InlineNodes nodes={parseInline(item)} budget={budget} hostMessageId={hostMessageId} hint={hint} shineRef={shineRef} />
                     </Text>
                   </View>
                 ))}
@@ -347,7 +405,7 @@ export const Markdown = memo(function Markdown({ text, hostMessageId }: { text: 
           case 'quote':
             return (
               <View key={i} className='md-quote'>
-                <InlineNodes nodes={parseInline(b.text)} budget={budget} hostMessageId={hostMessageId} />
+                <InlineNodes nodes={parseInline(b.text)} budget={budget} hostMessageId={hostMessageId} hint={hint} shineRef={shineRef} />
               </View>
             )
           case 'hr':
@@ -355,7 +413,7 @@ export const Markdown = memo(function Markdown({ text, hostMessageId }: { text: 
           default:
             return (
               <View key={i} className='md-p'>
-                <InlineNodes nodes={parseInline(b.text)} budget={budget} hostMessageId={hostMessageId} />
+                <InlineNodes nodes={parseInline(b.text)} budget={budget} hostMessageId={hostMessageId} hint={hint} shineRef={shineRef} />
               </View>
             )
         }

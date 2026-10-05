@@ -283,6 +283,55 @@
   border-bottom-style: solid;
 }
 
+/* 新用户发现性提示：首个编号的高亮扫光 + 上方气泡（由 IdLink 挂载 .id-link--hint 触发，6s 自动消失） */
+@keyframes idlink-shine {
+  from { background-position: -120% 0; }
+  to { background-position: 220% 0; }
+}
+@keyframes idlink-bubble-in {
+  from { opacity: 0; transform: translate(-50%, 4px); }
+  to { opacity: 1; transform: translate(-50%, 0); }
+}
+.id-link--hint {
+  border-bottom-color: transparent;
+  background-image: linear-gradient(
+    100deg,
+    color-mix(in oklch, var(--color-helix) 45%, transparent) 40%,
+    var(--color-helix) 50%,
+    color-mix(in oklch, var(--color-helix) 45%, transparent) 60%
+  );
+  background-repeat: no-repeat;
+  background-size: 220% 1px;
+  background-position: -120% 100%;
+  animation: idlink-shine 1.6s ease-in-out 3;
+}
+.id-link-hint-bubble {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 50%;
+  transform: translate(-50%, 0);
+  z-index: 30;
+  white-space: nowrap;
+  border-radius: 7px;
+  background: var(--color-foreground);
+  color: var(--color-background);
+  padding: 4px 9px;
+  font-size: 11px;
+  line-height: 1.4;
+  font-family: var(--font-sans);
+  pointer-events: none;
+  animation: idlink-bubble-in 0.25s ease-out both;
+}
+.id-link-hint-bubble::after {
+  content: "";
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  border: 4px solid transparent;
+  border-top-color: var(--color-foreground);
+}
+
 /* Markdown 消息排版（亮色档） */
 .md-body {
   line-height: 1.75;

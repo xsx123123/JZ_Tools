@@ -91,3 +91,67 @@
   text-decoration: underline;
   text-underline-offset: 3px;
 }
+
+/* 新用户发现性提示：首个编号的高亮扫光 + 气泡（由首个 IdLink 挂载 .id-link--hint 触发，
+   6s 自动消失或点出 ActionSheet 即消失；全程只出现一次，见 lib/linkHint.ts）。
+   注：网页版渐变用 color-mix 生成半透明主色，小程序不支持 → 直接写死 rgba 等价色，
+   暗色档在 .dark 下覆盖（与 theme.css .id-link 的既有处理一致）。 */
+@keyframes idlink-shine {
+  from { background-position: -120% 0; }
+  to { background-position: 220% 0; }
+}
+@keyframes idlink-bubble-in {
+  from { opacity: 0; transform: translate(-50%, 8rpx); }
+  to { opacity: 1; transform: translate(-50%, 0); }
+}
+.id-link--hint {
+  border-bottom-color: transparent;
+  background-image: linear-gradient(
+    100deg,
+    rgba(0, 150, 137, 0.45) 40%,
+    rgb(0, 150, 137) 50%,
+    rgba(0, 150, 137, 0.45) 60%
+  );
+  background-repeat: no-repeat;
+  background-size: 220% 1px;
+  background-position: -120% 100%;
+  animation: idlink-shine 1.6s ease-in-out 3;
+}
+.dark .id-link--hint {
+  background-image: linear-gradient(
+    100deg,
+    rgba(20, 189, 173, 0.45) 40%,
+    rgb(20, 189, 173) 50%,
+    rgba(20, 189, 173, 0.45) 60%
+  );
+}
+/* 气泡锚在 md-body 顶部（小程序 Text 内不能嵌 View，无法贴着行内链接定位，
+   退而求其次锚在消息排版容器上方，视觉上仍在首个编号附近） */
+.md-body {
+  position: relative;
+}
+.id-link-hint-bubble {
+  position: absolute;
+  top: -8rpx;
+  left: 50%;
+  transform: translate(-50%, -100%);
+  z-index: 30;
+  white-space: nowrap;
+  padding: 8rpx 18rpx;
+  font-size: 21rpx;
+  line-height: 1.4;
+  color: var(--background);
+  background-color: var(--foreground);
+  border-radius: 14rpx;
+  pointer-events: none;
+  animation: idlink-bubble-in 0.25s ease-out both;
+}
+.id-link-hint-bubble::after {
+  content: "";
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  margin-left: -8rpx;
+  border: 8rpx solid transparent;
+  border-top-color: var(--foreground);
+}
