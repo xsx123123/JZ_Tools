@@ -103,3 +103,10 @@ make docker-start                    # 预检密钥 → 构建 → 启动
 ## License
 
 [MIT](LICENSE)
+
+---
+**Author**: JZHANG | **Version**: JZ_Tools_v0.1.0
+
+## 🔗 Links
+- GitHub: [repository](https://github.com/xsx123123/JZ_Tools)
+- LINUX DO: [Announcement](https://linux.do/)
