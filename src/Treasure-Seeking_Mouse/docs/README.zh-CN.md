@@ -92,7 +92,7 @@ React 19 + TypeScript · Vite 7 · Tailwind CSS v4（双主题 design token）·
 
 ## 🔗 链接
 
-**作者**：JZHANG | **版本**：GeoMuse_v0.1.0
+**作者**：JZHANG | **版本**：GeoMuse_v0.1.1
 
 - GitHub：[仓库](https://github.com/xsx123123/JZ_Tools)
 - LINUX DO：[公告](https://linux.do/)
