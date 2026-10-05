@@ -148,3 +148,16 @@ qmuse import .          # 首次或更新云资源；密钥：qmuse-cli cloud se
 - 新增 `describeSeqoutError`：seqout 是定期同步 NCBI 的镜像库，很新项目（尤其 PRJNA）会 404，错误信息明确提示"库内尚未同步此项目，请稍后重试或到 NCBI/ENA 查询"，与"项目存在但无数据"区分。
 
 **验证**：对真实 API 跑 `resolveStudy`——GSE117176→PRJNA481344(5)、GSE151530→PRJNA636285(0)、GSE62944→PRJNA266377(0)、GSE26109→PRJNA142297(28)、GSE165500→PRJNA694699(9)，与主仓库逐条一致；`node --check` 通过。
+
+### R5 — 2026-10-05 解析回归测试 + AGENTS.md 黄金用例（源：主仓库未提交工作区改动）
+
+**内容**：
+- 主仓库新增 `functions/seqout-chat/tests/resolveStudy.test.ts`（`node --test` 原生跑 .ts，Node 24）+ `tests/fixtures/*.json.gz`（GSE117176/151530/62944 + SRP349691 的真实 seqout 响应，共 55KB），断言 `studyCandidates`/`extractAccFromUrl`/`describeSeqoutError` 的行为；`SEQOUT_LIVE=1` 时额外打真实 API 校验 `resolveStudy`。
+- 为测试导出 `extractAccFromUrl`/`studyCandidates`/`hasRuns`/`resolveStudy`/`resolveBioproject`/`describeSeqoutError`（原本为模块内私有函数）。
+- 根 `package.json` 新增 `npm test` / `npm run test:live`。
+- QMuse 迁移版新增平价测试 `qmuse/qmuse-app/functions/seqout-chat/tests/resolveStudy.test.mjs`（用源码切片 + `new Function` 抽取纯函数，不改变生产入口结构；共用主仓库 fixtures），`qmuse/qmuse-app/package.json` 加 `npm test`。
+- `AGENTS.md`（主仓库）新增「回归测试」章节：命令、触发条件、黄金用例表（GSE117176→PRJNA481344/5 runs，**绝不可成 SRP349691**）、四条不变量，并把 neighbors 污染列入踩坑记录。
+
+**验证**：主仓库 `npm test` 离线 7/7 通过、`SEQOUT_LIVE=1` 9/9 通过；QMuse `npm test` 5/5 通过；主仓库 `npx tsc --noEmit` 通过、QMuse `npm run check` 无新增报错。
+
+**未执行（需平台环境）**：`qmuse import .`。

@@ -8,7 +8,9 @@
     "server": "node server/local.mjs",
     "build": "vite build",
     "preview": "vite preview --port 3015 --host 0.0.0.0",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "node --test functions/seqout-chat/tests/*.test.ts",
+    "test:live": "SEQOUT_LIVE=1 node --test functions/seqout-chat/tests/*.test.ts"
   },
   "dependencies": {
     "@fontsource-variable/noto-sans-sc": "^5.3.0",

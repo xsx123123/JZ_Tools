@@ -35,7 +35,26 @@
 - 主题：亮色 `:root` + 夜探矿洞 `.dark` 双套 token（`src/styles.css`），组件一律消费 theme utility（`bg-card` 等），禁止再写 `bg-white` 类硬编码。切换由顶栏/折叠边条按钮触发，偏好写 localStorage `seqout-theme`；`index.html` 内联 bootstrap 脚本在 React 加载前挂 `.dark` 类防闪白（同时支持 `?theme=dark` URL 参数——这是沙箱截图取证通道，因为截图工具的 DOM 探针不支持 oklch，无法替我们点按钮）。暗色下 `--pet-amber-deep` 反转为亮金文字档，桌宠周边（土堆/气泡/尘埃/网格）均有 `.dark` 覆盖段。
 - 自托管离线模式：未配置 `VITE_SUPABASE_URL`/`VITE_SUPABASE_ANON_KEY` 时 `client.ts` 创建 Proxy 桩客户端（导出 `isOfflineMode`）——auth 固定未登录、任意调用链 await 得 `{data:null, error:null}`；`SessionSidebar` 的 `onLogin` 改可选，离线时隐藏登录按钮，应用以纯游客 + localStorage 运行。环境变量唯一来源 `server/.env`（vite `envDir` 指向 `server/`，Makefile 起容器带 `--env-file server/.env`；`.dockerignore` 排除该文件，容器构建只认 Dockerfile 注入的构建期变量）。dev 默认 `VITE_CHAT_API=http://localhost:<CHAT_API_PORT>` 直连本地对话服务；改成 `/chat-api` 则走 `vite.config.ts` `server.proxy` 同源代理（`CHAT_API_PROXY_TARGET` 可覆盖目标），单端口且局域网可用。
 
+## 回归测试（改平台后必须通过）
+- **命令**：根目录 `npm test`（离线，用 fixtures，秒级）；`npm run test:live`（额外打真实 seqout API 校验，需联网）。QMuse 迁移版：`cd qmuse/qmuse-app && npm test`。
+- **触发条件**：任何改动 `functions/seqout-chat/index.ts`（或 QMuse `functions/seqout-chat/src/main.js`）里的 **GSE→研究编号解析**（`resolveStudy` / `studyCandidates` / `hasRuns` / `describeSeqoutError`）后，**必须跑测试，全绿才可提交/部署/导入**。改一处平台就测一处——主仓库与 QMuse 两版都要测（两版测试各自独立，QMuse 版为迁移副本的平价测试）。
+- **测试位置**：主仓库 `functions/seqout-chat/tests/resolveStudy.test.ts`（fixtures 为真实 seqout 响应，gzip 存于 `tests/fixtures/`）；QMuse `qmuse/qmuse-app/functions/seqout-chat/tests/resolveStudy.test.mjs`（共用主仓库 fixtures）。
+- **黄金用例（期望值来自 NCBI/ENA 人工核实，勿随意修改）**：
+
+  | GSE | 正确研究号 | runs | 关键约束 |
+  |---|---|---|---|
+  | **GSE117176** | **PRJNA481344** | 5 | `SRR7526393..97` ↔ `GSM3272966..70`（lnATM/obATM/M0/M1/M2_BMDM）。**绝不可解析成 `SRP349691` / `PRJNA786951`** —— 那是 `neighbors[207]` 里的**另一个项目**（小鼠肝巨噬细胞），曾导致整条链路报"空矿" |
+  | GSE151530 | PRJNA636285 | 0 | ENA 核实上游确无公开 raw（GEO-only 加工矩阵），返回 0 run 是正确结果 |
+  | GSE62944 | PRJNA266377 | 0 | 同上；其 `overall_design` 里嵌了带 SRP 的 URL，**不得**被吞成假编号 `SRP33` |
+
+- **不变量（改解析逻辑时守住这几条，否则测试会红）**：
+  1. 只读 `relation[].@target`（`@type` 为 BioProject/SRA）、`alias`、`external_id` 三个权威字段；**禁止**递归整棵 JSON、**禁止**读 `neighbors` / 自由文本（`overall_design`/`abstract`）。
+  2. `alias` / `external_id` 同时支持 字符串/数组/对象 三种形态。
+  3. 候选 `PRJ` 优先、`SRP` 兜底，并逐个 `hasRuns` 验证；全为 0 时如实返回、不抛异常、不回退到任意 SRP。
+  4. 404 要区分"镜像库未同步"与"项目无数据"。
+
 ## 踩坑记录
+- ❌ **GSE→SRA 解析的 neighbors 污染（2026-10-05 定位并修复）**：`resolveStudy` 曾递归搜索整棵项目详情 JSON，因 JSON 键序 `neighbors` 在 `relation` 之前，会先命中 `neighbors[].accession`（300 条相似数据集里**别的项目**的真实编号）就返回。实测 GSE117176 被解析成 `SRP349691`（真身 `PRJNA786951`，另一个项目）→ `runs/download` 报空矿或指向错误项目；正确映射 `PRJNA481344` 在 `relation` 里从未被读到。修法见 `docs/gse-resolution-fix.md`，回归测试见上节。**教训：解析权威映射只读专用字段，绝不整树递归。**
 - ❌ Edge Function preflight TS2698（`Spread types may only be created from object types`）：Supabase `Json` 联合类型不能直接 spread → 先显式收窄为 `Record<string, Json>` 再展开。
 - ❌ web-fetch / curl raw.githubusercontent 超时失败 → 用 `api.github.com/repos/.../contents/<path>` + base64 解码取证 GitHub 文件。
 - ⚠️ 当前项目 `client.ts` 导出 `projectUrlId`，所有裸 fetch Edge Function 必须携带 `OneDay-App-Id` 头。

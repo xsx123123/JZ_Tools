@@ -223,7 +223,7 @@ const STUDY_PATTERN = /^(SRP|PRJNA|PRJEB|PRJDB)\d+$/i;
 
 /** 把 seqout 的 HTTP 错误转成对用户/模型都清楚的说明。seqout 是定期从 NCBI 同步的镜像库，
  *  很新的项目（尤其 PRJNA 编号）尚未同步时会 404 —— 这与"项目存在但无数据"是两回事，必须讲清。 */
-function describeSeqoutError(status: number, body: string): string {
+export function describeSeqoutError(status: number, body: string): string {
   if (status === 404 && /No project found for PRJ/i.test(body)) {
     return `seqout 库内尚无此 BioProject（HTTP 404：${body.slice(0, 120)}）。seqout 是 seqout.org 定期同步 NCBI 的镜像库，很新发布的项目往往还没同步进来，请稍后重试，或直接到 NCBI/ENA 官网查询该项目。`;
   }
@@ -322,7 +322,7 @@ function parseDelimited(text: string): { columns: string[]; rows: Record<string,
 
 const ACC_IN_URL = /\b(SRP|PRJNA|PRJEB|PRJDB)\d+\b/i;
 /** 从单个 URL 抽取研究号（relation 的 @target，如 https://…/bioproject/PRJNA636285） */
-function extractAccFromUrl(url: string): string | null {
+export function extractAccFromUrl(url: string): string | null {
   const m = ACC_IN_URL.exec(url);
   return m ? m[0].toUpperCase() : null;
 }
@@ -333,7 +333,7 @@ function extractAccFromUrl(url: string): string | null {
  *   - neighbors 是 300 条相似数据集，里面混着**别的**项目的真实编号
  *     （GSE117176 的 neighbors[207]=SRP349691 就是它），绝不可用作映射来源。
  *  因此只在 relation / alias / external_id 这三个字段里取候选，不递归整棵树。 */
-function studyCandidates(project: unknown): string[] {
+export function studyCandidates(project: unknown): string[] {
   const out: string[] = [];
   const seen = new Set<string>();
   const push = (raw: string | null | undefined, kind?: string) => {
@@ -367,7 +367,7 @@ function studyCandidates(project: unknown): string[] {
 
 /** 校验候选确实有 run。注意：seqout 对老 GEO-only 项目（如 GSE62944）即使映射正确也会返回 0 run，
  *  这是上游本就没有公开 raw（ENA 同样为空），不是解析错误——此时如实返回空，不再瞎找替代。 */
-async function hasRuns(studyAccession: string): Promise<boolean> {
+export async function hasRuns(studyAccession: string): Promise<boolean> {
   try {
     const runs = await seqoutGet(`/project/${encodeURIComponent(studyAccession)}/runs`);
     if (Array.isArray(runs)) return runs.length > 0;
@@ -381,7 +381,7 @@ async function hasRuns(studyAccession: string): Promise<boolean> {
 }
 
 /** GSE → 研究编号：取 relation/alias 里的权威候选，优先挑有 run 的（若都没有，返回排序后的首选）。 */
-async function resolveStudy(accession: string): Promise<string> {
+export async function resolveStudy(accession: string): Promise<string> {
   const acc = accession.trim().toUpperCase();
   if (GSE_PATTERN.test(acc)) {
     const project = await seqoutGet(`/project/${encodeURIComponent(acc)}`);
@@ -398,7 +398,7 @@ async function resolveStudy(accession: string): Promise<string> {
 
 /** 研究编号 → BioProject 编号（PRJNA…）。下载工具用它给前端「下载加速」卡片提供 -A 参数；
  *  SRP 研究不直接暴露 PRJ 字段，但项目详情的 alias 字段通常就是 PRJNA（实测 SRP426032 → PRJNA941834）。 */
-async function resolveBioproject(studyAccession: string): Promise<string | null> {
+export async function resolveBioproject(studyAccession: string): Promise<string | null> {
   if (/^PRJ(NA|EB|DB)\d+$/i.test(studyAccession)) return studyAccession.toUpperCase();
   try {
     const project = await seqoutGet(`/project/${encodeURIComponent(studyAccession)}`);

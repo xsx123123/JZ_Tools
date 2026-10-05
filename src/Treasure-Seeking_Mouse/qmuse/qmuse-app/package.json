@@ -8,7 +8,8 @@
     "dev": "vite dev",
     "lint": "oxlint src",
     "preview": "vite preview",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "node --test functions/seqout-chat/tests/*.test.mjs"
   },
   "dependencies": {
     "@fontsource-variable/noto-sans-sc": "^5.3.0",
