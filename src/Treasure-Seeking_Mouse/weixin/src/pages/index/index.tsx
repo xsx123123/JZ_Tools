@@ -18,8 +18,10 @@ import {
 } from '@/services/chatStore'
 import { applyTheme, readTheme, writeTheme, type Theme } from '@/services/petStore'
 import { addEvidenceListener, type EvidenceRequest } from '@/lib/evidenceBus'
+import { extractFollowups } from '@/lib/followup'
 import { copyLinkWithConfirm } from '@/lib/copyLink'
 import { Markdown } from '@/components/Markdown'
+import SuggestionBlock from '@/components/SuggestionBlock'
 import { LiteratureCardPanel, requestCardLiterature, ncbiLink } from '@/components/LiteratureCard'
 import { SessionSidebar } from '@/components/SessionSidebar'
 import { UsageStatsDialog } from '@/components/UsageStatsDialog'
@@ -319,7 +321,7 @@ export default function Index() {
             <View className='msg__body'>
               {m.content ? (
                 m.role === 'assistant' ? (
-                  <Markdown text={m.content} hostMessageId={m.id} />
+                  <Markdown text={extractFollowups(m.content).main} hostMessageId={m.id} />
                 ) : (
                   <Text className='msg__text'>{m.content}</Text>
                 )
@@ -359,6 +361,13 @@ export default function Index() {
             {m.error ? <Text className='msg__err'>{m.error}</Text> : null}
 
             {m.boost ? <PolariseqCard accession={m.boost.accession} /> : null}
+
+            {m.role === 'assistant' && !m.streaming && extractFollowups(m.content).items.length > 0 ? (
+              <SuggestionBlock
+                items={extractFollowups(m.content).items}
+                onPick={(q) => void handleSend(q)}
+              />
+            ) : null}
 
             {evidence && evidence.hostMessageId === m.id ? (
               <LiteratureCardPanel kind={evidence.kind} id={evidence.id} onClose={() => setEvidence(null)} />
