@@ -8,7 +8,6 @@ export const en = {
 
   // ---- 顶栏 ----
   "header.newChat": "New chat",
-  "header.guestTrial": "Trial mode (browser · {n} chats · {d} days)",
   "header.guestBadge": "guest mode",
   "header.expandSessions": "Expand session list",
   "header.collapseSessions": "Collapse session list",
@@ -40,7 +39,7 @@ export const en = {
 
   // ---- 空态 ----
   "empty.intro":
-    "Tell Muse which lode to dig. Its nose is sharp — it dives into GEO, SRA, ENA and GSA, sniffs out high-impact datasets, chews through cryptic accessions, and drops a bundle of samples right at your feet.",
+    "Tell Muse which lode to dig. Its nose is sharp, it dives into GEO, SRA, ENA and GSA, sniffs out high-impact datasets, chews through cryptic accessions, and drops a bundle of samples right at your feet.",
 
   // ---- 输入区 ----
   "composer.placeholder":
@@ -48,7 +47,7 @@ export const en = {
   "composer.stop": "Stop generating",
   "composer.send": "Send",
   "composer.disclaimer":
-    "Muse's treasures are retrieved from global public omics databases — check the original NCBI / NGDC entries for details",
+    "Muse's treasures are retrieved from global public omics databases, check the original NCBI / NGDC entries for details",
 
   // ---- 消息 ----
   "msg.thinking": "Thinking…",
@@ -72,12 +71,12 @@ export const en = {
   "boost.title": "Download Boost · Polariseq",
   "boost.page": "Project page",
   "boost.desc":
-    "Polariseq is a Rust-based high-speed download tool by GeoMuse's author xsx123 (CLI + cross-platform desktop GUI), supporting NCBI SRA / EBI / GEO — AWS S3 global acceleration by default, multi-threading, resumable downloads and MD5 verification.",
+    "Polariseq is a Rust-based high-speed download tool by GeoMuse's author xsx123 (CLI + cross-platform desktop GUI), supporting NCBI SRA / EBI / GEO, AWS S3 global acceleration by default, multi-threading, resumable downloads and MD5 verification.",
   "boost.note": "For GEO data, replace -A with the record's BioProject ID (found under the SRA / BioProject links on the GEO page); deps install only runs once to set up sra-tools.",
   "boost.copy": "Copy",
   "boost.copied": "Copied",
   "boost.download": "Download sheet",
-  "boost.noteKnown": "-A is pre-filled with this project's BioProject ID {acc} — just copy and run; deps install only runs once to set up sra-tools.",
+  "boost.noteKnown": "-A is pre-filled with this project's BioProject ID {acc}, just copy and run; deps install only runs once to set up sra-tools.",
 
   // ---- 文献卡片 ----
   "lit.title": "Evidence chain",
@@ -95,7 +94,7 @@ export const en = {
   "idlink.viewEvidence": "View evidence chain",
   "idlink.original": "Original page",
   "idlink.fetching": "Fetching paper",
-  "idlink.noPaper": "No directly linked paper found — open the original page or retry",
+  "idlink.noPaper": "No directly linked paper found, open the original page or retry",
   "idlink.hint": "💎 A-Xun found treasure here! Hover the accession to dig it up",
   "idlink.types.geo_series": "GEO Series",
   "idlink.types.geo_sample": "GEO Sample",
@@ -107,7 +106,7 @@ export const en = {
   "pet.recall": "Recall Muse",
   "pet.chest": "Chest",
   "pet.chestHover": "{n} treasures dug so far",
-  "pet.chestStock": "The chest holds {n} treasures — every one dug up by Muse!",
+  "pet.chestStock": "The chest holds {n} treasures, every one dug up by Muse!",
   "pet.badgeTitle": "Achievement “{name}” · {n} treasures dug",
   "pet.banner": "🏅 Achievement unlocked · {name} ({n} treasures)",
   "pet.hint": "Muse · {mode}",
@@ -136,7 +135,7 @@ export const en = {
   "board.loading": "Digging up the board…",
   "board.emptyWeek": "No one on the board this week",
   "board.emptyAll": "No one on the board yet",
-  "board.emptyDiggersHint": "Sign in — every dig gets recorded here",
+  "board.emptyDiggersHint": "Sign in, every dig gets recorded here",
   "board.emptyGuestsHint": "Send one message to become a founding temp miner",
   "board.me": "me",
   "board.rowMeta": "{chats} chats · {digs} digs",
@@ -177,7 +176,7 @@ export const en = {
   "stats.llmCallsHint": "{n} LLM requests",
   "stats.perTool": "Per-tool usage",
   "stats.perToolSummary": "{types} types / {calls} calls",
-  "stats.toolEmpty": "No tool calls yet — go ask Muse something",
+  "stats.toolEmpty": "No tool calls yet, go ask Muse something",
   "stats.toolFailed": "failed {n}",
   "stats.since": "Stats since {since} · last updated {updated}",
 
@@ -207,12 +206,12 @@ export const en = {
   "auth.backToLogin": "Back to sign in",
   "auth.resend": "No code? Resubmit registration",
   "auth.errInvalidCredentials": "Incorrect email or password",
-  "auth.errExists": "This email is already registered — just sign in",
+  "auth.errExists": "This email is already registered, just sign in",
   "auth.errRateLimit": "Too many attempts, please try later",
   "auth.errPasswordShort": "Password must be at least 6 characters",
   "auth.errSession": "Sign-in state not synced yet, please retry shortly",
-  "auth.verifySent": "Confirmation email sent — enter the 6-digit code from the email to finish signing up",
-  "auth.resetSent": "Reset link sent to your email — open it to set a new password",
+  "auth.verifySent": "Confirmation email sent, enter the 6-digit code from the email to finish signing up",
+  "auth.resetSent": "Reset link sent to your email, open it to set a new password",
 
   // ---- 重置密码页 ----
   "reset.title": "Set a new password",
@@ -231,7 +230,7 @@ export const en = {
   "about.highlights": "Highlights",
   "about.mcpTitle": "Chat backend: seqout-mcp",
   "about.mcpNote":
-    "The chat backend wraps {mcp}, an MCP Server that queries public omics data via {seqout}. It exposes 26 read-only tools covering GEO, SRA, ENA and GSA dataset search, project details, sample info, accession lookup, statistics and download links. It uses stdio transport: the MCP client launches the process and talks over stdin/stdout; regular logs go to stderr only, never polluting the MCP protocol stream. This app ports those tool capabilities declaratively into the chat service as OpenAI function schemas — no local Python MCP process required.",
+    "The chat backend wraps {mcp}, an MCP Server that queries public omics data via {seqout}. It exposes 26 read-only tools covering GEO, SRA, ENA and GSA dataset search, project details, sample info, accession lookup, statistics and download links. It uses stdio transport: the MCP client launches the process and talks over stdin/stdout; regular logs go to stderr only, never polluting the MCP protocol stream. This app ports those tool capabilities declaratively into the chat service as OpenAI function schemas, no local Python MCP process required.",
   "about.deploy": "One-click self-host",
   "about.deployDesc":
     "Fully platform-free: any OpenAI-compatible model (OpenAI / DeepSeek / SiliconFlow / local vLLM) + Docker. Config lives in a single {env} file; without a database it degrades to guest-only mode.",
@@ -241,16 +240,16 @@ export const en = {
   "about.stack": "Tech stack",
   "about.stackNote": "dual-theme design tokens (light academic + night-mine dark)",
   "about.footer":
-    "Conversational omics data retrieval · Data from the seqout.org public API · Answers are AI-generated — verify against the original NCBI / NGDC pages",
+    "Conversational omics data retrieval · Data from the seqout.org public API · Answers are AI-generated, verify against the original NCBI / NGDC pages",
   "about.online": "Live demo",
   "about.onlineStale": "the deployed version may lag behind the latest repo code",
   "about.github": "GitHub repo",
   "about.docs": "Detailed dev docs",
   "about.thanks": "Acknowledgements",
   "about.why": "Why we built the treasure mouse",
-  "about.why.1": "OmicsTreasure Hunter helps research newcomers leave behind the cold, labyrinthine bioinformatics databases of the past — through a personified \"prospecting for treasure\" interaction, it punches through the GEO / SRA / ENA / GSA data universe in one step.",
-  "about.why.2": "For first-year graduate students, what drains the passion for science is usually not the experiments — it's the blind wandering through icy, hostile database mazes at the very start: can't find the right samples, can't decode the accessions, can't locate the literature. Step one becomes self-doubt and burnout. OmicsTreasure Hunter exists to rescue researchers from that dreary, oppressive first step of data hunting.",
-  "about.why.3": "Here, research is no longer a lonely solo grind, and there is no cold wall of code between you and the data. Just chat about your project ideas the way you'd talk with a labmate — the desk pet \"A-Xun\" (阿寻) puts on its miner's helmet, dives into the data lodes, and gleefully digs out the golden datasets and key papers that best match your direction, delivering tidy sample cards right to your hands. Every search is a small adventure — less anxiety at the start of your research journey, more of the pure joy of exploration and steady companionship.",
+  "about.why.1": "OmicsTreasure Hunter helps research newcomers leave behind the cold, labyrinthine bioinformatics databases of the past: through a personified \"prospecting for treasure\" interaction, it punches through the GEO / SRA / ENA / GSA data universe in one step.",
+  "about.why.2": "For first-year graduate students, what drains the passion for science is usually not the experiments, it's the blind wandering through icy, hostile database mazes at the very start: can't find the right samples, can't decode the accessions, can't locate the literature. Step one becomes self-doubt and burnout. OmicsTreasure Hunter exists to rescue researchers from that dreary, oppressive first step of data hunting.",
+  "about.why.3": "Here, research is no longer a lonely solo grind, and there is no cold wall of code between you and the data. Just chat about your project ideas the way you'd talk with a labmate, the desk pet \"A-Xun\" (阿寻) puts on its miner's helmet, dives into the data lodes, and gleefully digs out the golden datasets and key papers that best match your direction, delivering tidy sample cards right to your hands. Every search is a small adventure, less anxiety at the start of your research journey, more of the pure joy of exploration and steady companionship.",
   "about.authors": "Built and deployed on {qmuse}, developed with assistance from AI models including DeepSeek-V4, Kimi-K3 and GLM-5.3.",
 
   "about.h.1.title": "Conversational retrieval",
@@ -264,7 +263,7 @@ export const en = {
   "about.h.5.title": "Pet & achievements",
   "about.h.5.desc": "The treasure mouse digs as you retrieve, unlocking achievement badges; draggable, long-press to silence.",
   "about.h.6.title": "Mobile adaptive",
-  "about.h.6.desc": "Soft keyboard, safe areas and touch interactions fully adapted — dig comfortably on a phone too.",
+  "about.h.6.desc": "Soft keyboard, safe areas and touch interactions fully adapted, dig comfortably on a phone too.",
 
   // ---- 错误 ----
   "err.connect": "Can't reach the data service. Check your network and retry.",
