@@ -134,28 +134,33 @@ export function IdLink({
       {summary && !litTitle ? (
         <p className="line-clamp-4 text-[12px] leading-relaxed text-foreground/85">{summary}</p>
       ) : null}
-      <div className="flex flex-wrap items-center gap-1.5 pt-1">
-        <button
-          type="button"
-          onClick={copyId}
-          className="flex shrink-0 items-center gap-1 whitespace-nowrap rounded-md border border-border bg-secondary px-2 py-1 text-[11px] text-secondary-foreground transition-colors hover:bg-accent"
-        >
-          {copied ? <Check size={11} className="text-helix" /> : <Copy size={11} />}
-          {copied ? t("idlink.copied") : t("idlink.copyId")}
-        </button>
-        <button
-          type="button"
-          onClick={showEvidence}
-          className="flex shrink-0 items-center gap-1 whitespace-nowrap rounded-md border border-border bg-secondary px-2 py-1 text-[11px] text-secondary-foreground transition-colors hover:bg-accent"
-        >
-          <BookOpen size={11} />
-          {t("idlink.viewEvidence")}
-        </button>
+      {/* 操作行：左侧两个按钮成组，右侧原始页链接贴边。
+          不用 flex-wrap + ml-auto：英文文案较长时会换行、把「原始页」单独挤到第二行右侧，
+          形成错位和下方空白。justify-between 恒为一行，两端对齐。 */}
+      <div className="flex items-center justify-between gap-1.5 pt-1">
+        <div className="flex items-center gap-1.5">
+          <button
+            type="button"
+            onClick={copyId}
+            className="flex shrink-0 items-center gap-1 whitespace-nowrap rounded-md border border-border bg-secondary px-2 py-1 text-[11px] text-secondary-foreground transition-colors hover:bg-accent"
+          >
+            {copied ? <Check size={11} className="text-helix" /> : <Copy size={11} />}
+            {copied ? t("idlink.copied") : t("idlink.copyId")}
+          </button>
+          <button
+            type="button"
+            onClick={showEvidence}
+            className="flex shrink-0 items-center gap-1 whitespace-nowrap rounded-md border border-border bg-secondary px-2 py-1 text-[11px] text-secondary-foreground transition-colors hover:bg-accent"
+          >
+            <BookOpen size={11} />
+            {t("idlink.viewEvidence")}
+          </button>
+        </div>
         <a
           href={match.url}
           target="_blank"
           rel="noreferrer noopener"
-          className="ml-auto flex shrink-0 items-center gap-1 whitespace-nowrap rounded-md px-2 py-1 text-[11px] text-muted-foreground transition-colors hover:text-helix"
+          className="flex shrink-0 items-center gap-1 whitespace-nowrap rounded-md px-2 py-1 text-[11px] text-muted-foreground transition-colors hover:text-helix"
         >
           <ExternalLink size={11} />
           {t("idlink.original")}

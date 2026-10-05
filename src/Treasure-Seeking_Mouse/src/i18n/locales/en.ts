@@ -47,7 +47,7 @@ export const en = {
   "composer.stop": "Stop generating",
   "composer.send": "Send",
   "composer.disclaimer":
-    "Muse's treasures are retrieved from global public omics databases, check the original NCBI / NGDC entries for details",
+    "Muse's finds come from public omics databases; verify via NCBI / NGDC.",
 
   // ---- 消息 ----
   "msg.thinking": "Thinking…",
@@ -91,8 +91,8 @@ export const en = {
   // ---- ID 浮层 ----
   "idlink.copyId": "Copy ID",
   "idlink.copied": "Copied",
-  "idlink.viewEvidence": "View evidence chain",
-  "idlink.original": "Original page",
+  "idlink.viewEvidence": "Evidence chain",
+  "idlink.original": "Source",
   "idlink.fetching": "Fetching paper",
   "idlink.noPaper": "No directly linked paper found, open the original page or retry",
   "idlink.hint": "💎 A-Xun found treasure here! Hover the accession to dig it up",
