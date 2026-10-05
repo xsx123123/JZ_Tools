@@ -10,13 +10,17 @@
 import Taro from "@tarojs/taro";
 import { readLang, translate } from "@/i18n";
 import { getDeviceId } from "./device";
+import { createFrameParser, type SseHandlers } from "./sseParse";
 
-/** 对话服务地址：必须是已配置到小程序后台的 HTTPS 合法域名 */
-const CHAT_API = "";
+/** 对话服务地址：构建期经 config/index.ts 的 defineConstants 注入（process.env.CHAT_API），
+ *  本地未注入时回退占位符。必须是已配置到小程序后台的 HTTPS 合法域名 */
+const CHAT_API: string = process.env.CHAT_API || "";
 
 function chatEndpoint(): string {
   return CHAT_API || "https://YOUR_DOMAIN/chat-api";
 }
+// 供 literature.ts 等同域服务复用（保持单一占位符来源，R3 换域名只改这一处）
+export { chatEndpoint };
 
 export interface ChatMessageDTO {
   role: "user" | "assistant";
@@ -38,19 +42,15 @@ export interface ToolLog {
   ms: number;
 }
 
-export interface StreamHandlers {
-  onDelta: (text: string) => void;
-  onTool: (evt: { name: string; label: string; status: "running" | "done" | "error"; ms?: number; error?: string }) => void;
-  onCards: (cards: DatasetCard[]) => void;
-  onEnd: (payload: { cards: DatasetCard[]; tools: ToolLog[] }) => void;
-  onError: (message: string) => void;
-}
+export type StreamHandlers = SseHandlers;
 
 function headers(): Record<string, string> {
   return {
     "Content-Type": "application/json",
     // 使用统计去重标识：小程序端恒为访客设备指纹（登录后由 auth 层提供 openid）
     "X-Stats-Actor": getDeviceId(),
+    // 可选防刷密钥：后端配置 CHAT_SHARED_SECRET 时必须匹配，否则 401；未配置时为空串无影响
+    "X-Chat-Key": process.env.CHAT_SHARED_SECRET || "",
   };
 }
 
@@ -98,47 +98,10 @@ export async function fetchModelCatalog(): Promise<{ models: string[]; defaultMo
 }
 
 /**
- * 把 ArrayBuffer 分块喂给 SSE 行解析器。
- * 关键点：chunk 边界可能切断一帧，必须用 buffer 累积、只在见到完整帧（\n\n）时才处理——
- * 这一点与网页版 getReader() 的处理方式一致，只是数据源换成了 onChunkReceived。
+ * SSE 帧解析器在 ./sseParse（纯函数、Node 可单测）。
+ * 关键点：chunk 边界可能切断一帧，必须用 buffer 累积、只在见到完整行时才处理——
+ * 这一点与网页版流式读取器的处理方式一致，只是数据源换成了 onChunkReceived。
  */
-function createFrameParser(handlers: StreamHandlers) {
-  let buffer = "";
-  const decoder = new TextDecoder("utf-8");
-
-  function handleLine(line: string): void {
-    const t = line.trim();
-    if (!t.startsWith("data:")) return; // 忽略 ": ping" 心跳
-    const payload = t.slice(5).trim();
-    if (payload === "[DONE]") return;
-    try {
-      const obj = JSON.parse(payload);
-      if (typeof obj.delta === "string" && obj.delta) handlers.onDelta(obj.delta);
-      else if (obj.event === "tool") handlers.onTool(obj);
-      else if (obj.event === "cards" && Array.isArray(obj.cards)) handlers.onCards(obj.cards);
-      else if (obj.event === "end") handlers.onEnd({ cards: obj.cards ?? [], tools: obj.tools ?? [] });
-      else if (typeof obj.error === "string") handlers.onError(obj.error);
-    } catch {
-      /* 忽略非法行 */
-    }
-  }
-
-  return {
-    /** 收到一块字节，按行切分并处理完整行 */
-    push(chunk: ArrayBuffer): void {
-      buffer += decoder.decode(chunk, { stream: true });
-      const lines = buffer.split("\n");
-      buffer = lines.pop() ?? ""; // 最后一段可能不完整，留到下一块
-      for (const line of lines) handleLine(line);
-    },
-    /** 流结束：冲刷残留缓冲 */
-    flush(): void {
-      buffer += decoder.decode();
-      if (buffer.trim()) handleLine(buffer);
-      buffer = "";
-    },
-  };
-}
 
 /** POST 流式对话；返回的 Promise 在流结束/出错时 resolve */
 export function requestSeqoutChat(
@@ -151,6 +114,9 @@ export function requestSeqoutChat(
   return new Promise<void>((resolve) => {
     const parser = createFrameParser(handlers);
     let settled = false;
+    // 双发防御：个别基础库版本既触发 onChunkReceived、success 的 res.data 又含完整 body，
+    // 若两条路径都喂解析器会导致 delta 重复渲染——收到过任一分块就只信分块流
+    let gotChunk = false;
     const done = () => {
       if (settled) return;
       settled = true;
@@ -165,7 +131,17 @@ export function requestSeqoutChat(
       // 小程序流式关键开关：开启分块传输，配合 onChunkReceived 收流
       enableChunked: true,
       responseType: "arraybuffer",
-      success: () => {
+      success: (res) => {
+        // 兜底：个别基础库/开发者工具版本不触发 onChunkReceived 时，
+        // success 里拿到的是完整响应体（arraybuffer），整块喂给解析器结果一致
+        const data = (res as unknown as { data?: unknown })?.data;
+        if (!gotChunk && data instanceof ArrayBuffer) {
+          try {
+            parser.push(data);
+          } catch {
+            /* ignore */
+          }
+        }
         parser.flush();
         done();
       },
@@ -185,6 +161,7 @@ export function requestSeqoutChat(
     if (abortRef) abortRef.current = { abort: () => task.abort() };
 
     task.onChunkReceived((res) => {
+      gotChunk = true;
       try {
         parser.push(res.data);
       } catch {

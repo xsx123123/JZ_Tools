@@ -1,7 +1,7 @@
 // 轻量 i18n 内核：字典 + t() 取词/插值 + 工具名/桌宠台词/示例池的中英文案表。
 // 不引第三方库；语言偏好写 wx storage，React 侧由 provider.tsx 提供响应式 t()。
-// 【小程序适配】localStorage→wx.getStorageSync、navigator.language→wx.getSystemInfoSync、
-//              document.documentElement.lang/document.title→wx.setNavigationBarTitle
+// 【小程序适配】网页版存储→wx.getStorageSync、网页版语言探测→wx.getSystemInfoSync、
+//              网页版文档语言/标题→wx.setNavigationBarTitle
 import Taro from "@tarojs/taro";
 import { zh } from "./locales/zh";
 import { en } from "./locales/en";

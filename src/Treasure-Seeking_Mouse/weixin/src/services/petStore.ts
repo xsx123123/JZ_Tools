@@ -101,7 +101,7 @@ export function writeTheme(t: Theme): void {
 
 /**
  * 把主题应用到页面根节点：dark 加 .dark 类，light 移除。
- * 【小程序适配】网页版操作 document.documentElement；小程序无 DOM，
+ * 【小程序适配】网页版操作根元素类名；小程序无 DOM，
  * 改用 Taro 的页面类名开关——给 page 根节点挂 .dark，WXSS 里 `.dark .xxx` 才能命中。
  * 注：需在页面根 View 上保留一个可被选择器命中的容器类（见 index.tsx 的 .theme-root）。
  */

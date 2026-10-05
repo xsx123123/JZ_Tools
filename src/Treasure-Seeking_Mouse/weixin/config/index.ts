@@ -15,7 +15,13 @@ export default defineConfig({
   sourceRoot: 'src',
   outputRoot: 'dist',
   plugins: [],
-  defineConstants: {},
+  defineConstants: {
+    // 对话服务地址：构建期注入，避免改源码。正式部署：
+    //   CHAT_API=https://cygnusx.icu/chat-api npm run build:weapp
+    'process.env.CHAT_API': JSON.stringify(process.env.CHAT_API || 'https://YOUR_DOMAIN/chat-api'),
+    // 可选：与后端 CHAT_SHARED_SECRET 配套的防刷密钥（后端未配置鉴权时留空即可，不影响请求）
+    'process.env.CHAT_SHARED_SECRET': JSON.stringify(process.env.CHAT_SHARED_SECRET || ''),
+  },
   copy: {
     patterns: [],
     options: {},

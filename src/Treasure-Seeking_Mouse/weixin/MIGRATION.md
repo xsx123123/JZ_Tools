@@ -3,6 +3,117 @@
 > 记录每轮从主仓库到小程序版的同步。体例参照 `../qmuse/MIGRATION.md`：
 > 每条记 `R<n> — 日期 — 源 commit`。
 
+## R3 — 2026-10-05 Web 版剩余功能组件移植（源：主仓库 commit `dc9845e`）
+
+### 本轮做了什么
+
+把 MIGRATION.md「已知未做」清单里的 5 块功能组件全部移植进小程序并接入 `index.tsx`：
+文献证据链卡片、会话侧栏、使用统计弹窗、排行榜抽屉、桌宠。
+i18n 再次零新增键——5 个组件的文案全部复用 Web 版字典已有键（`lit.*`/`sidebar.*`/`stats.*`/`board.*`/`pet.*`/`idlink.*`），中英维持各 218 键。
+
+### 文件级结果
+
+| 主仓库 | 小程序版 | 处理 |
+|---|---|---|
+| `src/components/chat/LiteratureCard.tsx` | `src/components/LiteratureCard.tsx` | 🔧 重写：骨架/摘要/建议检索词一致；原文链接（PubMed/DOI/OA）不能新窗口打开 → 统一「弹窗确认→复制」(`lib/copyLink.ts`)；附带 `requestCardLiterature`/`ncbiLink`（DatasetCard.tsx 的 LIT_KIND/buildLink 并入） |
+| `src/services/literature.ts` | 同路径 | 🔧 重写：fetch→`Taro.request`（3s timeout 对齐 AbortController），去 Supabase 鉴权头；ok 10min / not_found 5min 进程内缓存保留 |
+| `src/components/chat/SessionSidebar.tsx` | `src/components/SessionSidebar.tsx` | 🔧 重写：无 hover drawer → 「遮罩 + 左侧固定面板」；无登录入口，底部游客存储提示（`sidebar.guestNote`）；重命名用 Taro Input，删除走 showModal 二次确认 |
+| `src/components/chat/UsageStatsDialog.tsx` | `src/components/UsageStatsDialog.tsx` | 🔧 重写：居中覆盖层弹窗（mask 点击关闭，无 Escape）；数据源同 Web 版（`GET <chatEndpoint>/stats`），四宫格 + 每工具条形图保留 |
+| `src/components/chat/Leaderboard.tsx` | `src/components/Leaderboard.tsx` | 🔧 重写 + **数据源差异**：见下「差异决策」 |
+| `src/components/pet/TreasureMouse.tsx`（470 行） | `src/components/TreasureMouse.tsx` | 🔧 重写（简化版）：见下「桌宠方案」 |
+| `src/assets/pet/*.webp`（4 张，共 60KB） | `src/assets/pet/` | ✅ 原样拷贝（webp 小程序原生支持） |
+| — | `src/components/panels.css` / `pet.css` / `lib/copyLink.ts` | ✅ 新增：覆盖层公共骨架（mask/drawer/dialog）+ 组件样式；桌宠布局样式（动画关键帧复用 theme.css R1 已转换的 .pet-*） |
+| `src/pages/index/index.tsx` | 同路径 | 🔧 接线：顶栏 ☰/📊/🏆/主题/＋ 五个入口；底部简陋 sessions 列表删除；证据链总线监听渲染在宿主消息下方；数据卡片加「NCBI 链接 + 📖 文献」操作行；桌宠事件流（tool_start/cards/done/error） |
+| `types/global.d.ts` | 同路径 | 🔧 补 `*.webp` 模块声明 |
+
+### 差异决策（重要）
+
+**1) 排行榜数据源**：Web 版登录榜来自 Supabase 云端（`user_stats` 表）。
+小程序版无云端账号体系，且 AGENTS.md 硬约束禁止引入 Supabase（存储走 device.ts）。
+决策：**做成本机版排行榜**——`statsStore.fetchLeaderboard()` 在 R1 已重写为本机统计
+（等价 Web 版「离线模式」分支：登录榜恒空、默认落在「临时矿工」Tab、榜单只有本机访客一行）。
+昵称修改/排序口径/奖牌/「我」高亮等交互完整保留，接口形状与 Web 版一致，日后接后端无缝替换。
+
+**2) 桌宠方案**：Web 版 470 行依赖 pointer 拖拽、内联 SVG 宝石、DOM 动画、window 尺寸探测。
+小程序不支持内联 SVG、无 pointer 事件体系。决策：
+- 造型：3 张 webp 静态图（base/dig/cheer）按状态切换，`<Image>` + theme.css 已有 CSS 关键帧
+  （idle 浮动/挖掘/跳跃/转圈/庆祝/土堆/尘土/爱心/星尘/横幅，R1 已从主仓库转换好）
+- 状态机与事件协议和 Web 版完全一致（`makePetEvent` 的 seq 去重、cards/done 重复计数防护、
+  成就里程碑一次性庆祝、点按 poke 三连击彩蛋、宝箱库存播报、长按 600ms 静默）
+- **省略**：拖拽移动与闲置散步动画（无 pointer 体系，价值/成本比低）；SVG 宝石改 emoji 💎
+
+**3) IdLink 交互升级**（R2 的后续）：点击编号 → ActionSheet「复制链接 / 查看证据链」，
+不再只是复制——证据链请求经 evidenceBus 抛给页面层，文献卡片渲染在宿主消息下方（对齐 Web 版）。
+
+### 验证结果（本轮实测）
+
+| 项 | 结果 |
+|---|---|
+| `npm run typecheck` | ✅ 通过 |
+| `npm run build:weapp` | ✅ Compiled successfully，dist **584KB**（+124KB：4 张 webp 60KB + 组件代码/样式），< 1.5MB 验收线 |
+| `node scripts/verify-stream.mjs` | ✅ 仍 10 case 全过 |
+| `grep oklch(/color-mix(` | ✅ 0 |
+| `grep localStorage/window./document./navigator./getReader` | ✅ 0 |
+| i18n 字典 | ✅ zh/en 各 218 键，零新增 |
+| 微信 API 人工审查 | showActionSheet/showModal/Input focus/ScrollView scrollY/Image mode='aspectFit'/fixed 定位均为微信基础能力，Taro 4.3 类型齐全；真机效果仍待开发者工具实测 |
+
+### 踩坑记录（本轮新增）
+
+- ❌ `.pet__bubble` 同时挂定位 transform（translate(-50%)）和 `.pet-bubble` 入场动画会**互相覆盖**
+  （animation fill 终态 transform:none 吃掉定位）→ 定位与动画必须拆内外两层节点。
+- ❌ Taro `Input` 的 `focus` 属性可自动聚焦，但**不能**用 `autoFocus`（DOM 概念，小程序不认）。
+- ⚠️ `showActionSheet` 的 `fail` 回调在用户取消时也会触发（errMsg cancel），必须吞掉不算错误。
+- ⚠️ Input 放在 `Text` 里不合法（Text 只能嵌套 Text）——带输入框的行都用 View 作容器。
+- ⚠️ 昵称浮层在抽屉（fixed z-45）之上，需再高一档（z-60）+ 自己的 mask。
+
+## R2 — 2026-10-05 核心聊天体验补齐（源：主仓库 commit `dc9845e`）
+
+### 本轮做了什么
+
+在 R1 骨架上补齐三块核心体验：dark 主题真正生效（根节点类绑定 + 顶栏切换按钮）、
+轻量 Markdown 渲染（含 GSE/GSM/GO:/PMID 编号内嵌链接）、流式解析逻辑的 Node 验证 harness。
+i18n 零新增键（主题按钮复用 `header.themeLight/Dark`，复制确认复用 `idlink.copyId` / `board.cancel`），
+中英维持各 218 键。
+
+### 文件级结果
+
+| 主仓库 | 小程序版 | 处理 |
+|---|---|---|
+| `src/components/chat/Markdown.tsx`（react-markdown+rehype） | `src/components/Markdown.tsx` + `markdown.css` | 🔧 重写：手写块级切分+行内递归解析，Taro View/Text 渲染；语法子集=段落/粗体/斜体/行内代码/代码块/列表/标题/引用/分隔线/链接；编号经 `linkify.scanText` 切分渲染成 IdLink |
+| `src/components/chat/IdLink.tsx`（HoverCard/Popover） | （并入 `Markdown.tsx` 的 `IdLinkText`） | 🔧 重写：小程序无 hover/新窗口打开 → 点击 showModal 展示原始页地址，确认后 `Taro.setClipboardData` 复制链接 |
+| `src/services/seqoutChat.ts` 内联解析器 | `src/services/sseParse.ts`（新增） | 🔧 抽纯函数：TextDecoder 累积/按行切分/flush 冲刷，零平台依赖，Node 可直接 import（Node 24 原生 strip-types） |
+| — | `scripts/verify-stream.mjs`（新增） | ✅ 10 个 case：整帧单 chunk / 一帧拆 2~3 chunk / 两帧共 chunk / flush 半帧冲刷 / flush 完整帧 / 多字节 UTF-8 跨 chunk 切断 / 全事件序列 / error 帧 / CRLF / 空 delta |
+| `src/routes/index.tsx` 的 `toggleTheme` | `src/pages/index/index.tsx` | 🔧 根 View 绑 `theme === 'dark' ? 'chat dark' : 'chat'`，顶栏加 ☀️/🌙 切换按钮；持久化走 `petStore.readTheme/writeTheme`（→ device 存储层） |
+| `src/styles.css` 的 `@theme inline` 别名 | `src/styles/theme.css` | 🐞 **R1 补漏**：`--color-*` 别名随 Tailwind 指令被剥掉，全文 `var(--color-*)` 悬空 → 手写 26 条别名进 `:root`（惰性求值，`.dark` 自动生效） |
+| `src/pages/index/index.css` | 同路径 | 🔧 全部硬编码 hex 改语义变量（--background/--card/--helix...），dark 由根节点 `.dark` 驱动 |
+| `src/services/seqoutChat.ts` | 同路径 | 🔧 解析器改引 sseParse；success 兜底：基础库不触发 onChunkReceived 时整块响应体喂解析器 |
+
+### 验证结果（本轮实测）
+
+| 项 | 结果 |
+|---|---|
+| `npm run typecheck` | ✅ 通过 |
+| `npm run build:weapp` | ✅ Compiled successfully，dist **460KB**（+16KB，距 2MB 主包上限余量充足） |
+| `node scripts/verify-stream.mjs` | ✅ 10 case 全过（Node v24.11.0，原生跑 .ts 无需 flag） |
+| `grep oklch(/color-mix(` | ✅ 0（注释里的字样也清掉了，grep 字面 0） |
+| `grep localStorage/window./document./navigator./getReader` | ✅ 0（全是注释提及，已改写措辞） |
+| i18n 字典 | ✅ zh/en 各 218 键，零新增 |
+| `onChunkReceived` API 人工审查 | `Taro.request` 返回 RequestTask、`enableChunked`/`responseType:'arraybuffer'`/`task.onChunkReceived(res=>res.data)` 与微信文档一致；真机流式仍待开发者工具实测（见下） |
+
+### 踩坑记录（本轮新增）
+
+- ❌ **R1 暗雷**：`--color-*` 别名是 Tailwind v4 `@theme inline` 自动生成的，R1 剥 Tailwind 指令时一起丢失，
+  导致 theme.css 全文 `var(--color-*)` 悬空（R1 只验了 `--primary` 写出，没验引用侧）。
+  网页版行为依赖「自定义属性使用点惰性求值」：别名只写 `:root`，`.dark` 重定义底层 token 即自动换色。
+- ❌ 验收 grep 是**字面匹配**：注释里写 `window.open` / `oklch()` 这类字样也会命中。文案措辞要避开字面量
+  （写「网页版新窗口打开」「oklch 色彩函数」）。
+- ❌ tsconfig target=ES2017：正则 `s`（dotAll）flag 报 TS1501 → 用 `[^]` 代替 `.` 跨行匹配。
+- ⚠️ Taro React 页面里 `applyTheme` 的 `setData({ __theme })` 只更新 page data，**不参与 React 渲染**；
+  真正生效的是根 View 的 className 绑定（setData 保留作数据层同步/排查）。页面背景色靠 `.chat` 的
+  100vh 全覆盖，page 元素本身的背景不参与视觉。
+- ⚠️ `node scripts/verify-stream.mjs` 依赖 Node ≥22.6 的 type stripping（本机 v24.11 直接跑 .ts）；
+  engines 写的 `>=18` 对该脚本不成立，已在脚本头注释标明。
+
 ## R1 — 2026-10-05 首次落地（源：主仓库 commit `dc9845e`）
 
 ### 本轮做了什么

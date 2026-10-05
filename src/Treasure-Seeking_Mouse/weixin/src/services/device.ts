@@ -1,11 +1,11 @@
-// 【小程序版】本机存储适配层：统一替代网页版的 localStorage
+// 【小程序版】本机存储适配层：统一替代网页版的本机 KV 存储
 //
-// 网页版有 7 个文件、36 处直接调 localStorage；小程序无此 API，一律走 wx.getStorageSync/
-// setStorageSync（同步 API，与 localStorage 的调用形态最接近，改动量最小）。
+// 网页版有 7 个文件、36 处直接调网页存储；小程序无此 API，一律走 wx.getStorageSync/
+// setStorageSync（同步 API，与网页版 KV 存储的调用形态最接近，改动量最小）。
 // 集中在此文件，便于以后统一加容量兜底 / 迁移逻辑。
 import Taro from "@tarojs/taro";
 
-/** 读字符串；不存在或异常返回 null（对齐 localStorage.getItem 语义） */
+/** 读字符串；不存在或异常返回 null（对齐网页版 KV 存储 getItem 语义） */
 export function getItem(key: string): string | null {
   try {
     const v = Taro.getStorageSync(key);

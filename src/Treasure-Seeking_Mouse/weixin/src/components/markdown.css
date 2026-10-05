@@ -1,0 +1,93 @@
+/* 【小程序版】Markdown 消息排版（View/Text 版，配合 Markdown.tsx）
+   网页版的 .md-body p/ul/li 等标签选择器在小程序无对应元素，
+   改为渲染层打 .md-* 显式类名（WXSS 约束：只用类选择器）。全部走 theme.css 语义变量。 */
+
+.md-body {
+  line-height: 1.75;
+  word-break: break-word;
+  font-size: 28rpx;
+  color: var(--foreground);
+}
+
+.md-p {
+  margin: 0.35em 0;
+}
+
+.md-h {
+  font-weight: 700;
+  margin: 0.8em 0 0.35em;
+  letter-spacing: 0.01em;
+  color: var(--foreground);
+}
+.md-h--1 { font-size: 34rpx; }
+.md-h--2 { font-size: 31rpx; }
+.md-h--3 { font-size: 29rpx; }
+
+/* 列表：小程序无 ul/li 元素，marker 用渲染层显式文本（"• "/"1. "） */
+.md-ul,
+.md-ol {
+  margin: 0.4em 0;
+}
+.md-li {
+  margin: 0.2em 0;
+}
+.md-li__marker {
+  color: var(--helix);
+  margin-right: 0.35em;
+}
+
+.md-code {
+  font-family: var(--font-mono);
+  font-size: 0.86em;
+  background: var(--secondary);
+  border: 1rpx solid var(--border);
+  border-radius: 4px;
+  padding: 0 0.4em;
+  color: var(--strand);
+}
+
+.md-pre {
+  background: var(--secondary);
+  border: 1rpx solid var(--border);
+  border-radius: 8px;
+  padding: 0.8em 1em;
+  margin: 0.5em 0;
+}
+.md-pre__code {
+  font-family: var(--font-mono);
+  font-size: 24rpx;
+  color: var(--foreground);
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+.md-pre__lang {
+  display: block;
+  text-align: right;
+  font-family: var(--font-mono);
+  font-size: 20rpx;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted-foreground);
+  margin-bottom: 0.3em;
+}
+
+.md-quote {
+  border-left: 3px solid var(--helix);
+  margin: 0.5em 0;
+  padding: 0.15em 0 0.15em 0.9em;
+  color: var(--muted-foreground);
+  background: var(--helix-soft);
+}
+
+.md-hr {
+  border: none;
+  border-top: 1rpx dashed var(--border);
+  margin: 0.8em 0;
+}
+
+/* [text](url) 行内链接：小程序无新窗口打开能力，点击复制链接（交互见 Markdown.tsx 注释） */
+.md-link {
+  color: var(--strand);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}

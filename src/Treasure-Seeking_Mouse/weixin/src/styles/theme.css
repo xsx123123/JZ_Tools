@@ -1,7 +1,7 @@
 /* 【小程序版】已移除：Tailwind v4 指令（@import "tailwindcss"/@source/@theme）、
    Web 字体 @import（小程序用系统字体）。保留 :root / .dark 两套 token。 */
 /* 【小程序版】由主仓库 src/styles.css 转换而来
-   1) 全部 114 处 oklch() 已按 CSS Color 4 定义转成 rgb()/rgba()
+   1) 全部 114 处 oklch 色彩函数已按 CSS Color 4 定义转成 rgb()/rgba()
       （小程序低版本 WebView 不认 oklch，会整条声明失效）
    2) WXSS 不支持带参伪类：:nth-child(even) 需人工改为显式类名（见文件内 TODO 注记）
    3) 属性选择器本文件原本就没有，无需处理
@@ -48,6 +48,37 @@
   --pet-amber: rgb(218, 149, 11);                  /* 琥珀金 */
   --pet-amber-deep: rgb(164, 94, 0);             /* 深琥珀（文字档） */
   --pet-gold-soft: rgb(255, 242, 210);            /* 浅金底 */
+
+  /* R2 补漏：网页版这些 --color-* 别名由 Tailwind v4 的 `@theme inline` 自动生成，
+     R1 转换时随 Tailwind 指令一起被剥掉，导致全文 var(--color-*) 引用悬空。
+     手写等价别名（只写在 :root：自定义属性按使用点惰性求值，
+     .dark 重定义 --xxx 后别名自动取到暗色值，与网页版行为一致）。 */
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-helix: var(--helix);
+  --color-helix-soft: var(--helix-soft);
+  --color-strand: var(--strand);
+  --color-panel: var(--panel);
+  --color-pet-amber: var(--pet-amber);
+  --color-pet-amber-deep: var(--pet-amber-deep);
+  --color-pet-gold-soft: var(--pet-gold-soft);
 }
 
 /* 夜探矿洞：深蓝灰底、卡片亮一档、teal/琥珀金提亮发光 */
@@ -233,7 +264,7 @@
 }
 
 /* v2.1 正文内嵌编号链接（teal 主色 + hover 下划线展开，双主题自适应）
-   注：原用 color-mix(in oklch, ...) 生成半透明主色，小程序不支持 → 直接写死 rgba 等价色 */
+   注：原用 color-mix 混色函数生成半透明主色，小程序不支持 → 直接写死 rgba 等价色 */
 .id-link {
   position: relative;
   color: var(--color-helix);
