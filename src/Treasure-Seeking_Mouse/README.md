@@ -89,8 +89,10 @@ This app is built and deployed on QMuse, and was developed with assistance from 
 </p>
 
 ---
-**Author**: JZHANG | **Version**: GeoMuse_v0.1.0
 
 ## 🔗 Links
+
+**Author**: JZHANG | **Version**: GeoMuse_v0.1.0
+
 - GitHub: [repository](https://github.com/xsx123123/JZ_Tools)
 - LINUX DO: [Announcement](https://linux.do/)

@@ -87,3 +87,12 @@ React 19 + TypeScript · Vite 7 · Tailwind CSS v4（双主题 design token）·
   <a href="https://www.kimi.com/" target="_blank" rel="noreferrer"><img src="badges/kimi.svg" height="24" alt="Kimi" /></a>&nbsp;&nbsp;
   <a href="https://chat.z.ai/" target="_blank" rel="noreferrer"><img src="badges/zhipu.svg" height="20" alt="GLM · Z.AI" /></a>
 </p>
+
+---
+
+## 🔗 链接
+
+**作者**：JZHANG | **版本**：GeoMuse_v0.1.0
+
+- GitHub：[仓库](https://github.com/xsx123123/JZ_Tools)
+- LINUX DO：[公告](https://linux.do/)
