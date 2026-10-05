@@ -34,13 +34,13 @@
         }
       })();
       // React 加载前同步语言（seqout-lang 由应用写入；?lang= 可强制覆盖）：
-      // 中文环境默认 zh，其余默认 en，避免首屏 <title>/lang 与界面语言不一致
+      // 默认恒为中文（产品主市场），避免首屏 <title>/lang 与界面语言不一致
       (function () {
         try {
           var forced = /[?&]lang=(zh|en)\b/.exec(location.search);
           var lang = forced ? forced[1] : localStorage.getItem("seqout-lang");
           if (lang !== "zh" && lang !== "en") {
-            lang = /^zh\b/i.test(navigator.language || "") ? "zh" : "en";
+            lang = "zh";
           }
           document.documentElement.lang = lang === "zh" ? "zh-CN" : "en";
           document.title = lang === "zh" ? "GEO寻宝鼠" : "GeoMuse";

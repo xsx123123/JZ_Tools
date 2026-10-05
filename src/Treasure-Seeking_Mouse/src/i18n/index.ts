@@ -10,21 +10,16 @@ const DICTS: Record<Lang, Record<string, string>> = { zh, en };
 
 const KEY_LANG = "seqout-lang";
 
-/** 按浏览器语言猜测默认语言（中文环境→zh，其余→en） */
+/** 默认语言恒为中文（产品主市场）；浏览器语言不再参与判断。用户界面切换与 ?lang= 仍可覆盖 */
 function detectDefaultLang(): Lang {
-  try {
-    const nav = typeof navigator !== "undefined" ? navigator.language : "";
-    return /^zh\b/i.test(nav) ? "zh" : "en";
-  } catch {
-    return "zh";
-  }
+  return "zh";
 }
 
 /**
  * 当前语言（优先级与 index.html 引导脚本保持一致，避免首屏 title 与界面语言不一致）：
  *   1) ?lang=zh|en URL 参数强制覆盖（截图/取证通道，不落盘）
  *   2) localStorage 已存偏好（用户在界面上的切换）
- *   3) 浏览器语言（中文环境→zh，其余→en）
+ *   3) 默认中文（产品主市场，浏览器语言不参与判断）
  */
 export function readLang(): Lang {
   try {
