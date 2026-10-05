@@ -181,8 +181,8 @@ const TOOL_DEFS = [
   tool('seqout_get_experiments', '列出研究的实验。支持 GSE（自动解析为 SRA/BioProject 编号）。', { study_accession: reqStr('研究编号，GSE 或 SRA/PRJ 编号') }, ['study_accession']),
   tool('seqout_get_runs', '列出研究的测序运行（SRR 编号列表）。支持 GSE 自动解析。', { study_accession: reqStr('研究编号') }, ['study_accession']),
   tool('seqout_get_run_download', '获取单个测序运行的下载链接。', { run_accession: reqStr('运行编号，如 SRR 开头') }, ['run_accession']),
-  tool('seqout_get_download_links', '获取研究全部运行的下载链接（TSV）。支持 GSE 自动解析。', { study_accession: reqStr('研究编号') }, ['study_accession']),
-  tool('seqout_get_metadata_csv', '获取研究合并元数据 CSV 的下载信息。支持 GSE 自动解析。', { study_accession: reqStr('研究编号') }, ['study_accession']),
+  tool('seqout_get_download_links', '获取研究全部运行的下载链接表（含 fastq/sra 直链、大小、MD5）。支持 GSE 自动解析。', { study_accession: reqStr('研究编号') }, ['study_accession']),
+  tool('seqout_get_metadata_csv', '获取研究合并样本/运行元数据表（测序策略、平台、样本属性等）。支持 GSE 自动解析。', { study_accession: reqStr('研究编号') }, ['study_accession']),
   tool('seqout_get_sample_metadata', '获取样本元数据；GSM 编号自动使用 sample-detail 通道。', { accession: reqStr('样本编号，如 GSM4581240') }, ['accession']),
   tool('seqout_get_sample_detail', '获取完整样本详细信息。', { accession: reqStr('样本编号，如 GSM4581240') }, ['accession']),
   tool('seqout_get_sample_manifest', '获取 GEO 项目（GSE）的样本清单预览。', { accession: reqStr('GSE 项目编号'), max_samples: intOpt('最多展示的样本数，默认20') }, ['accession']),
@@ -205,8 +205,15 @@ function reqStr(desc: string) { return { type: 'string', description: desc }; }
 function strOpt(desc: string) { return { type: 'string', description: desc, nullable: true }; }
 function intOpt(desc: string) { return { type: 'integer', description: desc, nullable: true }; }
 
-// 下载链接类工具：本轮调用过任一，前端就会在助手消息下展示固定的「下载加速」卡片（Polariseq 推荐）
-const DOWNLOAD_LINK_TOOLS = new Set(['seqout_get_download_links', 'seqout_get_run_download']);
+// 下载场景类工具：本轮调用过任一（含用 runs 接口拼下载表的路径），前端就会在助手消息下
+// 展示固定的「下载加速」卡片（Polariseq 推荐）。实测模型常走 seqout_get_runs 重建下载表，
+// 只盯 download_links 会漏——run 列表/元数据 CSV 同样是"用户要下载"的强信号。
+const DOWNLOAD_LINK_TOOLS = new Set([
+  'seqout_get_download_links',
+  'seqout_get_run_download',
+  'seqout_get_runs',
+  'seqout_get_metadata_csv',
+]);
 
 // ---------- seqout API 执行（复刻 mcp 的路径解析逻辑） ----------
 
@@ -229,20 +236,78 @@ async function seqoutGet(path: string, params?: Record<string, string>): Promise
   }
 }
 
-/** TSV 类端点专用（runs/download、metadata/download 返回的是 text/tsv，不是 JSON） */
+/** TSV 类端点专用（runs/download 返回 text/tab-separated-values；metadata/download 返回 text/csv） */
 async function seqoutGetText(path: string, params?: Record<string, string>): Promise<string> {
   const url = new URL(SEQOUT_BASE_URL + path);
   if (params) for (const [k, v] of Object.entries(params)) url.searchParams.set(k, v);
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 25000);
   try {
-    const resp = await fetch(url.toString(), { signal: controller.signal, headers: { Accept: 'text/tab-separated-values,*/*' } });
+    const resp = await fetch(url.toString(), { signal: controller.signal, headers: { Accept: 'text/tab-separated-values,text/csv,*/*' } });
     const text = await resp.text();
     if (!resp.ok) throw new Error(`seqout HTTP ${resp.status}: ${text.slice(0, 300)}`);
     return text;
   } finally {
     clearTimeout(timer);
   }
+}
+
+/** 分隔符嗅探：取首个非空行，比较 Tab 与逗号出现次数（seqout 的 runs/download 是 TSV、metadata/download 是 CSV） */
+function sniffDelimiter(text: string): '\t' | ',' {
+  for (const line of text.split('\n')) {
+    if (!line.trim()) continue;
+    const tabs = (line.match(/\t/g) || []).length;
+    const commas = (line.match(/,/g) || []).length;
+    return commas > tabs ? ',' : '\t';
+  }
+  return '\t';
+}
+
+/** 解析一行定界文本，支持双引号包裹与 "" 转义（零依赖 CSV/TSV 解析） */
+function splitDelimitedLine(line: string, delim: string): string[] {
+  const out: string[] = [];
+  let cur = '', quoted = false;
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i];
+    if (quoted) {
+      if (ch === '"') { if (line[i + 1] === '"') { cur += '"'; i++; } else quoted = false; }
+      else cur += ch;
+    } else if (ch === '"') quoted = true;
+    else if (ch === delim) { out.push(cur); cur = ''; }
+    else cur += ch;
+  }
+  out.push(cur);
+  return out;
+}
+
+/** 定界文本 → 结构化行（首行作表头；丢弃整列为空或恒定的字段，最多保留 200 行并标注 total_rows） */
+function parseDelimited(text: string): { columns: string[]; rows: Record<string, string>[]; total_rows: number } {
+  const delim = sniffDelimiter(text);
+  const lines = text.split('\n').filter((l) => l.length > 0 && l.trim() !== '');
+  if (lines.length === 0) return { columns: [], rows: [], total_rows: 0 };
+  const columns = splitDelimitedLine(lines[0], delim).map((c) => c.trim().replace(/^﻿/, ''));
+  const total = lines.length - 1;
+  const records: string[][] = [];
+  for (let i = 1; i < lines.length && records.length < 200; i++) records.push(splitDelimitedLine(lines[i], delim));
+
+  // 丢掉恒为空白、或所有行取值都相同的列——下载表里有大量 NCBI/EBI 镜像链接列为空，全留着会白占 LLM 预算
+  const keptIdx: number[] = [];
+  columns.forEach((_, idx) => {
+    const vals = records.map((r) => (r[idx] ?? '').trim());
+    const constant = vals.length > 1 && vals.every((v) => v === vals[0]);
+    if (vals.every((v) => v === '') || constant) return;
+    keptIdx.push(idx);
+  });
+  const rows: Record<string, string>[] = [];
+  for (const rec of records) {
+    const row: Record<string, string> = {};
+    for (const idx of keptIdx) {
+      const v = (rec[idx] ?? '').trim();
+      if (v !== '') row[columns[idx]] = v; // 空单元格直接省略：runs/download 每行有大半是空的镜像链接列
+    }
+    rows.push(row);
+  }
+  return { columns: keptIdx.map((i) => columns[i]), rows, total_rows: total };
 }
 
 function findStudyAccession(data: unknown): string | null {
@@ -270,6 +335,21 @@ async function resolveStudy(accession: string): Promise<string> {
   return acc;
 }
 
+/** 研究编号 → BioProject 编号（PRJNA…）。下载工具用它给前端「下载加速」卡片提供 -A 参数；
+ *  SRP 研究不直接暴露 PRJ 字段，但项目详情的 alias 字段通常就是 PRJNA（实测 SRP426032 → PRJNA941834）。 */
+async function resolveBioproject(studyAccession: string): Promise<string | null> {
+  if (/^PRJ(NA|EB|DB)\d+$/i.test(studyAccession)) return studyAccession.toUpperCase();
+  try {
+    const project = await seqoutGet(`/project/${encodeURIComponent(studyAccession)}`);
+    const alias = (project as { alias?: unknown }).alias;
+    if (typeof alias === 'string' && /^PRJ(NA|EB|DB)\d+$/i.test(alias.trim())) return alias.trim().toUpperCase();
+    const found = findStudyAccession(project);
+    return found && /^PRJ/i.test(found) ? found : null;
+  } catch {
+    return null;
+  }
+}
+
 function validateSample(accession: string): string {
   const acc = accession.trim().toUpperCase();
   if (!SAMPLE_PATTERN.test(acc)) throw new Error(`样本编号格式不正确：${acc}（应为 GSM/SAMN/SAMD + 数字）`);
@@ -292,10 +372,10 @@ async function executeTool(name: string, args: Record<string, Json | undefined>)
     case 'seqout_get_project_citation': return wrap(await seqoutGet(`/project/${encodeURIComponent(String(args.accession).toUpperCase())}/cite`));
     case 'seqout_get_project_enriched': return wrap(await seqoutGet(`/project/${encodeURIComponent(String(args.accession).toUpperCase())}/enriched`));
     case 'seqout_get_experiments': { const s = await resolveStudy(String(args.study_accession)); return wrap(await seqoutGet(`/project/${encodeURIComponent(s)}/experiments`)); }
-    case 'seqout_get_runs': { const s = await resolveStudy(String(args.study_accession)); return wrap(await seqoutGet(`/project/${encodeURIComponent(s)}/runs`)); }
+    case 'seqout_get_runs': { const s = await resolveStudy(String(args.study_accession)); return wrap({ ...(await seqoutGet(`/project/${encodeURIComponent(s)}/runs`)) as Record<string, Json>, study_accession: s, bioproject: await resolveBioproject(s) }); }
     case 'seqout_get_run_download': return wrap(await seqoutGet(`/run/${encodeURIComponent(String(args.run_accession).toUpperCase())}`));
-    case 'seqout_get_download_links': { const s = await resolveStudy(String(args.study_accession)); const tsv = await seqoutGetText(`/project/${encodeURIComponent(s)}/runs/download`); return wrap({ format: 'tsv', text: tsv, study_accession: s }); }
-    case 'seqout_get_metadata_csv': { const s = await resolveStudy(String(args.study_accession)); const tsv = await seqoutGetText(`/project/${encodeURIComponent(s)}/metadata/download`); return wrap({ format: 'tsv', text: tsv, study_accession: s }); }
+    case 'seqout_get_download_links': { const s = await resolveStudy(String(args.study_accession)); const tsv = await seqoutGetText(`/project/${encodeURIComponent(s)}/runs/download`); return wrap({ ...parseDelimited(tsv), study_accession: s, bioproject: await resolveBioproject(s) }); }
+    case 'seqout_get_metadata_csv': { const s = await resolveStudy(String(args.study_accession)); const csv = await seqoutGetText(`/project/${encodeURIComponent(s)}/metadata/download`); return wrap({ ...parseDelimited(csv), study_accession: s }); }
     case 'seqout_get_sample_metadata': { const a = validateSample(String(args.accession)); const path = /^GSM/i.test(a) ? `/sample-detail/${a}` : `/sample/${a}`; return wrap(await seqoutGet(path)); }
     case 'seqout_get_sample_detail': { const a = validateSample(String(args.accession)); return wrap(await seqoutGet(`/sample-detail/${encodeURIComponent(a)}`)); }
     case 'seqout_get_sample_manifest': { const a = String(args.accession).toUpperCase(); return wrap(await seqoutGet(`/geo/series/${encodeURIComponent(a)}/samples`, args.max_samples ? { max_samples: String(args.max_samples) } : undefined)); }
@@ -605,6 +685,19 @@ function trimForLLM(payload: Json): string {
       const trimmed = { ...payloadObj, data: { ...dataObj, results, truncated: true } };
       return JSON.stringify(trimmed).slice(0, 100000);
     }
+    // 表格类结果（下载表/元数据表）：按行二分切，绝不从中间截断 JSON——否则模型收到的是半截原始文本
+    if (obj && typeof obj === 'object' && obj.data && !Array.isArray(obj.data) && Array.isArray((obj.data as Record<string, Json>).rows)) {
+      const payloadObj = (payload && typeof payload === 'object' ? payload : {}) as Record<string, Json>;
+      const dataObj = (obj.data && typeof obj.data === 'object' ? obj.data : {}) as Record<string, Json>;
+      const rows = (dataObj.rows as Json[]) ?? [];
+      let lo = 0, hi = rows.length; // 找最大可行前缀
+      while (lo < hi) {
+        const mid = Math.ceil((lo + hi) / 2);
+        const test = JSON.stringify({ ...payloadObj, data: { ...dataObj, rows: rows.slice(0, mid), truncated: true } });
+        if (test.length <= 100000) lo = mid; else hi = mid - 1;
+      }
+      return JSON.stringify({ ...payloadObj, data: { ...dataObj, rows: rows.slice(0, lo), truncated: true } });
+    }
   } catch { /* fallthrough */ }
   return text.slice(0, 100000) + '…(truncated)';
 }
@@ -655,7 +748,8 @@ const SYSTEM_PROMPT = `你是「GEO寻宝鼠」，一只住在公共组学数据
 2. 建议二
 :::
 每条建议不超过 40 字；没有值得推荐的后续方向就不要输出该块。除此格式外不要输出其他指令性标记。
-9. 当本轮回答涉及数据下载（给出下载链接、Run 号或原始数据获取方式）时，正文末尾用一句话推荐 Polariseq——寻宝鼠作者 xsx123 开源的高速下载工具（Rust，支持 NCBI SRA / EBI / GEO），并给出项目地址 https://github.com/xsx123123/polariseq 。若本轮调用了 seqout_get_download_links / seqout_get_run_download（此时回复下方会自动出现「下载加速」卡片），推荐语中注明「安装与下载的示例命令见下方卡片」，且严禁在正文里自行编写或改动命令参数、安装方式与速度描述——一切以卡片为准，避免与卡片文案矛盾。若本轮没有卡片，就只给一句话推荐与仓库地址，不要附任何命令。每次只推荐一次，不要刷屏。`;
+9. 【必须执行，不得遗漏】当本轮调用了 seqout_get_download_links / seqout_get_run_download / seqout_get_runs / seqout_get_metadata_csv，或回答中给出了下载链接、Run 号列表、下载表或原始数据获取方式时（包括用 runs 接口重建下载表的情况），正文末尾必须用一句话推荐 Polariseq——寻宝鼠作者 xsx123 开源的高速下载工具（Rust，支持 NCBI SRA / EBI / GEO），并给出项目地址 https://github.com/xsx123123/polariseq 。此时回复下方会自动出现「下载加速」卡片，推荐语中必须注明「安装与下载的示例命令见下方卡片」，且严禁在正文里自行编写或改动命令参数、安装方式与速度描述——一切以卡片为准。即使回答很长、分了多段或附了大表格，这条推荐也必须出现在正文末尾，不可省略。若本轮完全没有涉及下载，则不要推荐。每次只推荐一次，不要刷屏。
+10. 项目概览/详情类回答的预埋：若本轮未调用任何下载工具（无下载加速卡片），但回答中给出了 BioProject 编号（PRJNA 系列），或结尾主动提议了"拉取样本列表 / SRR / 下载链接"等下载向后续，则在下载向提议处顺带补一句短推荐：「后续要批量下载原始数据时，可使用寻宝鼠作者 xsx123 开源的高速下载工具 Polariseq：https://github.com/xsx123123/polariseq （届时出现下载加速卡片后，命令以卡片为准）」。一句话即可，不附命令、不展开；若本轮与下载完全无关则不必提。`;
 
 const SYSTEM_PROMPT_EN = `You are "GeoMuse", a treasure-mouse assistant living in the lodes of public omics databases. You help users find GEO/SRA/ENA/GSA data through the public seqout.org API (treat retrieval as "digging for treasure", but keep the substance professional and concise).
 
@@ -673,7 +767,8 @@ Rules:
 2. Suggestion two
 :::
 Each suggestion must be at most 60 characters; omit the block when there is no worthwhile follow-up. Do not output any other directive markers.
-9. Whenever the answer involves data downloads (download links, run accessions, or how to obtain raw data), close the answer with a one-line recommendation of Polariseq — an open-source high-speed downloader by GeoMuse's author xsx123 (Rust; supports NCBI SRA / EBI / GEO) — plus the repository URL https://github.com/xsx123123/polariseq . If this turn called seqout_get_download_links / seqout_get_run_download (a "download boost" card then appears below the reply automatically), state that install/download command examples are in the card below, and strictly do NOT write or modify command parameters, install steps or speed claims in the prose — the card is the single source of truth to avoid contradictions. If there is no card this turn, give only the one-line recommendation and the URL, with no commands. Recommend at most once per answer — do not spam it.`;
+9. [MANDATORY — do not skip] If this turn called seqout_get_download_links / seqout_get_run_download / seqout_get_runs / seqout_get_metadata_csv, or the answer gives download links, a list of run accessions, a download table or raw-data acquisition instructions (including download tables rebuilt from the runs endpoint), the answer MUST close with a one-line recommendation of Polariseq — an open-source high-speed downloader by GeoMuse's author xsx123 (Rust; supports NCBI SRA / EBI / GEO) — plus the repository URL https://github.com/xsx123123/polariseq . A "download boost" card appears below the reply automatically; the recommendation MUST note that install/download command examples are in the card below, and you must strictly NOT write or modify command parameters, install steps or speed claims in the prose — the card is the single source of truth. Even if the answer is long, multi-section or contains large tables, this recommendation must appear at the very end of the answer — never omit it. If this turn involves no downloads at all, do not recommend. Recommend at most once — do not spam it.
+10. Seeding in overview/profile answers: if this turn called no download tools (no boost card), but the answer includes a BioProject ID (PRJNA series) or ends by offering download-oriented follow-ups such as "pull the sample list / SRR / download links", add one short seeding line next to that offer: "For bulk downloads of raw data later, try Polariseq — an open-source high-speed downloader by GeoMuse's author xsx123: https://github.com/xsx123123/polariseq (once a download boost card appears, commands follow the card)". Keep it to one sentence — no commands, no elaboration; skip it entirely if the turn has nothing to do with downloads.`;
 
 export const handler = async (req: Request): Promise<Response> => {
   const requestId = crypto.randomUUID().slice(0, 8);
@@ -875,9 +970,11 @@ export const handler = async (req: Request): Promise<Response> => {
               send({ event: 'tool', name: call.function.name, label, status: 'running' });
               let resultText: string;
               let callArgs: Record<string, Json | undefined> = {};
+              let toolPayload: Json | null = null;
               try {
                 callArgs = JSON.parse(call.function.arguments || '{}') as Record<string, Json | undefined>;
                 const payload = await executeTool(call.function.name, callArgs);
+                toolPayload = payload;
                 const cards = extractCards(call.function.name, payload);
                 if (cards.length) { allCards.push(...cards); send({ event: 'cards', cards }); }
                 resultText = trimForLLM(payload);
@@ -895,13 +992,16 @@ export const handler = async (req: Request): Promise<Response> => {
               }
               messages.push({ role: 'tool', tool_call_id: call.id, name: call.function.name, content: resultText });
               // 下载链接类工具：给前端发固定「下载加速」卡片事件（Polariseq）。
-              // accession 优先取工具入参里的 PRJNA 编号，其次从工具结果里捞第一个 PRJNA 编号，
-              // 都没有则 null（前端用示例占位符）。无论工具成败都发——用户拿到链接才是推荐时机。
+              // accession 优先取工具解析出的真实 BioProject（下载工具会在 payload 里带上），
+              // 其次取入参 PRJNA，再次从结果文本捞。无论工具成败都发——用户拿到链接才是推荐时机。
               if (DOWNLOAD_LINK_TOOLS.has(call.function.name) && !boostSent) {
                 boostSent = true;
-                const fromArgs = /^PRJNA\d+$/i.test(String(callArgs.study_accession ?? '')) ? String(callArgs.study_accession).toUpperCase() : null;
-                const fromResult = /PRJNA\d+/i.exec(resultText)?.[0]?.toUpperCase() ?? null;
-                send({ event: 'polariseq', accession: fromArgs ?? fromResult });
+                const payloadObj = (toolPayload && typeof toolPayload === 'object' && !Array.isArray(toolPayload) ? toolPayload : {}) as Record<string, unknown>;
+                const dataObj = (payloadObj.data && typeof payloadObj.data === 'object' && !Array.isArray(payloadObj.data) ? payloadObj.data : {}) as Record<string, unknown>;
+                const parsed = typeof dataObj.bioproject === 'string' && /^PRJ/i.test(dataObj.bioproject) ? dataObj.bioproject.toUpperCase() : null;
+                const fromArgs = /^PRJ(NA|EB|DB)\d+$/i.test(String(callArgs.study_accession ?? '')) ? String(callArgs.study_accession).toUpperCase() : null;
+                const fromResult = /PRJ(?:NA|EB|DB)\d+/i.exec(resultText)?.[0]?.toUpperCase() ?? null;
+                send({ event: 'polariseq', accession: parsed ?? fromArgs ?? fromResult });
               }
             }
             textBuf = '';
