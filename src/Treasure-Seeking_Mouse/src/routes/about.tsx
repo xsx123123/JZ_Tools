@@ -1,4 +1,5 @@
 // 关于页：与仓库 README 对齐的产品介绍（核心亮点 / seqout-mcp 对话后端 / 自托管 / 技术栈 / 致谢）
+import { useCallback, useState } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import {
   ArrowLeft,
@@ -10,20 +11,20 @@ import {
   Hammer,
   Languages,
   Link2,
+  Moon,
   PawPrint,
   Smartphone,
   Sparkles,
+  Sun,
   Trophy,
   Wrench,
 } from "lucide-react";
 import { BrandMark } from "@/components/BrandMark";
+import { LanguageToggle } from "@/components/LanguageToggle";
 import { useI18n } from "@/i18n/provider";
 import type { MessageKey } from "@/i18n";
+import { readTheme, writeTheme, applyTheme, type Theme } from "@/services/petStore";
 import introImg from "@/assets/about/intro.png";
-import qmuseBadge from "@/assets/badges/qmuse.svg";
-import deepseekBadge from "@/assets/badges/deepseek.svg";
-import kimiBadge from "@/assets/badges/kimi.svg";
-import zhipuBadge from "@/assets/badges/zhipu.svg";
 
 export const Route = createFileRoute("/about")({
   component: AboutPage,
@@ -48,13 +49,6 @@ const STACK_TAIL: Record<"zh" | "en", string[]> = {
   en: ["Supabase-compatible", "OpenAI-compatible LLM", "Docker Compose"],
 };
 
-const AUTHORS = [
-  { href: "https://www.qmuse.cn/", src: qmuseBadge, height: 26, alt: "QMuse" },
-  { href: "https://www.deepseek.com/", src: deepseekBadge, height: 24, alt: "DeepSeek" },
-  { href: "https://www.kimi.com/", src: kimiBadge, height: 24, alt: "Kimi" },
-  { href: "https://chat.z.ai/", src: zhipuBadge, height: 20, alt: "GLM · Z.AI" },
-];
-
 const linkBtn =
   "flex items-center gap-1.5 rounded-lg border border-border bg-card px-3 py-1.5 text-[12.5px] text-muted-foreground shadow-sm transition-colors hover:border-helix/50 hover:text-helix";
 const sectionCls = "mt-4 rounded-2xl border border-border bg-card p-5 shadow-soft";
@@ -64,10 +58,20 @@ function AboutPage(): React.ReactElement {
   const { t, lang } = useI18n();
   const stack = [...STACK_BASE, ...STACK_TAIL[lang]];
   const navigate = useNavigate();
+  // 主题切换：与对话页同一套存储/应用逻辑（readTheme/writeTheme/applyTheme）
+  const [theme, setTheme] = useState<Theme>(() => readTheme());
+  const toggleTheme = useCallback(() => {
+    setTheme((cur) => {
+      const next: Theme = cur === "dark" ? "light" : "dark";
+      writeTheme(next);
+      applyTheme(next);
+      return next;
+    });
+  }, []);
   return (
     <div className="bg-grid ambient-glow min-h-dvh px-4 py-6 sm:py-10">
       <div className="mx-auto max-w-3xl">
-        <div className="mb-4 flex items-center justify-between">
+        <div className="mb-4 flex items-center justify-between gap-2">
           <button
             type="button"
             onClick={() => void navigate({ to: "/" })}
@@ -75,9 +79,21 @@ function AboutPage(): React.ReactElement {
           >
             <ArrowLeft size={14} /> {t("about.back")}
           </button>
-          <span className="flex items-center gap-2 text-[12.5px] text-muted-foreground">
+          <span className="hidden items-center gap-2 text-[12.5px] text-muted-foreground sm:flex">
             <BrandMark size={16} />
             {t("brand.name")}
+          </span>
+          <span className="flex items-center gap-1">
+            <LanguageToggle size={15} />
+            <button
+              type="button"
+              onClick={toggleTheme}
+              title={theme === "dark" ? t("header.themeDark") : t("header.themeLight")}
+              aria-label={t("header.themeAria")}
+              className="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-secondary hover:text-pet-amber-deep"
+            >
+              {theme === "dark" ? <Sun size={15} /> : <Moon size={15} />}
+            </button>
           </span>
         </div>
 
@@ -182,13 +198,6 @@ make docker-start                    # ${t("about.deploySteps")}`}
           <p className="mt-2 text-[12.5px] leading-relaxed text-muted-foreground">
             {t("about.authors", { qmuse: "QMuse" })}
           </p>
-          <div className="mt-3 flex flex-wrap items-center gap-4">
-            {AUTHORS.map((a) => (
-              <a key={a.alt} href={a.href} target="_blank" rel="noreferrer" title={a.alt}>
-                <img src={a.src} height={a.height} alt={a.alt} className="opacity-90 transition-opacity hover:opacity-100" />
-              </a>
-            ))}
-          </div>
         </section>
 
         <p className="mt-4 text-center font-mono text-[11px] text-muted-foreground/70">
