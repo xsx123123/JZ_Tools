@@ -93,6 +93,7 @@ export const zh = {
   "idlink.original": "原始页",
   "idlink.fetching": "正在检索论文",
   "idlink.noPaper": "未找到直接关联论文，可查看原始页或稍后再试",
+  "idlink.hint": "💎 阿寻提示：这里有宝藏，点一下挖挖看",
   "idlink.types.geo_series": "GEO 系列",
   "idlink.types.geo_sample": "GEO 样本",
   "idlink.types.go_term": "GO 条目",

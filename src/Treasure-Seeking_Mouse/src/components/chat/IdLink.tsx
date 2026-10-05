@@ -3,13 +3,14 @@
 // HoverCard 在触屏上点击会直接跳转、浮层永不出现，故按输入设备自动切换容器，浮层内容完全共用。
 // 浮层打开时经 T2 fetchLiterature 自动拉论文元数据（前端 TTL 缓存，反复 hover 不重复请求）；
 // 「查看证据链」经 evidenceBus 抛给消息列表层，渲染完整文献卡片
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { BookOpen, Copy, Check, ExternalLink } from "lucide-react";
 import { HoverCard, HoverCardTrigger, HoverCardContent } from "@/components/ui/hover-card";
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { linkTypeLabel, type IdMatch } from "@/lib/linkify";
 import { requestEvidence } from "@/lib/evidenceBus";
 import { consumeIdLinkHint } from "@/lib/linkHint";
+import { fireTreasureBurst } from "@/lib/treasureBurst";
 import { copyText } from "@/lib/clipboard";
 import { useIsTouch } from "@/hooks/use-touch";
 import { useI18n } from "@/i18n/provider";
@@ -39,6 +40,9 @@ export function IdLink({
   // 浮层自动预取的论文元数据（loading 骨架 → 标题/期刊/年份；not_found 显示提示）
   const [lit, setLit] = useState<LiteratureCardDTO | null>(null);
   const [litState, setLitState] = useState<"idle" | "loading" | "done">("idle");
+  // 「顺着提示来挖」标记：打开浮层时若提示气泡还在，记为首次发现之旅——
+  // 这次真挖到文献就全屏烟花庆祝（fireTreasureBurst 本身每浏览器只放一次）
+  const hintedRef = useRef(false);
 
   const loadLiterature = useCallback(() => {
     if (litState !== "idle") return; // 已加载/加载中不重复请求
@@ -46,8 +50,22 @@ export function IdLink({
     void fetchLiterature(match.type, match.id).then((card) => {
       setLit(card);
       setLitState("done");
+      if (card.status === "ok" && hintedRef.current) {
+        hintedRef.current = false;
+        fireTreasureBurst();
+      }
     });
   }, [litState, match.type, match.id]);
+
+  // 打开浮层：关闭提示气泡；若气泡本就在展示，标记这次为「首次发现」
+  const onLayerOpen = (open: boolean) => {
+    if (!open) return;
+    loadLiterature();
+    if (hintOn) {
+      hintedRef.current = true;
+      setHintOn(false);
+    }
+  };
 
   function copyId(): void {
     void copyText(match.id).then((ok) => {
@@ -142,7 +160,7 @@ export function IdLink({
   // 触摸端：点击触发（Popover）；桌面端：悬停触发（HoverCard）。打开浮层时同时关掉提示。
   if (isTouch) {
     return (
-      <Popover onOpenChange={(open) => { if (open) { loadLiterature(); setHintOn(false); } }}>
+      <Popover onOpenChange={onLayerOpen}>
         <PopoverTrigger asChild>{trigger}</PopoverTrigger>
         <PopoverContent className="w-80" side="top">
           {content}
@@ -152,7 +170,7 @@ export function IdLink({
   }
 
   return (
-    <HoverCard openDelay={300} closeDelay={120} onOpenChange={(open) => { if (open) { loadLiterature(); setHintOn(false); } }}>
+    <HoverCard openDelay={300} closeDelay={120} onOpenChange={onLayerOpen}>
       <HoverCardTrigger asChild>{trigger}</HoverCardTrigger>
       <HoverCardContent className="w-80" side="top">
         {content}

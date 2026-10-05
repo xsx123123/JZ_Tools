@@ -95,6 +95,7 @@ export const en = {
   "idlink.original": "Original page",
   "idlink.fetching": "Fetching paper",
   "idlink.noPaper": "No directly linked paper found — open the original page or retry",
+  "idlink.hint": "💎 A-Xun found treasure here! Tap to dig it up",
   "idlink.types.geo_series": "GEO Series",
   "idlink.types.geo_sample": "GEO Sample",
   "idlink.types.go_term": "GO Term",

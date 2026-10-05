@@ -95,6 +95,7 @@ export const zh = {
   "idlink.original": "原始页",
   "idlink.fetching": "正在检索论文",
   "idlink.noPaper": "未找到直接关联论文，可查看原始页或稍后再试",
+  "idlink.hint": "💎 阿寻提示：这里有宝藏，把鼠标放上来挖一挖",
   "idlink.types.geo_series": "GEO 系列",
   "idlink.types.geo_sample": "GEO 样本",
   "idlink.types.go_term": "GO 条目",
@@ -243,6 +244,10 @@ export const zh = {
   "about.github": "GitHub 项目主页",
   "about.docs": "详细开发文档",
   "about.thanks": "致谢",
+  "about.why": "立意 · 为什么做这只寻宝鼠",
+  "about.why.1": "GEO 寻宝鼠（OmicsTreasure Hunter）让新手科研小白告别老旧繁琐的生信数据库迷宫，用拟人化“探矿挖宝”交互，一键穿透 GEO / SRA / ENA / GSA 全网数据宝藏。",
+  "about.why.2": "对刚进组的研究生来说，科研最磨灭热情的，往往不是做实验，而是起步时在冰冷、反人类的数据库迷宫里抓瞎——找不对样本、看不懂编号、搜不到文献，第一步就陷入自我怀疑与精神内耗。「GEO 寻宝鼠」想要做的，是把高校科研人从枯燥压抑的第一步数据搜索中彻底解救出来。",
+  "about.why.3": "在这里，科研不再是孤独的单打独斗，也没有冰冷复杂的代码门槛。只要像和同门聊天一样，随口说出你的课题构想，桌宠“阿寻”就会戴上矿工帽一头扎进数据矿脉深处，兴冲冲地帮你刨出与研究方向最贴合的黄金数据与关键文献，将规整的样本卡片稳稳叼到你面前。每一次检索都是一次充满惊喜的挖宝——让科研起步少一点焦虑迷茫，多一份探索的纯粹乐趣与踏实陪伴。",
   "about.authors": "本应用基于 {qmuse} 构建与部署，并在 DeepSeek-V4、Kimi-K3、GLM-5.3 等 AI 模型的协助下开发完成。",
 
   "about.h.1.title": "对话式检索",

@@ -96,6 +96,7 @@ export const en = {
   "idlink.original": "Original page",
   "idlink.fetching": "Fetching paper",
   "idlink.noPaper": "No directly linked paper found — open the original page or retry",
+  "idlink.hint": "💎 A-Xun found treasure here! Hover the accession to dig it up",
   "idlink.types.geo_series": "GEO Series",
   "idlink.types.geo_sample": "GEO Sample",
   "idlink.types.go_term": "GO Term",
@@ -246,6 +247,10 @@ export const en = {
   "about.github": "GitHub repo",
   "about.docs": "Detailed dev docs",
   "about.thanks": "Acknowledgements",
+  "about.why": "Why we built the treasure mouse",
+  "about.why.1": "OmicsTreasure Hunter helps research newcomers leave behind the cold, labyrinthine bioinformatics databases of the past — through a personified \"prospecting for treasure\" interaction, it punches through the GEO / SRA / ENA / GSA data universe in one step.",
+  "about.why.2": "For first-year graduate students, what drains the passion for science is usually not the experiments — it's the blind wandering through icy, hostile database mazes at the very start: can't find the right samples, can't decode the accessions, can't locate the literature. Step one becomes self-doubt and burnout. OmicsTreasure Hunter exists to rescue researchers from that dreary, oppressive first step of data hunting.",
+  "about.why.3": "Here, research is no longer a lonely solo grind, and there is no cold wall of code between you and the data. Just chat about your project ideas the way you'd talk with a labmate — the desk pet \"A-Xun\" (阿寻) puts on its miner's helmet, dives into the data lodes, and gleefully digs out the golden datasets and key papers that best match your direction, delivering tidy sample cards right to your hands. Every search is a small adventure — less anxiety at the start of your research journey, more of the pure joy of exploration and steady companionship.",
   "about.authors": "Built and deployed on {qmuse}, developed with assistance from AI models including DeepSeek-V4, Kimi-K3 and GLM-5.3.",
 
   "about.h.1.title": "Conversational retrieval",
