@@ -221,6 +221,16 @@ const GSE_PATTERN = /^GSE\d+$/i;
 const SAMPLE_PATTERN = /^(GSM|SAMN|SAMD)\d+$/i;
 const STUDY_PATTERN = /^(SRP|PRJNA|PRJEB|PRJDB)\d+$/i;
 
+/** 把 seqout 的 HTTP 错误转成对用户/模型都清楚的说明。seqout 是定期从 NCBI 同步的镜像库，
+ *  很新的项目（尤其 PRJNA 编号）尚未同步时会 404 —— 这与"项目存在但无数据"是两回事，必须讲清。 */
+function describeSeqoutError(status: number, body: string): string {
+  if (status === 404 && /No project found for PRJ/i.test(body)) {
+    return `seqout 库内尚无此 BioProject（HTTP 404：${body.slice(0, 120)}）。seqout 是 seqout.org 定期同步 NCBI 的镜像库，很新发布的项目往往还没同步进来，请稍后重试，或直接到 NCBI/ENA 官网查询该项目。`;
+  }
+  if (status === 404) return `seqout 未收录该项目（HTTP 404：${body.slice(0, 160)}）。可能项目较新尚未同步，或编号有误。`;
+  return `seqout HTTP ${status}: ${body.slice(0, 300)}`;
+}
+
 async function seqoutGet(path: string, params?: Record<string, string>): Promise<Json> {
   const url = new URL(SEQOUT_BASE_URL + path);
   if (params) for (const [k, v] of Object.entries(params)) url.searchParams.set(k, v);
@@ -229,7 +239,7 @@ async function seqoutGet(path: string, params?: Record<string, string>): Promise
   try {
     const resp = await fetch(url.toString(), { signal: controller.signal, headers: { Accept: 'application/json' } });
     const text = await resp.text();
-    if (!resp.ok) throw new Error(`seqout HTTP ${resp.status}: ${text.slice(0, 300)}`);
+    if (!resp.ok) throw new Error(describeSeqoutError(resp.status, text));
     try { return JSON.parse(text) as Json; } catch { throw new Error(`seqout 非 JSON 响应: ${text.slice(0, 200)}`); }
   } finally {
     clearTimeout(timer);
@@ -245,7 +255,7 @@ async function seqoutGetText(path: string, params?: Record<string, string>): Pro
   try {
     const resp = await fetch(url.toString(), { signal: controller.signal, headers: { Accept: 'text/tab-separated-values,text/csv,*/*' } });
     const text = await resp.text();
-    if (!resp.ok) throw new Error(`seqout HTTP ${resp.status}: ${text.slice(0, 300)}`);
+    if (!resp.ok) throw new Error(describeSeqoutError(resp.status, text));
     return text;
   } finally {
     clearTimeout(timer);
@@ -310,26 +320,77 @@ function parseDelimited(text: string): { columns: string[]; rows: Record<string,
   return { columns: keptIdx.map((i) => columns[i]), rows, total_rows: total };
 }
 
-function findStudyAccession(data: unknown): string | null {
-  if (!data || typeof data !== 'object') return null;
-  if (Array.isArray(data)) {
-    for (const item of data) { const hit = findStudyAccession(item); if (hit) return hit; }
-    return null;
-  }
-  for (const [key, value] of Object.entries(data as Record<string, unknown>)) {
-    if (typeof value === 'string' && STUDY_PATTERN.test(value) && /accession/i.test(key)) return value.toUpperCase();
-    if (typeof value === 'object') { const hit = findStudyAccession(value); if (hit) return hit; }
-  }
-  return null;
+const ACC_IN_URL = /\b(SRP|PRJNA|PRJEB|PRJDB)\d+\b/i;
+/** 从单个 URL 抽取研究号（relation 的 @target，如 https://…/bioproject/PRJNA636285） */
+function extractAccFromUrl(url: string): string | null {
+  const m = ACC_IN_URL.exec(url);
+  return m ? m[0].toUpperCase() : null;
 }
 
+/** GSE → 研究编号。数据来源有讲究（实测 GSE117176/151530/62944/26109/165500）：
+ *   - relation[] 的 @target URL 是权威映射：[{@type:'BioProject'|'SRA', @target:'https://…/PRJNA…'}]
+ *   - alias 有时带 SRP（GSE117176 → ["SRP153927"]），有时是空数组
+ *   - neighbors 是 300 条相似数据集，里面混着**别的**项目的真实编号
+ *     （GSE117176 的 neighbors[207]=SRP349691 就是它），绝不可用作映射来源。
+ *  因此只在 relation / alias / external_id 这三个字段里取候选，不递归整棵树。 */
+function studyCandidates(project: unknown): string[] {
+  const out: string[] = [];
+  const seen = new Set<string>();
+  const push = (raw: string | null | undefined, kind?: string) => {
+    if (!raw) return;
+    const u = raw.toUpperCase();
+    // relation 里 BioProject/SRA 的 URL 与原样编号都收；alias 里的 E-GEOD-xxx 之类不是研究号，会被 STUDY_PATTERN 挡掉
+    if (STUDY_PATTERN.test(u)) { if (!seen.has(u)) { seen.add(u); out.push(u); } }
+    else if (kind && /:\/\//.test(raw) && /BioProject|SRA/i.test(kind)) {
+      const acc = extractAccFromUrl(raw);
+      if (acc && !seen.has(acc)) { seen.add(acc); out.push(acc); }
+    }
+  };
+  const p = (project && typeof project === 'object' && !Array.isArray(project) ? project : {}) as Record<string, unknown>;
+
+  const relation = p.relation;
+  if (Array.isArray(relation)) {
+    for (const rel of relation) {
+      const r = (rel && typeof rel === 'object' ? rel : {}) as Record<string, unknown>;
+      push(typeof r['@target'] === 'string' ? r['@target'] : null, typeof r['@type'] === 'string' ? r['@type'] : '');
+    }
+  }
+  for (const field of ['alias', 'external_id'] as const) {
+    const v = p[field];
+    if (typeof v === 'string') push(v);
+    else if (Array.isArray(v)) for (const item of v) if (typeof item === 'string') push(item);
+    else if (v && typeof v === 'object') for (const nested of Object.values(v as Record<string, unknown>)) if (typeof nested === 'string') push(nested);
+  }
+  // 排序：PRJ 优先（整项目、通常数据最全），其次 SRP；把 SRP 放后面只作兜底
+  return out.sort((a, b) => (b.startsWith('PRJ') ? 1 : 0) - (a.startsWith('PRJ') ? 1 : 0));
+}
+
+/** 校验候选确实有 run。注意：seqout 对老 GEO-only 项目（如 GSE62944）即使映射正确也会返回 0 run，
+ *  这是上游本就没有公开 raw（ENA 同样为空），不是解析错误——此时如实返回空，不再瞎找替代。 */
+async function hasRuns(studyAccession: string): Promise<boolean> {
+  try {
+    const runs = await seqoutGet(`/project/${encodeURIComponent(studyAccession)}/runs`);
+    if (Array.isArray(runs)) return runs.length > 0;
+    const n = (runs as { total_runs?: unknown })?.total_runs;
+    if (typeof n === 'number') return n > 0;
+    const arr = (runs as { runs?: unknown })?.runs;
+    return Array.isArray(arr) && arr.length > 0;
+  } catch {
+    return false;
+  }
+}
+
+/** GSE → 研究编号：取 relation/alias 里的权威候选，优先挑有 run 的（若都没有，返回排序后的首选）。 */
 async function resolveStudy(accession: string): Promise<string> {
   const acc = accession.trim().toUpperCase();
   if (GSE_PATTERN.test(acc)) {
     const project = await seqoutGet(`/project/${encodeURIComponent(acc)}`);
-    const found = findStudyAccession(project);
-    if (!found) throw new Error(`${acc} 未找到对应 SRA/BioProject 编号`);
-    return found;
+    const candidates = studyCandidates(project);
+    if (!candidates.length) throw new Error(`${acc} 未找到对应 SRA/BioProject 编号`);
+    for (const candidate of candidates) {
+      if (await hasRuns(candidate)) return candidate;
+    }
+    return candidates[0]; // 全部为空也不报错——让后续工具如实返回"无 run"，而不是抛解析异常
   }
   if (!STUDY_PATTERN.test(acc)) throw new Error(`研究编号格式不正确：${acc}（应为 GSE/SRP/PRJNA/PRJEB/PRJDB + 数字）`);
   return acc;
@@ -343,8 +404,8 @@ async function resolveBioproject(studyAccession: string): Promise<string | null>
     const project = await seqoutGet(`/project/${encodeURIComponent(studyAccession)}`);
     const alias = (project as { alias?: unknown }).alias;
     if (typeof alias === 'string' && /^PRJ(NA|EB|DB)\d+$/i.test(alias.trim())) return alias.trim().toUpperCase();
-    const found = findStudyAccession(project);
-    return found && /^PRJ/i.test(found) ? found : null;
+    const prj = collectStudyCandidates(project).find((c) => /^PRJ/i.test(c));
+    return prj ?? null;
   } catch {
     return null;
   }

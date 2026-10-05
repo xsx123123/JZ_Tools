@@ -68,6 +68,16 @@ const GSE_PATTERN = /^GSE\d+$/i;
 const SAMPLE_PATTERN = /^(GSM|SAMN|SAMD)\d+$/i;
 const STUDY_PATTERN = /^(SRP|PRJNA|PRJEB|PRJDB)\d+$/i;
 
+/** 把 seqout 的 HTTP 错误转成对用户/模型都清楚的说明。seqout 是定期从 NCBI 同步的镜像库，
+ *  很新的项目（尤其 PRJNA 编号）尚未同步时会 404 —— 这与"项目存在但无数据"是两回事。 */
+function describeSeqoutError(status, body) {
+  if (status === 404 && /No project found for PRJ/i.test(body)) {
+    return `seqout 库内尚无此 BioProject（HTTP 404：${body.slice(0, 120)}）。seqout 是 seqout.org 定期同步 NCBI 的镜像库，很新发布的项目往往还没同步进来，请稍后重试，或直接到 NCBI/ENA 官网查询该项目。`;
+  }
+  if (status === 404) return `seqout 未收录该项目（HTTP 404：${body.slice(0, 160)}）。可能项目较新尚未同步，或编号有误。`;
+  return `seqout HTTP ${status}: ${body.slice(0, 300)}`;
+}
+
 async function seqoutGet(path, params) {
   const url = new URL(SEQOUT_BASE_URL + path);
   if (params) for (const [k, v] of Object.entries(params)) url.searchParams.set(k, v);
@@ -76,7 +86,7 @@ async function seqoutGet(path, params) {
   try {
     const resp = await fetch(url.toString(), { signal: controller.signal, headers: { Accept: 'application/json' } });
     const text = await resp.text();
-    if (!resp.ok) throw new Error(`seqout HTTP ${resp.status}: ${text.slice(0, 300)}`);
+    if (!resp.ok) throw new Error(describeSeqoutError(resp.status, text));
     try { return JSON.parse(text); } catch { throw new Error(`seqout 非 JSON 响应: ${text.slice(0, 200)}`); }
   } finally {
     clearTimeout(timer);
@@ -92,7 +102,7 @@ async function seqoutGetText(path, params) {
   try {
     const resp = await fetch(url.toString(), { signal: controller.signal, headers: { Accept: 'text/tab-separated-values,text/csv,*/*' } });
     const text = await resp.text();
-    if (!resp.ok) throw new Error(`seqout HTTP ${resp.status}: ${text.slice(0, 300)}`);
+    if (!resp.ok) throw new Error(describeSeqoutError(resp.status, text));
     return text;
   } finally {
     clearTimeout(timer);
@@ -157,41 +167,83 @@ function parseDelimited(text) {
   return { columns: keptIdx.map((i) => columns[i]), rows, total_rows: total };
 }
 
-function findStudyAccession(data) {
-  if (!data || typeof data !== 'object') return null;
-  if (Array.isArray(data)) {
-    for (const item of data) { const hit = findStudyAccession(item); if (hit) return hit; }
-    return null;
+const ACC_IN_URL = /\b(SRP|PRJNA|PRJEB|PRJDB)\d+\b/i;
+/** 从单个 URL 抽取研究号（relation 的 @target，如 https://…/bioproject/PRJNA636285） */
+function extractAccFromUrl(url) {
+  const m = ACC_IN_URL.exec(url);
+  return m ? m[0].toUpperCase() : null;
+}
+
+/** GSE → 研究编号。数据来源有讲究（实测 GSE117176/151530/62944/26109/165500）：
+ *   - relation[] 的 @target URL 是权威映射
+ *   - alias 有时带 SRP（GSE117176 → ["SRP153927"]），有时是空数组
+ *   - neighbors 是 300 条相似数据集，里面混着**别的**项目的真实编号，绝不可用作映射来源。
+ *  因此只在 relation / alias / external_id 三个字段里取候选，不递归整棵树。 */
+function studyCandidates(project) {
+  const out = [], seen = new Set();
+  const push = (raw, kind) => {
+    if (!raw) return;
+    const u = raw.toUpperCase();
+    if (STUDY_PATTERN.test(u)) { if (!seen.has(u)) { seen.add(u); out.push(u); } }
+    else if (kind && raw.includes('://') && /BioProject|SRA/i.test(kind)) {
+      const acc = extractAccFromUrl(raw);
+      if (acc && !seen.has(acc)) { seen.add(acc); out.push(acc); }
+    }
+  };
+  const p = (project && typeof project === 'object' && !Array.isArray(project)) ? project : {};
+  if (Array.isArray(p.relation)) {
+    for (const rel of p.relation) {
+      const r = (rel && typeof rel === 'object') ? rel : {};
+      push(typeof r['@target'] === 'string' ? r['@target'] : null, typeof r['@type'] === 'string' ? r['@type'] : '');
+    }
   }
-  for (const [key, value] of Object.entries(data)) {
-    if (typeof value === 'string' && STUDY_PATTERN.test(value) && /accession/i.test(key)) return value.toUpperCase();
-    if (typeof value === 'object') { const hit = findStudyAccession(value); if (hit) return hit; }
+  for (const field of ['alias', 'external_id']) {
+    const v = p[field];
+    if (typeof v === 'string') push(v);
+    else if (Array.isArray(v)) for (const item of v) if (typeof item === 'string') push(item);
+    else if (v && typeof v === 'object') for (const nested of Object.values(v)) if (typeof nested === 'string') push(nested);
   }
-  return null;
+  // 排序：PRJ 优先（整项目、通常数据最全），SRP 仅作兜底
+  return out.sort((a, b) => (b.startsWith('PRJ') ? 1 : 0) - (a.startsWith('PRJ') ? 1 : 0));
+}
+
+/** 校验候选确实有 run。seqout 对老 GEO-only 项目即使映射正确也会返回 0 run（上游本就没有公开 raw），
+ *  此时如实返回空，不再瞎找替代。 */
+async function hasRuns(studyAccession) {
+  try {
+    const runs = await seqoutGet(`/project/${encodeURIComponent(studyAccession)}/runs`);
+    if (Array.isArray(runs)) return runs.length > 0;
+    if (typeof runs?.total_runs === 'number') return runs.total_runs > 0;
+    return Array.isArray(runs?.runs) && runs.runs.length > 0;
+  } catch {
+    return false;
+  }
 }
 
 async function resolveStudy(accession) {
   const acc = accession.trim().toUpperCase();
   if (GSE_PATTERN.test(acc)) {
     const project = await seqoutGet(`/project/${encodeURIComponent(acc)}`);
-    const found = findStudyAccession(project);
-    if (!found) throw new Error(`${acc} 未找到对应 SRA/BioProject 编号`);
-    return found;
+    const candidates = studyCandidates(project);
+    if (!candidates.length) throw new Error(`${acc} 未找到对应 SRA/BioProject 编号`);
+    for (const candidate of candidates) {
+      if (await hasRuns(candidate)) return candidate;
+    }
+    return candidates[0]; // 全部为空也不报错——让后续工具如实返回"无 run"，而不是抛解析异常
   }
   if (!STUDY_PATTERN.test(acc)) throw new Error(`研究编号格式不正确：${acc}（应为 GSE/SRP/PRJNA/PRJEB/PRJDB + 数字）`);
   return acc;
 }
 
-/** 研究编号 → BioProject 编号（PRJNA…）。下载工具用它给前端「下载加速」卡片提供 -A 参数；
- *  SRP 研究不直接暴露 PRJ 字段，但项目详情的 alias 字段通常就是 PRJNA。 */
+/** 研究编号 → BioProject 编号（PRJNA…）。下载工具用它给前端「下载加速」卡片提供 -A 参数。 */
 async function resolveBioproject(studyAccession) {
   if (/^PRJ(NA|EB|DB)\d+$/i.test(studyAccession)) return studyAccession.toUpperCase();
   try {
     const project = await seqoutGet(`/project/${encodeURIComponent(studyAccession)}`);
     const alias = project?.alias;
     if (typeof alias === 'string' && /^PRJ(NA|EB|DB)\d+$/i.test(alias.trim())) return alias.trim().toUpperCase();
-    const found = findStudyAccession(project);
-    return found && /^PRJ/i.test(found) ? found : null;
+    const prj = studyCandidates(project).find((c) => /^PRJ/i.test(c));
+    return prj ?? null;
   } catch {
     return null;
   }

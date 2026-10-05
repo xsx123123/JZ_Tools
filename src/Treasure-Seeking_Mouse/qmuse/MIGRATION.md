@@ -136,3 +136,15 @@ qmuse import .          # 首次或更新云资源；密钥：qmuse-cli cloud se
 
 **验证**：`node --check` 通过；对真实 `SRP426032`（TSV）/`SRP275550`（CSV）离线跑 `parseDelimited`+`trimForLLM`，输出 99 774 / 85 530 字符且均为合法 JSON（200/131、200/200 行）。`npm run check` 无新增报错。
 **未执行（需平台环境）**：`qmuse import .` 重新导入云函数使修复生效。
+
+### R4 — 2026-10-05 同步「GSE→研究编号解析」修复 + 未同步项目 404 提示（源：主仓库未提交工作区改动）
+
+**背景**：`resolveStudy` 用递归 `findStudyAccession` 在整棵项目详情里找第一个「accession 键 + 研究号字符串」，会命中 `neighbors`（300 条相似数据集）里**别的项目**的编号。实测 GSE117176 被解析成 `neighbors[207].accession = SRP349691` → `total_runs=0`，于是平台给出"空矿、原始 fastq 走不通"的错误结论；而该项目真实映射是 `PRJNA481344`（5 runs，experiments 正好对应 5 个 GSM）。
+
+**同步内容（`functions/seqout-chat/src/main.js`）：**
+
+- 删除递归 `findStudyAccession`，改为精确字段收集 `studyCandidates`：只读 `relation[].@target`（`@type` 为 BioProject/SRA 的 URL）、`alias`、`external_id`，不递归整棵树 → 杜绝 neighbors 污染。
+- 新增 `hasRuns` + 排序（PRJ 优先，SRP 兜底）：逐个候选验证有 run 才采用；全为空则返回首选并如实报"无 run"（老 GEO-only 项目如 GSE62944 上游本就没有公开 raw，ENA 同样为空——不再瞎找替代）。
+- 新增 `describeSeqoutError`：seqout 是定期同步 NCBI 的镜像库，很新项目（尤其 PRJNA）会 404，错误信息明确提示"库内尚未同步此项目，请稍后重试或到 NCBI/ENA 查询"，与"项目存在但无数据"区分。
+
+**验证**：对真实 API 跑 `resolveStudy`——GSE117176→PRJNA481344(5)、GSE151530→PRJNA636285(0)、GSE62944→PRJNA266377(0)、GSE26109→PRJNA142297(28)、GSE165500→PRJNA694699(9)，与主仓库逐条一致；`node --check` 通过。
