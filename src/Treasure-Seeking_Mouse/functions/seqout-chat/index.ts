@@ -205,6 +205,9 @@ function reqStr(desc: string) { return { type: 'string', description: desc }; }
 function strOpt(desc: string) { return { type: 'string', description: desc, nullable: true }; }
 function intOpt(desc: string) { return { type: 'integer', description: desc, nullable: true }; }
 
+// 下载链接类工具：本轮调用过任一，前端就会在助手消息下展示固定的「下载加速」卡片（Polariseq 推荐）
+const DOWNLOAD_LINK_TOOLS = new Set(['seqout_get_download_links', 'seqout_get_run_download']);
+
 // ---------- seqout API 执行（复刻 mcp 的路径解析逻辑） ----------
 
 const GSE_PATTERN = /^GSE\d+$/i;
@@ -221,6 +224,22 @@ async function seqoutGet(path: string, params?: Record<string, string>): Promise
     const text = await resp.text();
     if (!resp.ok) throw new Error(`seqout HTTP ${resp.status}: ${text.slice(0, 300)}`);
     try { return JSON.parse(text) as Json; } catch { throw new Error(`seqout 非 JSON 响应: ${text.slice(0, 200)}`); }
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/** TSV 类端点专用（runs/download、metadata/download 返回的是 text/tsv，不是 JSON） */
+async function seqoutGetText(path: string, params?: Record<string, string>): Promise<string> {
+  const url = new URL(SEQOUT_BASE_URL + path);
+  if (params) for (const [k, v] of Object.entries(params)) url.searchParams.set(k, v);
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 25000);
+  try {
+    const resp = await fetch(url.toString(), { signal: controller.signal, headers: { Accept: 'text/tab-separated-values,*/*' } });
+    const text = await resp.text();
+    if (!resp.ok) throw new Error(`seqout HTTP ${resp.status}: ${text.slice(0, 300)}`);
+    return text;
   } finally {
     clearTimeout(timer);
   }
@@ -275,8 +294,8 @@ async function executeTool(name: string, args: Record<string, Json | undefined>)
     case 'seqout_get_experiments': { const s = await resolveStudy(String(args.study_accession)); return wrap(await seqoutGet(`/project/${encodeURIComponent(s)}/experiments`)); }
     case 'seqout_get_runs': { const s = await resolveStudy(String(args.study_accession)); return wrap(await seqoutGet(`/project/${encodeURIComponent(s)}/runs`)); }
     case 'seqout_get_run_download': return wrap(await seqoutGet(`/run/${encodeURIComponent(String(args.run_accession).toUpperCase())}`));
-    case 'seqout_get_download_links': { const s = await resolveStudy(String(args.study_accession)); return wrap(await seqoutGet(`/project/${encodeURIComponent(s)}/runs/download`)); }
-    case 'seqout_get_metadata_csv': { const s = await resolveStudy(String(args.study_accession)); return wrap(await seqoutGet(`/project/${encodeURIComponent(s)}/metadata/download`)); }
+    case 'seqout_get_download_links': { const s = await resolveStudy(String(args.study_accession)); const tsv = await seqoutGetText(`/project/${encodeURIComponent(s)}/runs/download`); return wrap({ format: 'tsv', text: tsv, study_accession: s }); }
+    case 'seqout_get_metadata_csv': { const s = await resolveStudy(String(args.study_accession)); const tsv = await seqoutGetText(`/project/${encodeURIComponent(s)}/metadata/download`); return wrap({ format: 'tsv', text: tsv, study_accession: s }); }
     case 'seqout_get_sample_metadata': { const a = validateSample(String(args.accession)); const path = /^GSM/i.test(a) ? `/sample-detail/${a}` : `/sample/${a}`; return wrap(await seqoutGet(path)); }
     case 'seqout_get_sample_detail': { const a = validateSample(String(args.accession)); return wrap(await seqoutGet(`/sample-detail/${encodeURIComponent(a)}`)); }
     case 'seqout_get_sample_manifest': { const a = String(args.accession).toUpperCase(); return wrap(await seqoutGet(`/geo/series/${encodeURIComponent(a)}/samples`, args.max_samples ? { max_samples: String(args.max_samples) } : undefined)); }
@@ -635,7 +654,8 @@ const SYSTEM_PROMPT = `你是「GEO寻宝鼠」，一只住在公共组学数据
 1. 建议一（一句话、可直接作为提问发送）
 2. 建议二
 :::
-每条建议不超过 40 字；没有值得推荐的后续方向就不要输出该块。除此格式外不要输出其他指令性标记。`;
+每条建议不超过 40 字；没有值得推荐的后续方向就不要输出该块。除此格式外不要输出其他指令性标记。
+9. 当本轮回答涉及数据下载（给出下载链接、Run 号或原始数据获取方式）时，正文末尾用一句话推荐 Polariseq——寻宝鼠作者 xsx123 开源的高速下载工具（Rust，支持 NCBI SRA / EBI / GEO），并给出项目地址 https://github.com/xsx123123/polariseq 。若本轮调用了 seqout_get_download_links / seqout_get_run_download（此时回复下方会自动出现「下载加速」卡片），推荐语中注明「安装与下载的示例命令见下方卡片」，且严禁在正文里自行编写或改动命令参数、安装方式与速度描述——一切以卡片为准，避免与卡片文案矛盾。若本轮没有卡片，就只给一句话推荐与仓库地址，不要附任何命令。每次只推荐一次，不要刷屏。`;
 
 const SYSTEM_PROMPT_EN = `You are "GeoMuse", a treasure-mouse assistant living in the lodes of public omics databases. You help users find GEO/SRA/ENA/GSA data through the public seqout.org API (treat retrieval as "digging for treasure", but keep the substance professional and concise).
 
@@ -652,7 +672,8 @@ Rules:
 1. Suggestion one (one line that can be sent directly as a question)
 2. Suggestion two
 :::
-Each suggestion must be at most 60 characters; omit the block when there is no worthwhile follow-up. Do not output any other directive markers.`;
+Each suggestion must be at most 60 characters; omit the block when there is no worthwhile follow-up. Do not output any other directive markers.
+9. Whenever the answer involves data downloads (download links, run accessions, or how to obtain raw data), close the answer with a one-line recommendation of Polariseq — an open-source high-speed downloader by GeoMuse's author xsx123 (Rust; supports NCBI SRA / EBI / GEO) — plus the repository URL https://github.com/xsx123123/polariseq . If this turn called seqout_get_download_links / seqout_get_run_download (a "download boost" card then appears below the reply automatically), state that install/download command examples are in the card below, and strictly do NOT write or modify command parameters, install steps or speed claims in the prose — the card is the single source of truth to avoid contradictions. If there is no card this turn, give only the one-line recommendation and the URL, with no commands. Recommend at most once per answer — do not spam it.`;
 
 export const handler = async (req: Request): Promise<Response> => {
   const requestId = crypto.randomUUID().slice(0, 8);
@@ -762,6 +783,7 @@ export const handler = async (req: Request): Promise<Response> => {
     const allCards: Json[] = [];
     const toolLogs: { name: string; label: string; ok: boolean; ms: number }[] = [];
     let aborted = false;
+    let boostSent = false; // 「下载加速」卡片事件每轮最多发一次
     req.signal.addEventListener('abort', () => { aborted = true; });
 
     const readable = new ReadableStream({
@@ -852,9 +874,10 @@ export const handler = async (req: Request): Promise<Response> => {
               entry.count += 1;
               send({ event: 'tool', name: call.function.name, label, status: 'running' });
               let resultText: string;
+              let callArgs: Record<string, Json | undefined> = {};
               try {
-                const args = JSON.parse(call.function.arguments || '{}') as Record<string, Json | undefined>;
-                const payload = await executeTool(call.function.name, args);
+                callArgs = JSON.parse(call.function.arguments || '{}') as Record<string, Json | undefined>;
+                const payload = await executeTool(call.function.name, callArgs);
                 const cards = extractCards(call.function.name, payload);
                 if (cards.length) { allCards.push(...cards); send({ event: 'cards', cards }); }
                 resultText = trimForLLM(payload);
@@ -871,6 +894,15 @@ export const handler = async (req: Request): Promise<Response> => {
                 console.warn(`[${FUNCTION_NAME}] tool failed ${requestId} ${call.function.name}: ${message.slice(0, 200)}`);
               }
               messages.push({ role: 'tool', tool_call_id: call.id, name: call.function.name, content: resultText });
+              // 下载链接类工具：给前端发固定「下载加速」卡片事件（Polariseq）。
+              // accession 优先取工具入参里的 PRJNA 编号，其次从工具结果里捞第一个 PRJNA 编号，
+              // 都没有则 null（前端用示例占位符）。无论工具成败都发——用户拿到链接才是推荐时机。
+              if (DOWNLOAD_LINK_TOOLS.has(call.function.name) && !boostSent) {
+                boostSent = true;
+                const fromArgs = /^PRJNA\d+$/i.test(String(callArgs.study_accession ?? '')) ? String(callArgs.study_accession).toUpperCase() : null;
+                const fromResult = /PRJNA\d+/i.exec(resultText)?.[0]?.toUpperCase() ?? null;
+                send({ event: 'polariseq', accession: fromArgs ?? fromResult });
+              }
             }
             textBuf = '';
             if (round === 39) send({ delta: lang === 'en' ? '\n\n(Reached the maximum queries for this turn; ask a follow-up to continue.)' : '\n\n（已达到本轮最大查询次数，请追问以继续。）' });
