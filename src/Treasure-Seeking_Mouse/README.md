@@ -25,6 +25,11 @@
 
 ---
 
+## Documentation
+
+- [中文说明（简体中文版 README）](docs/README.zh-CN.md)
+- [Detailed development docs](docs/DETAILED_README.md)
+
 ## Quick start
 
 ### Docker deployment (recommended — no local Node/pnpm/nginx needed)
@@ -69,11 +74,6 @@ React 19 + TypeScript · Vite 7 · Tailwind CSS v4 (dual-theme design tokens) ·
 | `server/` | Self-hosted chat service (runs the Edge Function handler natively on Node, zero dependencies) |
 
 For detailed architecture notes, the Meoo platform release process, manual deployment steps and troubleshooting, see **[docs/DETAILED_README.md](docs/DETAILED_README.md)**.
-
-## Documentation
-
-- [Detailed development docs](docs/DETAILED_README.md)
-- [中文说明（简体中文版 README）](docs/README.zh-CN.md)
 
 ---
 

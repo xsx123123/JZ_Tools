@@ -25,6 +25,11 @@
 
 ---
 
+## 文档
+
+- [English README](../README.md)
+- [详细开发文档](DETAILED_README.md)
+
 ## 快速开始
 
 ### Docker 部署（推荐，无需本机 Node/pnpm/nginx）

@@ -5,7 +5,7 @@
 - 改 QMuse 版时遵守 `qmuse/qmuse-app/AGENTS.md` 与其内置 qmuse-cloud 技能契约；改完跑 `npm run check`、`npm run build` 与产物校验器（见 MIGRATION.md 第五节）。
 
 ## 文档与文案同步（改一处要连带改的地方）
-- **README 双语**：根 `README.md` 是**英文版**（GitHub 仓库首页默认展示），`docs/README.zh-CN.md` 是**中文版**，两份顶部有互链语言切换行（`**English** | [简体中文](docs/README.zh-CN.md)` / `[English](../README.md) | **简体中文**`）。改功能一览、技术栈、目录、快速开始、致谢等任一章节，**两份都要同步改**，别只动一份。图片/链接用各自所在目录的相对路径：根 README 写 `docs/寻宝鼠.png`、`docs/badges/*.svg`、`src/assets/pet/*`；中文版在 `docs/` 下，写 `寻宝鼠.png`、`badges/*.svg`、`../src/assets/pet/*`。代码块的命令字面量保持原样，只翻译注释。
+- **README 双语**：根 `README.md` 是**英文版**（GitHub 仓库首页默认展示），`docs/README.zh-CN.md` 是**中文版**。两份顶部有互链语言切换行（`**English** | [简体中文](docs/README.zh-CN.md)` / `[English](../README.md) | **简体中文**`），且**正文前部**各有一个 `## Documentation` / `## 文档` 段互列中英 README + 详细文档入口（中文版排在前）。改功能一览、技术栈、目录、快速开始、致谢等任一章节，**两份都要同步改**，别只动一份；章节顺序也保持一致。图片/链接用各自所在目录的相对路径：根 README 写 `docs/寻宝鼠.png`、`docs/badges/*.svg`、`src/assets/pet/*`；中文版在 `docs/` 下，写 `寻宝鼠.png`、`badges/*.svg`、`../src/assets/pet/*`。代码块的命令字面量保持原样，只翻译注释。
 - **关于页跟 README**：`src/routes/about.tsx` 是 README 的应用内镜像（核心亮点 / seqout-mcp 后端 / 自托管 / 技术栈 / 致谢）。README 改了这几节，关于页对应改，文案落在 `src/i18n/locales/{zh,en}.ts` 的 `about.*` 键，**中英两份字典同时加**（zh 是键的权威来源，缺 en 键会静默回退中文）。seqout-mcp 段与致谢图标行（`src/assets/badges/`，拷贝自 `docs/badges/`）易漏。
 - **i18n 键约定**：新增界面文案一律走 `t("key")`，不写死在组件里；错误提示若在 service 层（非组件）用 `translate(readLang(), "key")`。改完跑 `npx tsc --noEmit`（键名打错会报错）+ `npx vite build`，并核对 zh/en 键数一致。
 
