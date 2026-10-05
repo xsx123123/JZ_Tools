@@ -10,6 +10,7 @@ import { DownloadBoostCard } from "./DownloadBoostCard";
 import { SuggestionBlock, extractFollowups } from "./SuggestionBlock";
 import { LiteratureCardPanel } from "./LiteratureCard";
 import { addEvidenceListener, type EvidenceRequest } from "@/lib/evidenceBus";
+import { copyText } from "@/lib/clipboard";
 import { useIsTouch } from "@/hooks/use-touch";
 import { useI18n } from "@/i18n/provider";
 import type { DatasetCard, ToolLog } from "@/services/seqoutChat";
@@ -58,13 +59,11 @@ function ActionButton({ label, onClick, children }: { label: string; onClick?: (
 function useCopy(): [boolean, (text: string) => void] {
   const [copied, setCopied] = useState(false);
   function copy(text: string): void {
-    void navigator.clipboard
-      ?.writeText(text)
-      .then(() => {
-        setCopied(true);
-        setTimeout(() => setCopied(false), 2000);
-      })
-      .catch(() => undefined);
+    void copyText(text).then((ok) => {
+      if (!ok) return; // 两种通道都失败就不显示"已复制"，避免假成功
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
   }
   return [copied, copy];
 }

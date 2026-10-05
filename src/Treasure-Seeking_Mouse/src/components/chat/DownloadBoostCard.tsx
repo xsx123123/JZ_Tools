@@ -1,6 +1,7 @@
 // 「下载加速」推荐卡片：本轮调用过下载链接工具时，随 polariseq 事件固定渲染（不依赖模型输出）
 import { useState } from "react";
 import { Check, Copy, Download, ExternalLink } from "lucide-react";
+import { copyText } from "@/lib/clipboard";
 import { useI18n } from "@/i18n/provider";
 
 const PROJECT_URL = "https://github.com/xsx123123/polariseq";
@@ -17,13 +18,11 @@ export function DownloadBoostCard({ accession }: { accession: string | null }): 
   const sheetUrl = known ? `${SEQOUT_API}/project/${known}/runs/download` : null;
 
   function onCopy(): void {
-    void navigator.clipboard
-      ?.writeText(commands)
-      .then(() => {
-        setCopied(true);
-        setTimeout(() => setCopied(false), 2000);
-      })
-      .catch(() => undefined);
+    void copyText(commands).then((ok) => {
+      if (!ok) return;
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
   }
 
   return (

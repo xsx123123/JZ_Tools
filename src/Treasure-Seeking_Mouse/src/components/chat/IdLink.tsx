@@ -3,12 +3,14 @@
 // HoverCard 在触屏上点击会直接跳转、浮层永不出现，故按输入设备自动切换容器，浮层内容完全共用。
 // 浮层打开时经 T2 fetchLiterature 自动拉论文元数据（前端 TTL 缓存，反复 hover 不重复请求）；
 // 「查看证据链」经 evidenceBus 抛给消息列表层，渲染完整文献卡片
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { BookOpen, Copy, Check, ExternalLink } from "lucide-react";
 import { HoverCard, HoverCardTrigger, HoverCardContent } from "@/components/ui/hover-card";
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { linkTypeLabel, type IdMatch } from "@/lib/linkify";
 import { requestEvidence } from "@/lib/evidenceBus";
+import { consumeIdLinkHint } from "@/lib/linkHint";
+import { copyText } from "@/lib/clipboard";
 import { useIsTouch } from "@/hooks/use-touch";
 import { useI18n } from "@/i18n/provider";
 import { fetchLiterature, type LiteratureCardDTO } from "@/services/literature";
@@ -27,6 +29,13 @@ export function IdLink({
   const { t, lang } = useI18n();
   const [copied, setCopied] = useState(false);
   const isTouch = useIsTouch();
+  // 新用户发现性提示：全站只展示一次（见 lib/linkHint），6s 自动消失或打开浮层即消失
+  const [hintOn, setHintOn] = useState(() => consumeIdLinkHint());
+  useEffect(() => {
+    if (!hintOn) return;
+    const id = setTimeout(() => setHintOn(false), 6000);
+    return () => clearTimeout(id);
+  }, [hintOn]);
   // 浮层自动预取的论文元数据（loading 骨架 → 标题/期刊/年份；not_found 显示提示）
   const [lit, setLit] = useState<LiteratureCardDTO | null>(null);
   const [litState, setLitState] = useState<"idle" | "loading" | "done">("idle");
@@ -41,13 +50,11 @@ export function IdLink({
   }, [litState, match.type, match.id]);
 
   function copyId(): void {
-    void navigator.clipboard
-      ?.writeText(match.id)
-      .then(() => {
-        setCopied(true);
-        setTimeout(() => setCopied(false), 2000);
-      })
-      .catch(() => undefined);
+    void copyText(match.id).then((ok) => {
+      if (!ok) return;
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
   }
 
   function showEvidence(): void {
@@ -60,19 +67,22 @@ export function IdLink({
     : null;
 
   const trigger = (
-    <a
-      href={match.url}
-      target="_blank"
-      rel="noreferrer noopener"
-      className="id-link font-mono font-medium text-helix"
-      title={linkTypeLabel(lang, match.type)}
-      // 触摸端：拦截默认跳转，改为打开浮层（跳转交给浮层内的「原始页」按钮）
-      onClick={(e) => {
-        if (isTouch) e.preventDefault();
-      }}
-    >
-      {match.id}
-    </a>
+    <span className="relative inline-block">
+      <a
+        href={match.url}
+        target="_blank"
+        rel="noreferrer noopener"
+        className={`id-link font-mono font-medium text-helix${hintOn ? " id-link--hint" : ""}`}
+        title={linkTypeLabel(lang, match.type)}
+        // 触摸端：拦截默认跳转，改为打开浮层（跳转交给浮层内的「原始页」按钮）
+        onClick={(e) => {
+          if (isTouch) e.preventDefault();
+        }}
+      >
+        {match.id}
+      </a>
+      {hintOn ? <span className="id-link-hint-bubble">{t("idlink.hint")}</span> : null}
+    </span>
   );
 
   const content = (
@@ -129,10 +139,10 @@ export function IdLink({
     </div>
   );
 
-  // 触摸端：点击触发（Popover）；桌面端：悬停触发（HoverCard）
+  // 触摸端：点击触发（Popover）；桌面端：悬停触发（HoverCard）。打开浮层时同时关掉提示。
   if (isTouch) {
     return (
-      <Popover onOpenChange={(open) => { if (open) loadLiterature(); }}>
+      <Popover onOpenChange={(open) => { if (open) { loadLiterature(); setHintOn(false); } }}>
         <PopoverTrigger asChild>{trigger}</PopoverTrigger>
         <PopoverContent className="w-80" side="top">
           {content}
@@ -142,7 +152,7 @@ export function IdLink({
   }
 
   return (
-    <HoverCard openDelay={300} closeDelay={120} onOpenChange={(open) => { if (open) loadLiterature(); }}>
+    <HoverCard openDelay={300} closeDelay={120} onOpenChange={(open) => { if (open) { loadLiterature(); setHintOn(false); } }}>
       <HoverCardTrigger asChild>{trigger}</HoverCardTrigger>
       <HoverCardContent className="w-80" side="top">
         {content}
