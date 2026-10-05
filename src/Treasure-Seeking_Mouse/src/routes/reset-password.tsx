@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { BrandMark } from "@/components/BrandMark";
 import { supabase } from "@/supabase/client";
+import { useI18n } from "@/i18n/provider";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -12,6 +13,7 @@ export const Route = createFileRoute("/reset-password")({
 });
 
 function ResetPasswordPage(): React.ReactElement {
+  const { t } = useI18n();
   const navigate = useNavigate();
   const [ready, setReady] = useState(false);
   const [password, setPassword] = useState("");
@@ -28,16 +30,16 @@ function ResetPasswordPage(): React.ReactElement {
       const isRecovery = data.session?.user?.user_metadata?.provider === "recover" ||
         window.location.hash.includes("type=recovery");
       if (isRecovery && data.session) setReady(true);
-      else setMsg({ type: "error", text: "未检测到有效的重置链接，请回到登录页重新发起「忘记密码」" });
+      else setMsg({ type: "error", text: t("reset.errNoLink") });
     })();
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [t]);
 
   async function handleSave(): Promise<void> {
     if (password.length < 6) {
-      setMsg({ type: "error", text: "密码至少 6 位" });
+      setMsg({ type: "error", text: t("reset.errShort") });
       return;
     }
     setBusy(true);
@@ -45,11 +47,11 @@ function ResetPasswordPage(): React.ReactElement {
     try {
       const { error } = await supabase.auth.updateUser({ password });
       if (error) throw error;
-      setMsg({ type: "ok", text: "密码已更新，即将返回登录页…" });
+      setMsg({ type: "ok", text: t("reset.saved") });
       await supabase.auth.signOut();
       setTimeout(() => void navigate({ to: "/" }), 1200);
     } catch (e) {
-      setMsg({ type: "error", text: e instanceof Error ? e.message : "更新失败，请重试" });
+      setMsg({ type: "error", text: e instanceof Error ? e.message : t("reset.errFailed") });
     } finally {
       setBusy(false);
     }
@@ -63,22 +65,22 @@ function ResetPasswordPage(): React.ReactElement {
             <BrandMark size={20} />
           </span>
           <div>
-            <p className="font-display text-[16px] font-semibold tracking-tight">设置新密码</p>
-            <p className="text-[11.5px] text-muted-foreground">GEO寻宝鼠</p>
+            <p className="font-display text-[16px] font-semibold tracking-tight">{t("reset.title")}</p>
+            <p className="text-[11.5px] text-muted-foreground">{t("brand.name")}</p>
           </div>
         </div>
 
         {!ready ? (
-          <p className="py-6 text-center text-[13px] text-muted-foreground">正在校验重置链接…</p>
+          <p className="py-6 text-center text-[13px] text-muted-foreground">{t("reset.checking")}</p>
         ) : (
           <div className="space-y-3.5">
             <div className="space-y-1.5">
-              <Label htmlFor="new-pass" className="text-xs text-muted-foreground">新密码</Label>
+              <Label htmlFor="new-pass" className="text-xs text-muted-foreground">{t("reset.newPassword")}</Label>
               <Input
                 id="new-pass"
                 type="password"
                 autoComplete="new-password"
-                placeholder="至少 6 位"
+                placeholder={t("reset.passwordPlaceholder")}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 className="h-10 rounded-lg border-border bg-card shadow-sm focus-visible:border-helix focus-visible:ring-2 focus-visible:ring-helix/20"
@@ -90,7 +92,7 @@ function ResetPasswordPage(): React.ReactElement {
               </p>
             ) : null}
             <Button onClick={handleSave} disabled={busy || !password} className="h-10 w-full bg-primary text-primary-foreground hover:bg-primary/90">
-              {busy ? "保存中…" : "保存并返回登录"}
+              {busy ? t("reset.busy") : t("reset.save")}
             </Button>
           </div>
         )}

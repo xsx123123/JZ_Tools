@@ -1,6 +1,8 @@
 // 工具执行轨迹：紧凑展示 Edge Function 内 seqout 工具调用过程
 import { Check, Loader2, X } from "lucide-react";
 import type { ToolLog } from "@/services/seqoutChat";
+import { useI18n } from "@/i18n/provider";
+import { toolLabel } from "@/i18n";
 
 export interface LiveToolEvent {
   name: string;
@@ -22,6 +24,7 @@ export function ToolTrace({
   logs: ToolLog[];
   live?: LiveToolEvent[];
 }): React.ReactElement | null {
+  const { lang } = useI18n();
   const items: LiveToolEvent[] =
     live && live.length > 0 ? live : logs.map((l) => ({ name: l.name, label: l.label, status: l.ok ? "done" : "error", ms: l.ms }));
   if (items.length === 0) return null;
@@ -39,7 +42,7 @@ export function ToolTrace({
           }`}
         >
           {statusIcon(it.status)}
-          {it.label}
+          {toolLabel(lang, it.name, it.label)}
           {it.status !== "running" && typeof it.ms === "number" ? (
             <span className="opacity-60">{it.ms}ms</span>
           ) : null}

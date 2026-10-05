@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { readPetPos, writePetPos, readPetQuiet, writePetQuiet, bumpPokeCount, readTreasureCount, addTreasure, ACHIEVEMENTS, claimAchievement, earnedAchievements, type Achievement, type PetPos } from "@/services/petStore";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { useI18n } from "@/i18n/provider";
+import { petLines, type MessageKey } from "@/i18n";
 import IMG_BASE from "@/assets/pet/mouse-base.webp";
 import IMG_DIG from "@/assets/pet/mouse-dig.webp";
 import IMG_CHEER from "@/assets/pet/mouse-cheer.webp";
@@ -23,17 +25,6 @@ type DistributiveOmit<T, K extends PropertyKey> = T extends unknown ? Omit<T, K>
 export function makePetEvent(e: DistributiveOmit<PetEvent, "seq">): PetEvent {
   return { ...e, seq: ++petSeq } as PetEvent;
 }
-
-const IDLE_LINES = ["这片土里有单细胞的味道…", "今天也来挖 GSE 吧！", "嗅到了高分文献的气息", "我的铲子呢…哦在背包里", "宝藏藏在第三铲之后"];
-const DIG_LINES = ["挖挖挖…", "GEO? SRA?", "这块土有点硬", "快出来了快出来了", "阿寻挖矿中，请勿投喂"];
-const POKE_LINES = ["吱!", "别戳啦~", "背包里掉出一张 GSM 卡片", "给你看我的宝贝收藏", "再戳就咬你哦（轻轻）"];
-const SPIN_LINES = ["转圈圈！宝藏多多！", "被爱了吱吱吱", "嘿嘿，痒"];
-const MISS_LINES = ["唉，只有石头…", "这铲土是空的", "一定是姿势不对，再试一次!"];
-const WALK_LINES = ["去那边看看…", "闻着 RNA 的味儿就去了", "散步消食，顺便探矿"];
-const TREASURE_LINES: [() => string, (n: number) => string] = [
-  () => "宝藏还在路上，别急~",
-  (n: number) => `本鼠已囤 ${n} 份宝藏，富甲一方！`,
-];
 
 function pick<T>(arr: T[]): T {
   return arr[Math.floor(Math.random() * arr.length)];
@@ -75,6 +66,8 @@ interface Burst {
 let burstId = 0;
 
 export function TreasureMouse({ event }: { event: PetEvent | null }): React.ReactElement {
+  const { t, lang } = useI18n();
+  const L = petLines(lang);
   const isMobile = useIsMobile();
   const size = isMobile ? SIZE_MOBILE : SIZE; // 移动端缩小，避免遮挡近半屏宽
   const [quiet, setQuiet] = useState<boolean>(() => readPetQuiet());
@@ -189,29 +182,29 @@ export function TreasureMouse({ event }: { event: PetEvent | null }): React.Reac
       case "tool_start":
         setGemCount(null);
         countedRef.current = false;
-        transient("digging", pick(DIG_LINES), 10_000); // 兜底超时回 idle；done/error 会提前打断
+        transient("digging", pick(L.dig), 10_000); // 兜底超时回 idle；done/error 会提前打断
         break;
       case "cards": {
         setGemCount(event.count);
         countedRef.current = true;
-        revealStow(event.count, `找到 ${event.count} 份数据!`, 1800, false);
+        revealStow(event.count, t("pet.foundData", { n: event.count }), 1800, false);
         break;
       }
       case "done":
         if (event.cards > 0 && state !== "reveal" && state !== "stow" && state !== "celebrate") {
           setGemCount(event.cards);
-          revealStow(event.cards, "这一铲，值了!", 1600, countedRef.current);
+          revealStow(event.cards, t("pet.worthIt"), 1600, countedRef.current);
         } else if (event.cards === 0) {
-          transient("miss", pick(MISS_LINES), 2400);
+          transient("miss", pick(L.miss), 2400);
         }
         break;
       case "error":
-        transient("miss", pick(MISS_LINES), 2400);
+        transient("miss", pick(L.miss), 2400);
         break;
       default:
         break;
     }
-  }, [event, quiet, transient, state, checkMilestones]);
+  }, [event, quiet, transient, state, checkMilestones, lang]);
 
   // 闲置剧场：冒泡 / 散步 / 张望
   useEffect(() => {
@@ -220,13 +213,13 @@ export function TreasureMouse({ event }: { event: PetEvent | null }): React.Reac
       if (busyRef.current) return;
       const r = Math.random();
       if (r < 0.3) {
-        setBubble(pick(IDLE_LINES));
-        setTimeout(() => setBubble((b) => (b && IDLE_LINES.includes(b) ? null : b)), 3200);
+        setBubble(pick(L.idle));
+        setTimeout(() => setBubble((b) => (b && L.idle.includes(b) ? null : b)), 3200);
       } else if (r < 0.44) {
         // 溜达一小段
         const dir = Math.random() < 0.5 ? -1 : 1;
         setState("walk");
-        setBubble(pick(WALK_LINES));
+        setBubble(pick(L.walk));
         const start = Date.now();
         const base = pos.x;
         const step = setInterval(() => {
@@ -248,7 +241,7 @@ export function TreasureMouse({ event }: { event: PetEvent | null }): React.Reac
       if (idleTimer.current) clearInterval(idleTimer.current);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [quiet, pos.x, pos.y, transient]);
+  }, [quiet, pos.x, pos.y, transient, lang]);
 
   useEffect(() => () => {
     if (stateTimer.current) clearTimeout(stateTimer.current);
@@ -272,18 +265,18 @@ export function TreasureMouse({ event }: { event: PetEvent | null }): React.Reac
       // 连击彩蛋：转圈 + 爱心雨 + 报宝藏库存
       pokeStreak.current = { n: 0, at: 0 };
       spawnHearts(5);
-      const line = TREASURE_LINES[1](readTreasureCount());
+      const line = L.treasureStash(readTreasureCount());
       transient("spin", line, 1400);
       return;
     }
     spawnHearts(1);
-    const line = n > 6 && pokeStreak.current.n === 1 ? "…吱…（已读不回）" : pick([...POKE_LINES, ...SPIN_LINES.slice(0, 1)]);
+    const line = n > 6 && pokeStreak.current.n === 1 ? t("pet.readNoReply") : pick([...L.poke, ...L.spin.slice(0, 1)]);
     transient("poke", line, 900);
   }
 
   function handleChestClick(): void {
     const total = readTreasureCount();
-    const line = total > 0 ? `宝箱里已囤 ${total} 份宝藏，都是阿寻一铲一铲挖的！` : TREASURE_LINES[0]();
+    const line = total > 0 ? t("pet.chestStock", { n: total }) : L.treasureEmpty;
     transient("poke", line, 1800);
   }
 
@@ -340,9 +333,9 @@ export function TreasureMouse({ event }: { event: PetEvent | null }): React.Reac
       <button
         type="button"
         onClick={() => toggleQuiet(false)}
-        title="唤回寻宝鼠"
+        title={t("pet.recall")}
         className="fixed bottom-4 right-4 z-30 flex h-9 w-9 items-end justify-center rounded-b-full border border-dashed border-helix/40 bg-helix-soft/60 pb-1 text-helix shadow-soft transition-transform hover:scale-110"
-        aria-label="唤回寻宝鼠"
+        aria-label={t("pet.recall")}
       >
         <span className="h-2 w-2 rounded-full bg-helix/50" />
       </button>
@@ -367,7 +360,7 @@ export function TreasureMouse({ event }: { event: PetEvent | null }): React.Reac
   return (
     <div
       role="img"
-      aria-label="寻宝鼠阿寻"
+      aria-label={t("pet.alt")}
       className="fixed z-30 select-none touch-none"
       style={{ left: pos.x, bottom: pos.y, width: size }}
     >
@@ -399,7 +392,7 @@ export function TreasureMouse({ event }: { event: PetEvent | null }): React.Reac
       {/* 成就横幅 */}
       {milestone ? (
         <div className="pet-banner absolute -top-10 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full border border-pet-amber/60 bg-card px-3 py-1 text-[11px] font-semibold text-pet-amber-deep shadow-soft-lg">
-          🏅 成就解锁 · {milestone.name}（{milestone.threshold} 份宝藏）
+          {t("pet.banner", { name: t(`pet.achievements.${milestone.threshold}` as MessageKey), n: milestone.threshold })}
         </div>
       ) : null}
 
@@ -443,10 +436,10 @@ export function TreasureMouse({ event }: { event: PetEvent | null }): React.Reac
       <button
         type="button"
         onClick={handleChestClick}
-        title={`已累计挖到 ${treasure} 份宝藏`}
+        title={t("pet.chestHover", { n: treasure })}
         className="absolute -left-7 bottom-0 block h-8 w-8 transition-transform hover:scale-110 active:scale-95"
       >
-        <img key={chestPopKey} src={IMG_CHEST} alt="宝箱" draggable={false} className={`pointer-events-none block h-full w-full drop-shadow-[0_3px_5px_rgb(0_0_0/0.15)] ${chestPopKey > 0 ? "pet-chest-pop" : ""}`} />
+        <img key={chestPopKey} src={IMG_CHEST} alt={t("pet.chest")} draggable={false} className={`pointer-events-none block h-full w-full drop-shadow-[0_3px_5px_rgb(0_0_0/0.15)] ${chestPopKey > 0 ? "pet-chest-pop" : ""}`} />
         {treasure > 0 ? (
           <span className="absolute -right-1 -top-1 min-w-[15px] rounded-full bg-pet-amber-deep px-1 text-center font-mono text-[9px] leading-[15px] text-white shadow-sm">{treasure > 99 ? "99+" : treasure}</span>
         ) : null}
@@ -458,7 +451,7 @@ export function TreasureMouse({ event }: { event: PetEvent | null }): React.Reac
           {earned.map((a, i) => (
             <span
               key={a.threshold}
-              title={`成就「${a.name}」· 累计挖到 ${a.threshold} 份宝藏`}
+              title={t("pet.badgeTitle", { name: t(`pet.achievements.${a.threshold}` as MessageKey), n: a.threshold })}
               className={`flex h-[18px] w-[18px] items-center justify-center rounded-full text-[9px] leading-none shadow-sm ring-1 ${milestone?.threshold === a.threshold ? "pet-badge-in" : ""}`}
               style={{ background: a.bg, boxShadow: `0 0 6px ${a.ring}`, ["--tw-ring-color" as string]: a.ring, animationDelay: `${i * 0.12}s` }}
             >
@@ -470,7 +463,7 @@ export function TreasureMouse({ event }: { event: PetEvent | null }): React.Reac
 
       {/* 小字提示：触摸端无右键，提示长按 */}
       <p className="mt-0.5 text-center font-mono text-[9px] text-muted-foreground/60">
-        阿寻 · {isMobile ? "长按静默" : "右键静默"}
+        {t("pet.hint", { mode: isMobile ? t("pet.modeLongPress") : t("pet.modeRightClick") })}
       </p>
     </div>
   );

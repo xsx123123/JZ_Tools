@@ -1,6 +1,7 @@
 // 对话输入区：多行输入 + 模型选择 + 发送/停止
 import { useEffect, useRef, useState } from "react";
 import { Send, Square } from "lucide-react";
+import { useI18n } from "@/i18n/provider";
 
 export function Composer({
   models,
@@ -19,6 +20,7 @@ export function Composer({
   onSend: (text: string) => void;
   onStop: () => void;
 }): React.ReactElement {
+  const { t } = useI18n();
   const [value, setValue] = useState("");
   const taRef = useRef<HTMLTextAreaElement>(null);
 
@@ -51,7 +53,7 @@ export function Composer({
                 submit();
               }
             }}
-            placeholder="告诉阿寻去哪儿挖宝，如：搜索小鼠心脏发育的单细胞测序数据集…（Enter 发送）"
+            placeholder={t("composer.placeholder")}
             className="max-h-40 min-h-[40px] flex-1 resize-none bg-transparent px-2 py-1.5 text-[14px] leading-relaxed text-foreground outline-none placeholder:text-muted-foreground/70"
             disabled={disabled}
           />
@@ -59,7 +61,7 @@ export function Composer({
             <button
               type="button"
               onClick={onStop}
-              title="停止生成"
+              title={t("composer.stop")}
               className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-destructive/40 bg-destructive/5 text-destructive transition-colors hover:bg-destructive/10"
             >
               <Square size={14} fill="currentColor" />
@@ -69,7 +71,7 @@ export function Composer({
               type="button"
               onClick={submit}
               disabled={!value.trim() || disabled}
-              title="发送"
+              title={t("composer.send")}
               className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground shadow-sm transition-all hover:bg-[oklch(0.53_0.11_184.7)] active:scale-95 disabled:cursor-not-allowed disabled:opacity-40"
             >
               <Send size={15} />
@@ -89,7 +91,7 @@ export function Composer({
               ))}
             </select>
           </label>
-          <span className="hidden sm:inline">阿寻挖的宝藏由 AI 生成，数据以 NCBI / NGDC 原始页面为准</span>
+          <span className="hidden sm:inline">{t("composer.disclaimer")}</span>
         </div>
       </div>
     </div>

@@ -1,6 +1,8 @@
 // 邮箱验证码 + 密码：登录 / 注册（signUp→verifyOtp 两步状态机）/ 忘记密码
 import { useState } from "react";
 import { supabase } from "@/supabase/client";
+import { useI18n } from "@/i18n/provider";
+import type { TFunc } from "@/i18n";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -13,11 +15,11 @@ import {
 
 type Mode = "login" | "register" | "forgot";
 
-function errText(e: unknown): string {
+function errText(t: TFunc, e: unknown): string {
   const m = e instanceof Error ? e.message : String(e);
-  if (/Invalid login credentials/i.test(m)) return "邮箱或密码不正确";
-  if (/already registered|already exists/i.test(m)) return "该邮箱已注册，请直接登录";
-  if (/rate limit/i.test(m)) return "操作过于频繁，请稍后再试";
+  if (/Invalid login credentials/i.test(m)) return t("auth.errInvalidCredentials");
+  if (/already registered|already exists/i.test(m)) return t("auth.errExists");
+  if (/rate limit/i.test(m)) return t("auth.errRateLimit");
   return m;
 }
 
@@ -30,6 +32,7 @@ export function AuthDialog({
   onClose: () => void;
   onSuccess: () => void;
 }): React.ReactElement {
+  const { t } = useI18n();
   const [mode, setMode] = useState<Mode>("login");
   const [step, setStep] = useState<"form" | "verify">("form"); // 注册两步状态机
   const [email, setEmail] = useState("");
@@ -60,7 +63,7 @@ export function AuthDialog({
       if (error) throw error;
       onSuccess();
     } catch (e) {
-      setMsg({ type: "error", text: errText(e) });
+      setMsg({ type: "error", text: errText(t, e) });
     } finally {
       setBusy(false);
     }
@@ -68,7 +71,7 @@ export function AuthDialog({
 
   async function handleRegister(): Promise<void> {
     if (password.length < 6) {
-      setMsg({ type: "error", text: "密码至少 6 位" });
+      setMsg({ type: "error", text: t("auth.errPasswordShort") });
       return;
     }
     setBusy(true);
@@ -84,9 +87,12 @@ export function AuthDialog({
       });
       if (error) throw error;
       setStep("verify");
-      setMsg({ type: "ok", text: "确认邮件已发送，请输入邮件中的 6 位验证码完成注册" });
+      setMsg({
+        type: "ok",
+        text: t("auth.verifySent"),
+      });
     } catch (e) {
-      setMsg({ type: "error", text: errText(e) });
+      setMsg({ type: "error", text: errText(t, e) });
     } finally {
       setBusy(false);
     }
@@ -99,7 +105,7 @@ export function AuthDialog({
       const { error } = await supabase.auth.verifyOtp({ email: email.trim(), token: token.trim(), type: "signup" });
       if (error) throw error;
       const { data, error: userError } = await supabase.auth.getUser();
-      if (userError || !data.user) throw new Error("登录状态尚未同步，请稍后重试");
+      if (userError || !data.user) throw new Error(t("auth.errSession"));
       const { error: upErr } = await supabase
         .from("profiles")
         .upsert({ id: data.user.id, username: pendingUsername })
@@ -108,7 +114,7 @@ export function AuthDialog({
       if (upErr) throw new Error(upErr.message);
       onSuccess();
     } catch (e) {
-      setMsg({ type: "error", text: errText(e) });
+      setMsg({ type: "error", text: errText(t, e) });
     } finally {
       setBusy(false);
     }
@@ -122,9 +128,9 @@ export function AuthDialog({
         redirectTo: `${window.location.origin}/reset-password`,
       });
       if (error) throw error;
-      setMsg({ type: "ok", text: "重置链接已发送到邮箱，请查收邮件并点击链接设置新密码" });
+      setMsg({ type: "ok", text: t("auth.resetSent") });
     } catch (e) {
-      setMsg({ type: "error", text: errText(e) });
+      setMsg({ type: "error", text: errText(t, e) });
     } finally {
       setBusy(false);
     }
@@ -137,22 +143,26 @@ export function AuthDialog({
       <DialogContent className="sm:max-w-[400px] border-border bg-card text-foreground shadow-soft-lg">
         <DialogHeader>
           <DialogTitle className="font-display text-[18px] font-semibold tracking-tight">
-            {mode === "login" ? "登录 GEO寻宝鼠" : mode === "register" ? (step === "verify" ? "输入邮箱验证码" : "注册新账号") : "找回密码"}
+            {mode === "login"
+              ? t("auth.loginTitle")
+              : mode === "register"
+                ? (step === "verify" ? t("auth.verifyTitle") : t("auth.registerTitle"))
+                : t("auth.forgotTitle")}
           </DialogTitle>
           <p className="text-[12.5px] text-muted-foreground">
             {mode === "login"
-              ? "登录后可跨设备同步历史会话"
+              ? t("auth.loginSub")
               : mode === "register"
                 ? step === "verify"
-                  ? `验证码已发送至 ${email}`
-                  : "真实邮箱 + 密码，注册需邮箱验证"
-                : "输入注册邮箱，我们将发送重置密码链接"}
+                  ? t("auth.verifySub", { email })
+                  : t("auth.registerSub")
+                : t("auth.forgotSub")}
           </p>
         </DialogHeader>
 
         <div className="space-y-3.5 pt-1">
           <div className="space-y-1.5">
-            <Label htmlFor="auth-email" className="text-xs text-muted-foreground">邮箱</Label>
+            <Label htmlFor="auth-email" className="text-xs text-muted-foreground">{t("auth.email")}</Label>
             <Input
               id="auth-email"
               type="email"
@@ -167,12 +177,12 @@ export function AuthDialog({
 
           {mode !== "forgot" && !(mode === "register" && step === "verify") ? (
             <div className="space-y-1.5">
-              <Label htmlFor="auth-pass" className="text-xs text-muted-foreground">密码</Label>
+              <Label htmlFor="auth-pass" className="text-xs text-muted-foreground">{t("auth.password")}</Label>
               <Input
                 id="auth-pass"
                 type="password"
                 autoComplete={mode === "login" ? "current-password" : "new-password"}
-                placeholder={mode === "register" ? "至少 6 位" : "••••••••"}
+                placeholder={mode === "register" ? t("auth.passwordPlaceholderRegister") : "••••••••"}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 className={fieldCls}
@@ -182,12 +192,12 @@ export function AuthDialog({
 
           {mode === "register" && step === "verify" ? (
             <div className="space-y-1.5">
-              <Label htmlFor="auth-token" className="text-xs text-muted-foreground">邮件验证码</Label>
+              <Label htmlFor="auth-token" className="text-xs text-muted-foreground">{t("auth.code")}</Label>
               <Input
                 id="auth-token"
                 inputMode="numeric"
                 maxLength={8}
-                placeholder="6 位数字验证码"
+                placeholder={t("auth.codePlaceholder")}
                 value={token}
                 onChange={(e) => setToken(e.target.value)}
                 className={`${fieldCls} font-mono tracking-[0.3em]`}
@@ -203,42 +213,42 @@ export function AuthDialog({
 
           {mode === "login" ? (
             <Button onClick={handleLogin} disabled={busy || !email || !password} className="w-full h-10 bg-primary text-primary-foreground hover:bg-primary/90">
-              {busy ? "登录中…" : "登 录"}
+              {busy ? t("auth.busyLogin") : t("auth.login")}
             </Button>
           ) : null}
 
           {mode === "register" && step === "form" ? (
             <Button onClick={handleRegister} disabled={busy || !email || !password} className="w-full h-10 bg-primary text-primary-foreground hover:bg-primary/90">
-              {busy ? "发送中…" : "注册并发送验证码"}
+              {busy ? t("auth.busySend") : t("auth.register")}
             </Button>
           ) : null}
 
           {mode === "register" && step === "verify" ? (
             <div className="space-y-2.5">
               <Button onClick={handleVerify} disabled={busy || !token} className="w-full h-10 bg-primary text-primary-foreground hover:bg-primary/90">
-                {busy ? "校验中…" : "验证并完成注册"}
+                {busy ? t("auth.busyVerify") : t("auth.verify")}
               </Button>
               <Button variant="ghost" size="sm" className="w-full text-muted-foreground" onClick={() => switchMode("register")}>
-                收不到？重新提交注册
+                {t("auth.resend")}
               </Button>
             </div>
           ) : null}
 
           {mode === "forgot" ? (
             <Button onClick={handleForgot} disabled={busy || !email} className="w-full h-10 bg-primary text-primary-foreground hover:bg-primary/90">
-              {busy ? "发送中…" : "发送重置链接"}
+              {busy ? t("auth.busySend") : t("auth.forgot")}
             </Button>
           ) : null}
 
           <div className="flex items-center justify-between pt-1 text-[12.5px] text-muted-foreground">
             {mode === "login" ? (
               <>
-                <button type="button" className="story-link hover:text-helix" onClick={() => switchMode("register")}>创建账号</button>
-                <button type="button" className="story-link hover:text-helix" onClick={() => switchMode("forgot")}>忘记密码？</button>
+                <button type="button" className="story-link hover:text-helix" onClick={() => switchMode("register")}>{t("auth.createAccount")}</button>
+                <button type="button" className="story-link hover:text-helix" onClick={() => switchMode("forgot")}>{t("auth.forgotLink")}</button>
               </>
             ) : (
               <button type="button" className="mx-auto story-link hover:text-helix" onClick={() => switchMode("login")}>
-                返回登录
+                {t("auth.backToLogin")}
               </button>
             )}
           </div>

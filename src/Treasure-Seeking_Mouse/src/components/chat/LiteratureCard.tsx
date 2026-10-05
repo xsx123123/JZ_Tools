@@ -2,6 +2,7 @@
 // not_found 显示建议检索词；加载中骨架 ≤3s；出现时滚动到可视区（📖 点击反馈闭环）
 import { useEffect, useRef, useState } from "react";
 import { BookOpen, ExternalLink, FileText, X } from "lucide-react";
+import { useI18n } from "@/i18n/provider";
 import { fetchLiterature, type LiteratureCardDTO } from "@/services/literature";
 
 export function LiteratureCardPanel({
@@ -13,6 +14,7 @@ export function LiteratureCardPanel({
   id: string;
   onClose?: () => void;
 }): React.ReactElement {
+  const { t } = useI18n();
   const [state, setState] = useState<"loading" | "done">("loading");
   const [card, setCard] = useState<LiteratureCardDTO | null>(null);
   const rootRef = useRef<HTMLDivElement | null>(null);
@@ -40,14 +42,14 @@ export function LiteratureCardPanel({
     <div ref={rootRef} className="card-in relative mt-3 overflow-hidden rounded-lg border border-helix/40 bg-card shadow-sm ring-2 ring-helix/10">
       <div className="flex items-center gap-2 border-b border-border/60 bg-pet-gold-soft/40 px-3.5 py-2">
         <BookOpen size={13} className="shrink-0 text-pet-amber-deep" />
-        <span className="font-display text-[12px] font-semibold tracking-wide text-foreground/80">文献证据链</span>
+        <span className="font-display text-[12px] font-semibold tracking-wide text-foreground/80">{t("lit.title")}</span>
         <span className="truncate font-mono text-[11px] text-muted-foreground">{id}</span>
         {onClose ? (
           <button
             type="button"
             onClick={onClose}
             className="ml-auto shrink-0 rounded-md p-1 text-muted-foreground/70 transition-colors hover:bg-secondary hover:text-foreground"
-            aria-label="关闭文献卡片"
+            aria-label={t("lit.close")}
           >
             <X size={12} />
           </button>
@@ -59,7 +61,7 @@ export function LiteratureCardPanel({
           <div className="h-3.5 w-3/4 animate-pulse rounded bg-secondary" />
           <div className="h-3 w-full animate-pulse rounded bg-secondary" />
           <div className="h-3 w-5/6 animate-pulse rounded bg-secondary" />
-          <p className="pt-1 text-[11px] text-muted-foreground">正在检索文献（NCBI / Europe PMC）…</p>
+          <p className="pt-1 text-[11px] text-muted-foreground">{t("lit.loading")}</p>
         </div>
       ) : card?.status === "ok" ? (
         <div className="px-3.5 py-3">
@@ -96,7 +98,7 @@ export function LiteratureCardPanel({
                   rel="noreferrer noopener"
                   className="flex items-center gap-1 text-[11.5px] text-helix story-link"
                 >
-                  <ExternalLink size={11} /> DOI 原文
+                  <ExternalLink size={11} /> {t("lit.doi")}
                 </a>
               ) : null}
               {card.urls.full_text ? (
@@ -106,7 +108,7 @@ export function LiteratureCardPanel({
                   rel="noreferrer noopener"
                   className="flex items-center gap-1 text-[11.5px] text-helix story-link"
                 >
-                  <FileText size={11} /> OA 全文
+                  <FileText size={11} /> {t("lit.fullText")}
                 </a>
               ) : null}
             </div>
@@ -114,7 +116,7 @@ export function LiteratureCardPanel({
         </div>
       ) : (
         <div className="px-3.5 py-3">
-          <p className="text-[12.5px] text-muted-foreground">未找到该编号直接关联的文献。</p>
+          <p className="text-[12.5px] text-muted-foreground">{t("lit.notFound")}</p>
           {card?.suggested_queries && card.suggested_queries.length > 0 ? (
             <div className="mt-2 flex flex-wrap gap-1.5">
               {card.suggested_queries.slice(0, 3).map((q, i) => (
@@ -124,7 +126,7 @@ export function LiteratureCardPanel({
               ))}
             </div>
           ) : null}
-          <p className="mt-2 text-[11px] text-muted-foreground/70">可复制检索词到 PubMed 手动检索，或稍后再试。</p>
+          <p className="mt-2 text-[11px] text-muted-foreground/70">{t("lit.notFoundHint")}</p>
         </div>
       )}
     </div>

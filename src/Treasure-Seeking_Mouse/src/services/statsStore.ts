@@ -2,10 +2,16 @@
 // 离线模式（无 Supabase 配置）走 localStorage 本地统计：本地开发的排行榜也有数据
 // 所有写入均为 fire-and-forget，失败静默，绝不打断对话主流程。
 import { isOfflineMode, supabase } from "@/supabase/client";
+import { readLang, translate } from "@/i18n";
 
 const KEY_DEVICE = "seqout-device-id";
 const KEY_LOCAL_STATS = "seqout-local-stats";
 const DEVICE_CHARS = "abcdefghijklmnopqrstuvwxyz0123456789";
+
+/** 未命名访客的默认昵称（按语言） */
+function guestName(deviceId: string): string {
+  return translate(readLang(), "board.guestName", { n: deviceId.slice(-4) });
+}
 
 export interface StatRow {
   key: string;
@@ -175,7 +181,7 @@ export async function bumpStats(
 /** 修改显示昵称（仅本人行）；返回是否成功 */
 export async function updateNickname(nick: string): Promise<{ ok: boolean; message?: string }> {
   const name = nick.trim().slice(0, 16);
-  if (name.length < 1) return { ok: false, message: "昵称不能为空" };
+  if (name.length < 1) return { ok: false, message: translate(readLang(), "err.nickEmpty") };
 
   // 离线模式：改本地统计行的昵称
   if (isOfflineMode) {
@@ -199,15 +205,15 @@ export async function updateNickname(nick: string): Promise<{ ok: boolean; messa
     const uid = sess?.session?.user?.id;
     if (uid) {
       const { error } = await supabase.from("user_stats").update({ display_name: name }).eq("user_id", uid);
-      if (error) return { ok: false, message: "保存失败，请重试" };
+      if (error) return { ok: false, message: translate(readLang(), "err.nickSave") };
       return { ok: true };
     }
     const deviceId = getDeviceId();
     const { error } = await supabase.from("guest_stats").update({ display_name: name }).eq("device_id", deviceId);
-    if (error) return { ok: false, message: "保存失败，请重试" };
+    if (error) return { ok: false, message: translate(readLang(), "err.nickSave") };
     return { ok: true };
   } catch {
-    return { ok: false, message: "网络异常，请稍后再试" };
+    return { ok: false, message: translate(readLang(), "err.network") };
   }
 }
 
@@ -219,7 +225,7 @@ export async function fetchLeaderboard(): Promise<{ users: StatRow[]; guests: St
     const guests: StatRow[] = row && (row.treasures > 0 || row.chats > 0)
       ? [{
           key: `g:${row.device_id}`,
-          name: row.display_name?.trim() || `游客${row.device_id.slice(-4)}`,
+          name: row.display_name?.trim() || guestName(row.device_id),
           treasures: row.treasures,
           digs: row.digs,
           chats: row.chats,
@@ -261,7 +267,7 @@ export async function fetchLeaderboard(): Promise<{ users: StatRow[]; guests: St
     name:
       String(r.display_name ?? "").trim() ||
       String(r.nickname ?? "").trim() ||
-      `游客${String(r.device_id).slice(-4)}`,
+      guestName(String(r.device_id)),
     treasures: Number(r.treasures ?? 0),
     digs: Number(r.digs ?? 0),
     chats: Number(r.chats ?? 0),

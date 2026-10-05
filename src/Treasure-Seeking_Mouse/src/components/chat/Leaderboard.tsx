@@ -3,6 +3,8 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Loader2, Pencil, RefreshCw, Sparkles, Trophy, X } from "lucide-react";
 import { fetchLeaderboard, myGuestKey, updateNickname, type StatRow } from "@/services/statsStore";
 import { isOfflineMode } from "@/supabase/client";
+import { useI18n } from "@/i18n/provider";
+import type { TFunc } from "@/i18n";
 
 type BoardTab = "diggers" | "guests";
 type Range = "week" | "all";
@@ -32,16 +34,16 @@ function sortRows(rows: StatRow[], range: Range): StatRow[] {
   });
 }
 
-function fmtTime(iso: string): string {
+function fmtTime(t: TFunc, iso: string): string {
   if (!iso) return "";
-  const t = Date.parse(iso);
-  if (Number.isNaN(t)) return "";
-  const diff = Date.now() - t;
-  if (diff < 60_000) return "刚刚";
-  if (diff < 3_600_000) return `${Math.floor(diff / 60_000)} 分钟前`;
-  if (diff < 86_400_000) return `${Math.floor(diff / 3_600_000)} 小时前`;
-  if (diff < 7 * 86_400_000) return `${Math.floor(diff / 86_400_000)} 天前`;
-  return new Date(t).toLocaleDateString("zh-CN");
+  const time = Date.parse(iso);
+  if (Number.isNaN(time)) return "";
+  const diff = Date.now() - time;
+  if (diff < 60_000) return t("board.justNow");
+  if (diff < 3_600_000) return t("board.minutesAgo", { n: Math.floor(diff / 60_000) });
+  if (diff < 86_400_000) return t("board.hoursAgo", { n: Math.floor(diff / 3_600_000) });
+  if (diff < 7 * 86_400_000) return t("board.daysAgo", { n: Math.floor(diff / 86_400_000) });
+  return new Date(time).toLocaleDateString();
 }
 
 function RankRow({
@@ -59,6 +61,7 @@ function RankRow({
   editing: boolean;
   onStartEdit: () => void;
 }): React.ReactElement {
+  const { t } = useI18n();
   const m = metricOf(row, range);
   const top3 = rank <= 3;
   return (
@@ -73,7 +76,7 @@ function RankRow({
         className={`w-7 shrink-0 text-center font-mono text-[13px] tabular-nums ${
           top3 ? "text-base" : "text-muted-foreground"
         }`}
-        aria-label={`第 ${rank} 名`}
+        aria-label={t("board.rankAria", { n: rank })}
       >
         {top3 ? MEDALS[rank - 1] : rank}
       </span>
@@ -94,15 +97,15 @@ function RankRow({
           </span>
           {highlight ? (
             <span className="shrink-0 rounded-full bg-pet-amber/15 px-1.5 py-0.5 font-mono text-[9.5px] text-pet-amber-deep">
-              我
+              {t("board.me")}
             </span>
           ) : null}
           {editing ? (
             <button
               type="button"
               onClick={onStartEdit}
-              title="修改昵称"
-              aria-label="修改昵称"
+              title={t("board.editNick")}
+              aria-label={t("board.editNick")}
               className="shrink-0 rounded p-0.5 text-muted-foreground transition-colors hover:bg-secondary hover:text-helix"
             >
               <Pencil size={12} />
@@ -110,7 +113,8 @@ function RankRow({
           ) : null}
         </span>
         <span className="mt-0.5 block font-mono text-[10.5px] text-muted-foreground">
-          {m.chats} 轮对话 · {m.digs} 铲{row.updated_at ? ` · ${fmtTime(row.updated_at)}` : ""}
+          {t("board.rowMeta", { chats: m.chats, digs: m.digs })}
+          {row.updated_at ? ` · ${fmtTime(t, row.updated_at)}` : ""}
         </span>
       </span>
       <span className="shrink-0 text-right">
@@ -118,20 +122,21 @@ function RankRow({
           <Sparkles size={12} className="text-pet-amber" />
           {m.treasures}
         </span>
-        <span className="block font-mono text-[9.5px] text-muted-foreground">宝藏</span>
+        <span className="block font-mono text-[9.5px] text-muted-foreground">{t("board.treasures")}</span>
       </span>
     </li>
   );
 }
 
 export function Leaderboard({ open, onClose, ownUserId }: LeaderboardProps): React.ReactElement | null {
+  const { t, lang } = useI18n();
   // 离线模式默认切到「临时矿工」页签：本地统计只写在访客榜，登录榜恒为空
   const [tab, setTab] = useState<BoardTab>(isOfflineMode ? "guests" : "diggers");
   const [range, setRange] = useState<Range>("all");
   const [users, setUsers] = useState<StatRow[]>([]);
   const [guests, setGuests] = useState<StatRow[]>([]);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState(false);
   const [nickOpen, setNickOpen] = useState(false);
   const [nickDraft, setNickDraft] = useState("");
   const [nickSaving, setNickSaving] = useState(false);
@@ -139,13 +144,13 @@ export function Leaderboard({ open, onClose, ownUserId }: LeaderboardProps): Rea
 
   const load = useCallback(async () => {
     setLoading(true);
-    setError(null);
+    setError(false);
     try {
       const r = await fetchLeaderboard();
       setUsers(r.users);
       setGuests(r.guests);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "加载失败，请稍后重试");
+    } catch {
+      setError(true);
     } finally {
       setLoading(false);
     }
@@ -181,7 +186,7 @@ export function Leaderboard({ open, onClose, ownUserId }: LeaderboardProps): Rea
   async function saveNickname(): Promise<void> {
     const name = nickDraft.trim().slice(0, 16);
     if (!name) {
-      setNickMsg("昵称不能为空");
+      setNickMsg(t("board.nickEmpty"));
       return;
     }
     setNickSaving(true);
@@ -192,14 +197,14 @@ export function Leaderboard({ open, onClose, ownUserId }: LeaderboardProps): Rea
       setNickOpen(false);
       void load();
     } else {
-      setNickMsg(res.message ?? "保存失败");
+      setNickMsg(res.message ?? t("board.saveFailed"));
     }
   }
 
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex justify-end" role="dialog" aria-modal="true" aria-label="挖宝排行榜">
+    <div className="fixed inset-0 z-50 flex justify-end" role="dialog" aria-modal="true" aria-label={t("board.title")}>
       <div className="absolute inset-0 bg-black/35 backdrop-blur-[2px]" onClick={onClose} />
       <div className="shadow-soft-lg relative flex h-full w-full max-w-[420px] flex-col border-l border-border bg-card">
         {/* 头部 */}
@@ -208,16 +213,16 @@ export function Leaderboard({ open, onClose, ownUserId }: LeaderboardProps): Rea
             <Trophy size={16} />
           </span>
           <div className="min-w-0 flex-1">
-            <h2 className="text-[14px] font-semibold tracking-tight text-foreground">寻宝排行榜</h2>
+            <h2 className="text-[14px] font-semibold tracking-tight text-foreground">{t("board.title")}</h2>
             <p className="font-mono text-[10.5px] text-muted-foreground">
-              {range === "week" ? "本周" : "全站"}累计出土 {totalTreasures} 件宝藏
+              {t(range === "week" ? "board.subtitleWeek" : "board.subtitleAll", { n: totalTreasures })}
             </p>
           </div>
           <button
             type="button"
             onClick={() => void load()}
-            title="刷新榜单"
-            aria-label="刷新榜单"
+            title={t("board.refresh")}
+            aria-label={t("board.refresh")}
             className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-secondary hover:text-pet-amber-deep"
           >
             <RefreshCw size={15} className={loading ? "animate-spin" : undefined} />
@@ -225,7 +230,7 @@ export function Leaderboard({ open, onClose, ownUserId }: LeaderboardProps): Rea
           <button
             type="button"
             onClick={onClose}
-            aria-label="关闭排行榜"
+            aria-label={t("board.close")}
             className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
           >
             <X size={17} />
@@ -237,29 +242,29 @@ export function Leaderboard({ open, onClose, ownUserId }: LeaderboardProps): Rea
           <div className="flex gap-1">
             {(
               [
-                { id: "diggers", label: "寻宝鼠" },
-                { id: "guests", label: "临时矿工" },
+                { id: "diggers", label: t("board.tabDiggers") },
+                { id: "guests", label: t("board.tabGuests") },
               ] as const
-            ).map((t) => (
+            ).map((tabItem) => (
               <button
-                key={t.id}
+                key={tabItem.id}
                 type="button"
-                onClick={() => setTab(t.id)}
+                onClick={() => setTab(tabItem.id)}
                 className={`rounded-lg px-3 py-1.5 text-[12.5px] font-medium tracking-tight transition-colors ${
-                  tab === t.id
+                  tab === tabItem.id
                     ? "bg-helix-soft text-helix ring-1 ring-helix/25"
                     : "text-muted-foreground hover:bg-secondary hover:text-foreground"
                 }`}
               >
-                {t.label}
+                {tabItem.label}
               </button>
             ))}
           </div>
           <div className="flex rounded-lg border border-border bg-secondary/40 p-0.5">
             {(
               [
-                { id: "week", label: "本周" },
-                { id: "all", label: "累计" },
+                { id: "week", label: t("board.rangeWeek") },
+                { id: "all", label: t("board.rangeAll") },
               ] as const
             ).map((r) => (
               <button
@@ -291,9 +296,7 @@ export function Leaderboard({ open, onClose, ownUserId }: LeaderboardProps): Rea
             className="flex w-full items-center gap-2 rounded-lg border border-dashed border-border px-3 py-2 text-left transition-colors hover:border-helix/40 hover:bg-helix-soft/40"
           >
             <Pencil size={13} className="shrink-0 text-muted-foreground" />
-            <span className="text-[12px] text-muted-foreground">
-              给自己取个上榜昵称（限 16 字）
-            </span>
+            <span className="text-[12px] text-muted-foreground">{t("board.setNickname")}</span>
           </button>
         </div>
 
@@ -301,19 +304,19 @@ export function Leaderboard({ open, onClose, ownUserId }: LeaderboardProps): Rea
         <div className="flex-1 overflow-y-auto px-4 pb-4 pt-2">
           {error ? (
             <div className="mt-10 text-center">
-              <p className="text-[13px] text-muted-foreground">{error}</p>
+              <p className="text-[13px] text-muted-foreground">{t("board.loadFailed")}</p>
               <button
                 type="button"
                 onClick={() => void load()}
                 className="mt-3 rounded-lg bg-helix-soft px-3 py-1.5 text-[12.5px] text-helix ring-1 ring-helix/25 transition-colors hover:bg-helix/10"
               >
-                重试
+                {t("board.retry")}
               </button>
             </div>
           ) : loading && rows.length === 0 ? (
             <div className="mt-16 flex items-center justify-center gap-2 text-muted-foreground">
               <Loader2 size={16} className="animate-spin" />
-              <span className="text-[13px]">正在挖掘榜单…</span>
+              <span className="text-[13px]">{t("board.loading")}</span>
             </div>
           ) : rows.length === 0 ? (
             <div className="mt-16 text-center">
@@ -321,10 +324,10 @@ export function Leaderboard({ open, onClose, ownUserId }: LeaderboardProps): Rea
                 <Trophy size={22} />
               </span>
               <p className="mt-3 text-[13px] font-medium text-foreground">
-                {range === "week" ? "本周还没有人上榜" : "还没有人上榜"}
+                {t(range === "week" ? "board.emptyWeek" : "board.emptyAll")}
               </p>
               <p className="mt-1 text-[12px] text-muted-foreground">
-                {tab === "diggers" ? "登录后每轮挖宝都会记录在此" : "发一轮对话即可成为首批临时矿工"}
+                {t(tab === "diggers" ? "board.emptyDiggersHint" : "board.emptyGuestsHint")}
               </p>
             </div>
           ) : (
@@ -351,7 +354,7 @@ export function Leaderboard({ open, onClose, ownUserId }: LeaderboardProps): Rea
         {/* 脚注 */}
         <div className="border-t border-border px-4 py-2.5">
           <p className="font-mono text-[10px] text-muted-foreground">
-            排序口径：{range === "week" ? "本周" : "累计"}宝藏数 · 并列看对话轮次、下铲数
+            {t("board.sortNote", { range: t(range === "week" ? "board.rangeWeek" : "board.rangeAll") })}
           </p>
         </div>
       </div>
@@ -361,10 +364,8 @@ export function Leaderboard({ open, onClose, ownUserId }: LeaderboardProps): Rea
         <div className="absolute inset-0 z-10 flex items-center justify-center p-6">
           <div className="absolute inset-0 bg-black/30" onClick={() => setNickOpen(false)} />
           <div className="shadow-soft-lg relative w-full max-w-[320px] rounded-2xl border border-border bg-card p-5">
-            <h3 className="text-[14px] font-semibold tracking-tight text-foreground">显示昵称</h3>
-            <p className="mt-1 text-[12px] text-muted-foreground">
-              登录用户改本人账号昵称，访客改本机匿名身份，仅用于榜单展示。
-            </p>
+            <h3 className="text-[14px] font-semibold tracking-tight text-foreground">{t("board.nickTitle")}</h3>
+            <p className="mt-1 text-[12px] text-muted-foreground">{t("board.nickDesc")}</p>
             <input
               autoFocus
               value={nickDraft}
@@ -373,7 +374,7 @@ export function Leaderboard({ open, onClose, ownUserId }: LeaderboardProps): Rea
               onKeyDown={(e) => {
                 if (e.key === "Enter") void saveNickname();
               }}
-              placeholder="比如：阿寻本鼠"
+              placeholder={t("board.nickPlaceholder")}
               className="mt-3 w-full rounded-lg border border-border bg-background px-3 py-2 text-[13px] text-foreground outline-none transition-colors placeholder:text-muted-foreground focus:border-helix/50"
             />
             {nickMsg ? <p className="mt-1.5 font-mono text-[11px] text-destructive">{nickMsg}</p> : null}
@@ -383,7 +384,7 @@ export function Leaderboard({ open, onClose, ownUserId }: LeaderboardProps): Rea
                 onClick={() => setNickOpen(false)}
                 className="rounded-lg px-3 py-1.5 text-[12.5px] text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
               >
-                取消
+                {t("board.cancel")}
               </button>
               <button
                 type="button"
@@ -392,7 +393,7 @@ export function Leaderboard({ open, onClose, ownUserId }: LeaderboardProps): Rea
                 className="flex items-center gap-1.5 rounded-lg bg-helix px-3.5 py-1.5 text-[12.5px] font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-60"
               >
                 {nickSaving ? <Loader2 size={13} className="animate-spin" /> : null}
-                保存
+                {t("board.save")}
               </button>
             </div>
           </div>

@@ -637,6 +637,23 @@ const SYSTEM_PROMPT = `你是「GEO寻宝鼠」，一只住在公共组学数据
 :::
 每条建议不超过 40 字；没有值得推荐的后续方向就不要输出该块。除此格式外不要输出其他指令性标记。`;
 
+const SYSTEM_PROMPT_EN = `You are "GeoMuse", a treasure-mouse assistant living in the lodes of public omics databases. You help users find GEO/SRA/ENA/GSA data through the public seqout.org API (treat retrieval as "digging for treasure", but keep the substance professional and concise).
+
+Rules:
+1. Prefer tools to query real data; never fabricate accessions, titles or links. If you haven't called a tool, do not state specific dataset facts.
+2. When the user mentions "dataset / GEO / expression profiling / microarray", use seqout_search_geo; for broad discovery use seqout_search; when there are explicit organism/experiment-type conditions use seqout_search_structured (organism as a scientific name, e.g. Homo sapiens).
+3. For GSE details use seqout_get_project_detail; for samples use seqout_get_sample_manifest; for experiments / runs / downloads use seqout_get_experiments / seqout_get_runs / seqout_get_download_links respectively (they resolve GSE automatically).
+4. When the user gives a GSM/SRR accession and wants to know its parent project, use seqout_resolve_accession.
+5. Answer in English, concisely and professionally. Summarize search results as a Markdown list (accessions in bold); the system renders matched datasets as cards automatically, so do not repeat full abstracts.
+6. When there are no results, explain why and suggest loosening keywords or using structured filters. When a tool errors, relay the error faithfully (e.g. malformed accession, service timeout) and suggest the next step.
+7. For statistics (growth, organism totals, platforms) use the corresponding stats tools.
+8. Only when you want to suggest follow-up directions at the end of an answer, append them in exactly this format (the frontend renders it as a clickable collapsible card):
+:::followup
+1. Suggestion one (one line that can be sent directly as a question)
+2. Suggestion two
+:::
+Each suggestion must be at most 60 characters; omit the block when there is no worthwhile follow-up. Do not output any other directive markers.`;
+
 export const handler = async (req: Request): Promise<Response> => {
   const requestId = crypto.randomUUID().slice(0, 8);
   const startTime = Date.now();
@@ -723,9 +740,11 @@ export const handler = async (req: Request): Promise<Response> => {
 
     const history = (body.messages || []) as ChatMsg[];
     const model = (body.model as string) || DEFAULT_MODEL;
-    const messages: ChatMsg[] = [{ role: 'system', content: SYSTEM_PROMPT }, ...history.slice(-16)];
+    const lang = body.lang === 'en' ? 'en' : 'zh';
+    const systemPrompt = lang === 'en' ? SYSTEM_PROMPT_EN : SYSTEM_PROMPT;
+    const messages: ChatMsg[] = [{ role: 'system', content: systemPrompt }, ...history.slice(-16)];
 
-    console.info(`[${FUNCTION_NAME}] request ${requestId} model=${model} messages=${history.length}`);
+    console.info(`[${FUNCTION_NAME}] request ${requestId} model=${model} lang=${lang} messages=${history.length}`);
 
     // 使用统计：本算一轮对话 + 记录使用者（登录用户 id / 访客设备指纹，前端经 X-Stats-Actor 上报）
     usageStats.chats += 1;
@@ -839,7 +858,7 @@ export const handler = async (req: Request): Promise<Response> => {
               messages.push({ role: 'tool', tool_call_id: call.id, name: call.function.name, content: resultText });
             }
             textBuf = '';
-            if (round === 39) send({ delta: '\n\n（已达到本轮最大查询次数，请追问以继续。）' });
+            if (round === 39) send({ delta: lang === 'en' ? '\n\n(Reached the maximum queries for this turn; ask a follow-up to continue.)' : '\n\n（已达到本轮最大查询次数，请追问以继续。）' });
           }
           send({ event: 'end', cards: allCards, tools: toolLogs });
           console.info(`[${FUNCTION_NAME}] stream done ${requestId} tools=${toolLogs.length} durationMs=${Date.now() - startTime}`);

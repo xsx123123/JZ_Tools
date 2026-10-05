@@ -1,6 +1,7 @@
 // 「继续寻宝」建议块：默认折叠，展开后逐条可点击直接发送
 import { useState } from "react";
 import { ChevronDown, Compass } from "lucide-react";
+import { useI18n } from "@/i18n/provider";
 
 export interface SuggestionItem {
   text: string;
@@ -19,6 +20,7 @@ export function extractFollowups(content: string): { main: string; items: string
 }
 
 export function SuggestionBlock({ items, onPick }: { items: string[]; onPick?: (q: string) => void }): React.ReactElement | null {
+  const { t } = useI18n();
   const [open, setOpen] = useState(false);
   if (items.length === 0) return null;
   return (
@@ -30,7 +32,7 @@ export function SuggestionBlock({ items, onPick }: { items: string[]; onPick?: (
         className="flex w-full items-center gap-2 px-3 py-2 text-left transition-colors hover:bg-secondary/60"
       >
         <Compass size={13} className="shrink-0 text-helix" />
-        <span className="text-[12.5px] font-medium text-foreground/80">阿寻的下一铲建议</span>
+        <span className="text-[12.5px] font-medium text-foreground/80">{t("suggest.title")}</span>
         <span className="rounded-full bg-helix-soft px-1.5 py-px font-mono text-[10px] text-helix">{items.length}</span>
         <ChevronDown size={14} className={`ml-auto shrink-0 text-muted-foreground transition-transform duration-200 ${open ? "rotate-180" : ""}`} />
       </button>

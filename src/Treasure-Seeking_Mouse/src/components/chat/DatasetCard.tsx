@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { BookOpen, ExternalLink } from "lucide-react";
 import type { DatasetCard as CardData } from "@/services/seqoutChat";
 import { requestEvidence } from "@/lib/evidenceBus";
+import { useI18n } from "@/i18n/provider";
 
 const NCBI_BASE: Record<string, string> = {
   GSE: "https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=",
@@ -53,6 +54,7 @@ function onLiterature(accession: string, hostMessageId?: string): void {
 }
 
 export function DatasetCardView({ card, hostMessageId }: { card: CardData; hostMessageId?: string }): React.ReactElement {
+  const { t } = useI18n();
   const link = buildLink(card.accession);
   const prefix = prefixOf(card.accession);
   // 📖 点击反馈：短暂高亮 + 卡片描边脉冲（文献卡片在消息层渲染时的视觉锚点）
@@ -97,8 +99,8 @@ export function DatasetCardView({ card, hostMessageId }: { card: CardData; hostM
                 type="button"
                 onClick={onLiteratureClick}
                 className={`rounded-md p-1 transition-colors hover:bg-secondary hover:text-helix ${litClicked ? "bg-helix-soft text-helix" : "text-muted-foreground"}`}
-                title="查看关联文献（证据链）"
-                aria-label="查看关联文献"
+                title={t("card.literature")}
+                aria-label={t("card.literatureAria")}
               >
                 <BookOpen size={12} />
               </button>
@@ -108,7 +110,7 @@ export function DatasetCardView({ card, hostMessageId }: { card: CardData; hostM
               target="_blank"
               rel="noreferrer noopener"
               className="shrink-0 text-muted-foreground transition-colors hover:text-helix"
-              title="在 NCBI 打开"
+              title={t("card.openNcbi")}
             >
               <ExternalLink size={12} />
             </a>

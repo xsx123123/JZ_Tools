@@ -6,6 +6,7 @@ import {
   createRootRouteWithContext,
   useRouterState,
 } from '@tanstack/react-router';
+import { I18nProvider } from '@/i18n/provider';
 
 function NotFoundComponent() {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
@@ -32,7 +33,9 @@ function RootComponent() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <Outlet />
+      <I18nProvider>
+        <Outlet />
+      </I18nProvider>
     </QueryClientProvider>
   );
 }

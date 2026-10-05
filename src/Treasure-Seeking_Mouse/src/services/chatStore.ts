@@ -1,5 +1,6 @@
 // 会话与消息的云端存取（Supabase Client，RLS 仅本人可见）
 import { supabase } from "@/supabase/client";
+import { readLang, translate } from "@/i18n";
 import type { Json } from "@/supabase/types";
 import type { DatasetCard, ToolLog } from "./seqoutChat";
 
@@ -49,7 +50,7 @@ export async function touchSession(id: string): Promise<void> {
 export async function deleteSession(id: string): Promise<void> {
   const { data, error } = await supabase.from("chat_sessions").delete().eq("id", id).select("id");
   if (error) throw new Error(error.message);
-  if (!data || data.length === 0) throw new Error("删除失败：会话不存在或无权限");
+  if (!data || data.length === 0) throw new Error(translate(readLang(), "err.deleteSession"));
 }
 
 export async function listMessages(sessionId: string): Promise<MessageRow[]> {

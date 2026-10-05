@@ -7,9 +7,10 @@ import { useCallback, useState } from "react";
 import { BookOpen, Copy, Check, ExternalLink } from "lucide-react";
 import { HoverCard, HoverCardTrigger, HoverCardContent } from "@/components/ui/hover-card";
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
-import { LINK_TYPE_LABEL, type IdMatch } from "@/lib/linkify";
+import { linkTypeLabel, type IdMatch } from "@/lib/linkify";
 import { requestEvidence } from "@/lib/evidenceBus";
 import { useIsTouch } from "@/hooks/use-touch";
+import { useI18n } from "@/i18n/provider";
 import { fetchLiterature, type LiteratureCardDTO } from "@/services/literature";
 
 export function IdLink({
@@ -23,6 +24,7 @@ export function IdLink({
   /** 宿主消息 id：文献卡片渲染在该消息下方 */
   hostMessageId?: string;
 }): React.ReactElement {
+  const { t, lang } = useI18n();
   const [copied, setCopied] = useState(false);
   const isTouch = useIsTouch();
   // 浮层自动预取的论文元数据（loading 骨架 → 标题/期刊/年份；not_found 显示提示）
@@ -63,7 +65,7 @@ export function IdLink({
       target="_blank"
       rel="noreferrer noopener"
       className="id-link font-mono font-medium text-helix"
-      title={LINK_TYPE_LABEL[match.type]}
+      title={linkTypeLabel(lang, match.type)}
       // 触摸端：拦截默认跳转，改为打开浮层（跳转交给浮层内的「原始页」按钮）
       onClick={(e) => {
         if (isTouch) e.preventDefault();
@@ -76,13 +78,13 @@ export function IdLink({
   const content = (
     <div className="space-y-2">
       <p className="text-[11px] text-muted-foreground">
-        <span className="font-display font-semibold text-foreground/70">{LINK_TYPE_LABEL[match.type]}</span>
+        <span className="font-display font-semibold text-foreground/70">{linkTypeLabel(lang, match.type)}</span>
         <span className="mx-1">·</span>
         <span className="font-mono">{match.id}</span>
       </p>
       {/* 自动预取的论文信息：loading 骨架 → 标题/期刊；查不到显示轻提示 */}
       {litState === "loading" ? (
-        <div className="space-y-1.5 py-0.5" aria-label="正在检索论文">
+        <div className="space-y-1.5 py-0.5" aria-label={t("idlink.fetching")}>
           <div className="h-3 w-4/5 animate-pulse rounded bg-secondary" />
           <div className="h-2.5 w-2/5 animate-pulse rounded bg-secondary" />
         </div>
@@ -92,7 +94,7 @@ export function IdLink({
           {litMeta ? <p className="mt-0.5 truncate text-[10.5px] text-muted-foreground">{litMeta}</p> : null}
         </div>
       ) : litState === "done" ? (
-        <p className="text-[11px] text-muted-foreground/70">未找到直接关联论文，可查看原始页或稍后再试</p>
+        <p className="text-[11px] text-muted-foreground/70">{t("idlink.noPaper")}</p>
       ) : null}
       {summary && !litTitle ? (
         <p className="line-clamp-4 text-[12px] leading-relaxed text-foreground/85">{summary}</p>
@@ -104,7 +106,7 @@ export function IdLink({
           className="flex items-center gap-1 rounded-md border border-border bg-secondary px-2 py-1 text-[11px] text-secondary-foreground transition-colors hover:bg-accent"
         >
           {copied ? <Check size={11} className="text-helix" /> : <Copy size={11} />}
-          {copied ? "已复制" : "复制 ID"}
+          {copied ? t("idlink.copied") : t("idlink.copyId")}
         </button>
         <button
           type="button"
@@ -112,7 +114,7 @@ export function IdLink({
           className="flex items-center gap-1 rounded-md border border-border bg-secondary px-2 py-1 text-[11px] text-secondary-foreground transition-colors hover:bg-accent"
         >
           <BookOpen size={11} />
-          查看证据链
+          {t("idlink.viewEvidence")}
         </button>
         <a
           href={match.url}
@@ -121,7 +123,7 @@ export function IdLink({
           className="ml-auto flex items-center gap-1 rounded-md px-2 py-1 text-[11px] text-muted-foreground transition-colors hover:text-helix"
         >
           <ExternalLink size={11} />
-          原始页
+          {t("idlink.original")}
         </a>
       </div>
     </div>

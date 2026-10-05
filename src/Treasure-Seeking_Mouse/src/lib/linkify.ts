@@ -24,13 +24,24 @@ const URL_MAP: Record<LinkType, (id: string) => string> = {
   pubmed: (id) => `https://pubmed.ncbi.nlm.nih.gov/${id}`,
 };
 
-/** 返回类型标签（浮层/无障碍用） */
-export const LINK_TYPE_LABEL: Record<LinkType, string> = {
+/** 返回类型标签（浮层/无障碍用）；按语言取值 */
+const LINK_TYPE_LABEL_ZH: Record<LinkType, string> = {
   geo_series: "GEO 系列",
   geo_sample: "GEO 样本",
   go_term: "GO 条目",
   pubmed: "PubMed 文献",
 };
+
+const LINK_TYPE_LABEL_EN: Record<LinkType, string> = {
+  geo_series: "GEO Series",
+  geo_sample: "GEO Sample",
+  go_term: "GO Term",
+  pubmed: "PubMed Article",
+};
+
+export function linkTypeLabel(lang: "zh" | "en", type: LinkType): string {
+  return (lang === "en" ? LINK_TYPE_LABEL_EN : LINK_TYPE_LABEL_ZH)[type];
+}
 
 /**
  * 扫描一段纯文本，返回其中所有可链接编号（按出现位置排序）。

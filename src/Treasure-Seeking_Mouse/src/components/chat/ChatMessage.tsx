@@ -10,6 +10,7 @@ import { SuggestionBlock, extractFollowups } from "./SuggestionBlock";
 import { LiteratureCardPanel } from "./LiteratureCard";
 import { addEvidenceListener, type EvidenceRequest } from "@/lib/evidenceBus";
 import { useIsTouch } from "@/hooks/use-touch";
+import { useI18n } from "@/i18n/provider";
 import type { DatasetCard, ToolLog } from "@/services/seqoutChat";
 
 /**
@@ -74,6 +75,7 @@ export function ChatMessage({
   onRegenerate?: (id: string) => void;
   onPickSuggestion?: (q: string) => void;
 }): React.ReactElement {
+  const { t } = useI18n();
   const [copied, copy] = useCopy();
   const isTouch = useIsTouch();
   // T2：本条消息挂载的文献证据链请求（来自正文 IdLink 或 DatasetCard 的文献入口）
@@ -89,7 +91,7 @@ export function ChatMessage({
     return (
       <div className="group flex items-center justify-end gap-1.5">
         <div className={`flex items-center gap-0.5 ${isTouch ? ALWAYS_SHOWN : REVEAL_ON_HOVER}`}>
-          <ActionButton label={copied ? "已复制" : "复制提问"} onClick={() => copy(msg.content)}>
+          <ActionButton label={copied ? t("msg.copied") : t("msg.copyQuestion")} onClick={() => copy(msg.content)}>
             {copied ? <Check size={13} className="text-helix" /> : <Copy size={13} />}
           </ActionButton>
         </div>
@@ -113,10 +115,10 @@ export function ChatMessage({
       </span>
       <div className="min-w-0 max-w-[92%] flex-1">
         <p className="mb-1 flex items-baseline gap-2 text-[11px] text-muted-foreground/80">
-          <span className="font-display font-semibold tracking-wide text-foreground/70">GEO寻宝鼠</span>
+          <span className="font-display font-semibold tracking-wide text-foreground/70">{t("brand.name")}</span>
           {msg.toolLogs && msg.toolLogs.length > 0 && !msg.streaming ? (
             <span className="font-mono opacity-70">
-              {msg.toolLogs.length} 次检索 · {msg.toolLogs.reduce((a, l) => a + (l.ms ?? 0), 0)}ms
+              {t("msg.searches", { n: msg.toolLogs.length, ms: msg.toolLogs.reduce((a, l) => a + (l.ms ?? 0), 0) })}
             </span>
           ) : null}
         </p>
@@ -127,7 +129,7 @@ export function ChatMessage({
           <div className="rounded-xl rounded-tl-sm border border-border bg-card px-4 py-3 shadow-soft">
             {main ? <Markdown text={main} hostMessageId={msg.id} /> : null}
             {!msg.content && msg.streaming ? (
-              <span className="text-[13px] text-muted-foreground">正在思考…</span>
+              <span className="text-[13px] text-muted-foreground">{t("msg.thinking")}</span>
             ) : null}
             {msg.streaming && msg.content ? (
               <span className="typing-caret inline-block" aria-hidden />
@@ -148,11 +150,11 @@ export function ChatMessage({
         ) : null}
         {showActions ? (
           <div className={`mt-1.5 flex items-center gap-0.5 ${isTouch ? ALWAYS_SHOWN : REVEAL_ON_HOVER}`}>
-            <ActionButton label={copied ? "已复制" : "复制回答"} onClick={() => copy(main)}>
+            <ActionButton label={copied ? t("msg.copied") : t("msg.copyAnswer")} onClick={() => copy(main)}>
               {copied ? <Check size={13} className="text-helix" /> : <Copy size={13} />}
             </ActionButton>
             {onRegenerate ? (
-              <ActionButton label="重新挖一次" onClick={() => onRegenerate(msg.id)}>
+              <ActionButton label={t("msg.regenerate")} onClick={() => onRegenerate(msg.id)}>
                 <RotateCcw size={13} />
               </ActionButton>
             ) : null}

@@ -3,6 +3,7 @@ import { useState } from "react";
 import { LogIn, LogOut, MessageSquare, Pencil, Plus, Trash2, X } from "lucide-react";
 import { BrandMark } from "@/components/BrandMark";
 import { useIsTouch } from "@/hooks/use-touch";
+import { useI18n } from "@/i18n/provider";
 import type { SessionRow } from "@/services/chatStore";
 
 export function SessionSidebar({
@@ -28,6 +29,7 @@ export function SessionSidebar({
   onLogout: () => void;
   storageNote?: string; // 游客存储策略提示（未登录时展示在侧栏底部）
 }): React.ReactElement {
+  const { t } = useI18n();
   const [editingId, setEditingId] = useState<string | null>(null);
   const [draft, setDraft] = useState("");
   const isTouch = useIsTouch();
@@ -45,8 +47,8 @@ export function SessionSidebar({
           <BrandMark size={18} />
         </span>
         <div className="min-w-0">
-          <p className="font-display truncate text-[15px] font-semibold tracking-tight">GEO寻宝鼠</p>
-          <p className="text-[11px] font-mono text-muted-foreground">阿寻带你挖组学宝藏</p>
+          <p className="font-display truncate text-[15px] font-semibold tracking-tight">{t("brand.name")}</p>
+          <p className="text-[11px] font-mono text-muted-foreground">{t("brand.tagline")}</p>
         </div>
       </div>
 
@@ -56,13 +58,13 @@ export function SessionSidebar({
           onClick={onNew}
           className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-border bg-card px-3 py-2 text-[13px] font-medium text-foreground shadow-sm transition-all hover:border-helix/40 hover:bg-accent hover:text-helix active:scale-[0.98]"
         >
-          <Plus size={14} /> 新建对话
+          <Plus size={14} /> {t("sidebar.newChat")}
         </button>
       </div>
 
       <div className="mt-3 flex-1 overflow-y-auto px-3 pb-3">
         {sessions.length === 0 ? (
-          <p className="mt-6 text-center text-xs text-muted-foreground/70">暂无历史会话</p>
+          <p className="mt-6 text-center text-xs text-muted-foreground/70">{t("sidebar.empty")}</p>
         ) : (
           <ul className="space-y-1">
             {sessions.map((s) => (
@@ -96,7 +98,7 @@ export function SessionSidebar({
                   <span className={`${isTouch ? "flex" : "hidden group-hover:flex"} shrink-0 items-center gap-1`}>
                     <button
                       type="button"
-                      title="重命名"
+                      title={t("sidebar.rename")}
                       onClick={() => {
                         setEditingId(s.id);
                         setDraft(s.title);
@@ -107,7 +109,7 @@ export function SessionSidebar({
                     </button>
                     <button
                       type="button"
-                      title="删除"
+                      title={t("sidebar.delete")}
                       onClick={() => onDelete(s.id)}
                       className="rounded p-1 text-muted-foreground transition-colors hover:bg-destructive/15 hover:text-destructive"
                     >
@@ -132,7 +134,7 @@ export function SessionSidebar({
               onClick={onLogout}
               className="flex shrink-0 items-center gap-1 rounded-md border border-border px-2 py-1 text-[11.5px] text-muted-foreground transition-colors hover:border-destructive/50 hover:text-destructive"
             >
-              <LogOut size={12} /> 退出
+              <LogOut size={12} /> {t("sidebar.logout")}
             </button>
           </div>
         ) : onLogin ? (
@@ -141,7 +143,7 @@ export function SessionSidebar({
             onClick={onLogin}
             className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-border bg-card px-3 py-2 text-[13px] text-foreground transition-colors hover:border-helix/50 hover:text-helix"
           >
-            <LogIn size={14} /> 登录 / 注册（同步历史）
+            <LogIn size={14} /> {t("sidebar.login")}
           </button>
         ) : null}
         {!userLabel && storageNote ? (
@@ -155,9 +157,10 @@ export function SessionSidebar({
 }
 
 export function MobileDrawerHeader({ onClose }: { onClose: () => void }): React.ReactElement {
+  const { t } = useI18n();
   return (
     <div className="flex items-center justify-between border-b border-border px-4 py-3">
-      <span className="text-sm font-semibold">会话列表</span>
+      <span className="text-sm font-semibold">{t("sidebar.listTitle")}</span>
       <button type="button" onClick={onClose} className="rounded p-1 text-muted-foreground hover:text-foreground">
         <X size={16} />
       </button>

@@ -17,6 +17,8 @@ import { readTheme, writeTheme, applyTheme, type Theme } from "@/services/petSto
 import { bumpStats } from "@/services/statsStore";
 import { Leaderboard } from "@/components/chat/Leaderboard";
 import { UsageStatsDialog } from "@/components/chat/UsageStatsDialog";
+import { LanguageToggle } from "@/components/LanguageToggle";
+import { useI18n } from "@/i18n/provider";
 
 import { fetchModelCatalog, requestSeqoutChat, type DatasetCard, type ToolLog } from "@/services/seqoutChat";
 import {
@@ -78,6 +80,7 @@ function writeLocalSessions(list: LocalSession[]): void {
 function ChatPage(): React.ReactElement {
   // 软键盘适配：写入 --vvh，根容器据此收缩（见 use-visual-viewport.ts）
   useVisualViewport();
+  const { t, lang } = useI18n();
   const [session, setSession] = useState<Session | null>(null);
   const [authOpen, setAuthOpen] = useState(false);
   const [sessions, setSessions] = useState<SessionRow[]>([]);
@@ -323,6 +326,7 @@ function ChatPage(): React.ReactElement {
         },
       },
       controller.signal,
+      lang,
     );
 
     patch((m) => ({ ...m, streaming: false, liveTools: undefined, toolLogs: finalTools, cards: finalCards }));
@@ -441,7 +445,11 @@ function ChatPage(): React.ReactElement {
       storageNote={
         user
           ? undefined
-          : `游客记录仅保存在本浏览器：最多 ${GUEST_MAX_SESSIONS} 条会话，保留 ${GUEST_KEEP_DAYS} 天${isOfflineMode ? "" : "；登录可云端永久保存"}`
+          : t("sidebar.guestNote", {
+              n: GUEST_MAX_SESSIONS,
+              d: GUEST_KEEP_DAYS,
+              loginSuffix: isOfflineMode ? "" : t("sidebar.guestNoteLogin"),
+            })
       }
     />
   );
@@ -457,8 +465,8 @@ function ChatPage(): React.ReactElement {
           <button
             type="button"
             onClick={toggleCollapsed}
-            title="展开会话列表"
-            aria-label="展开会话列表"
+            title={t("header.expandSessions")}
+            aria-label={t("header.expandSessions")}
             className="flex h-9 w-9 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
           >
             <ChevronsRight size={17} />
@@ -466,12 +474,13 @@ function ChatPage(): React.ReactElement {
           <span className="mt-4 flex h-8 w-8 items-center justify-center rounded-lg bg-helix-soft text-helix ring-1 ring-helix/20">
             <BrandMark size={16} />
           </span>
+          <LanguageToggle size={16} className="mt-auto" />
           <button
             type="button"
             onClick={toggleTheme}
-            title={theme === "dark" ? "切回白昼" : "夜探矿洞"}
-            aria-label="切换主题"
-            className="mt-auto flex h-9 w-9 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-secondary hover:text-pet-amber-deep"
+            title={theme === "dark" ? t("header.themeDark") : t("header.themeLight")}
+            aria-label={t("header.themeAria")}
+            className="mt-1.5 flex h-9 w-9 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-secondary hover:text-pet-amber-deep"
           >
             {theme === "dark" ? <Sun size={16} /> : <Moon size={16} />}
           </button>
@@ -482,8 +491,8 @@ function ChatPage(): React.ReactElement {
           <button
             type="button"
             onClick={toggleCollapsed}
-            title="收起会话列表"
-            aria-label="收起会话列表"
+            title={t("header.collapseSessions")}
+            aria-label={t("header.collapseSessions")}
             className="absolute -right-3 top-5 z-10 flex h-6 w-6 items-center justify-center rounded-full border border-border bg-card text-muted-foreground shadow-sm transition-colors hover:border-helix/50 hover:text-helix"
           >
             <ChevronsLeft size={13} />
@@ -509,18 +518,22 @@ function ChatPage(): React.ReactElement {
             type="button"
             onClick={() => setDrawerOpen(true)}
             className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground md:hidden"
-            aria-label="打开会话列表"
+            aria-label={t("header.openSessions")}
           >
             <Menu size={18} />
           </button>
           <h1 className="truncate text-[13.5px] font-medium tracking-tight">
-            {activeId ? sessions.find((s) => s.id === activeId)?.title ?? "GEO寻宝鼠" : user ? "新对话" : `临时试用（本机保存 ${GUEST_MAX_SESSIONS} 条 · ${GUEST_KEEP_DAYS} 天）`}
+            {activeId
+              ? sessions.find((s) => s.id === activeId)?.title ?? t("brand.name")
+              : user
+                ? t("header.newChat")
+                : t("header.guestTrial", { n: GUEST_MAX_SESSIONS, d: GUEST_KEEP_DAYS })}
           </h1>
           <button
             type="button"
             onClick={() => setBoardOpen(true)}
-            title="寻宝排行榜"
-            aria-label="打开寻宝排行榜"
+            title={t("header.leaderboard")}
+            aria-label={t("header.leaderboardAria")}
             className={`${user ? "" : "ml-auto "}rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-secondary hover:text-pet-amber-deep`}
           >
             <Trophy size={17} />
@@ -528,32 +541,33 @@ function ChatPage(): React.ReactElement {
           <button
             type="button"
             onClick={() => setStatsOpen(true)}
-            title="使用统计"
-            aria-label="打开使用统计"
+            title={t("header.stats")}
+            aria-label={t("header.statsAria")}
             className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-secondary hover:text-helix"
           >
             <BarChart3 size={17} />
           </button>
           <Link
             to="/about"
-            title="关于 GEO寻宝鼠"
-            aria-label="关于"
+            title={t("header.about")}
+            aria-label={t("header.aboutAria")}
             className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-secondary hover:text-pet-amber-deep"
           >
             <Info size={17} />
           </Link>
+          <LanguageToggle />
           <button
             type="button"
             onClick={toggleTheme}
-            title={theme === "dark" ? "切回白昼" : "夜探矿洞"}
-            aria-label="切换主题"
+            title={theme === "dark" ? t("header.themeDark") : t("header.themeLight")}
+            aria-label={t("header.themeAria")}
             className={`rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-secondary hover:text-pet-amber-deep`}
           >
             {theme === "dark" ? <Sun size={17} /> : <Moon size={17} />}
           </button>
           {!user ? (
             <span className={`${user ? "ml-auto" : ""} rounded-full border border-helix/20 bg-helix-soft px-2.5 py-1 font-mono text-[10.5px] text-helix`}>
-              guest mode
+              {t("header.guestBadge")}
             </span>
           ) : null}
         </header>

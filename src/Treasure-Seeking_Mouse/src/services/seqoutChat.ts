@@ -1,6 +1,7 @@
 // seqout-chat Edge Function 前端封装：流式请求 + SSE 解析
 import { projectUrlId, supabase, supabaseUrl } from "@/supabase/client";
 import { getDeviceId } from "@/services/statsStore";
+import { readLang, translate } from "@/i18n";
 
 // 自托管模式：VITE_CHAT_API 指向任意 OpenAI 兼容对话服务（如本地 server/local.mjs 的 http://localhost:8787）
 // 未设置时走 Meoo 平台 Edge Function（须带 OneDay-App-Id 头）
@@ -109,22 +110,23 @@ export async function requestSeqoutChat(
   model: string,
   handlers: StreamHandlers,
   signal?: AbortSignal,
+  lang: "zh" | "en" = "zh",
 ): Promise<void> {
   let response: Response;
   try {
     response = await fetch(chatEndpoint(), {
       method: "POST",
       headers: await authHeaders(),
-      body: JSON.stringify({ messages, model, stream: true }),
+      body: JSON.stringify({ messages, model, stream: true, lang }),
       signal,
     });
   } catch (err) {
     if ((err as Error).name === "AbortError") return;
-    handlers.onError("无法连接数据服务，请检查网络后重试");
+    handlers.onError(translate(readLang(), "err.connect"));
     return;
   }
   if (!response.ok) {
-    let detail = `请求失败（${response.status}）`;
+    let detail = translate(readLang(), "err.requestFailed", { status: response.status });
     try {
       const j = await response.json();
       if (typeof j?.error === "string") detail = j.error;
@@ -135,7 +137,7 @@ export async function requestSeqoutChat(
     return;
   }
   if (!response.body) {
-    handlers.onError("当前环境不支持流式响应");
+    handlers.onError(translate(readLang(), "err.noStream"));
     return;
   }
 
@@ -167,6 +169,6 @@ export async function requestSeqoutChat(
       }
     }
   } catch (err) {
-    if ((err as Error).name !== "AbortError") handlers.onError("响应中断，请重试");
+    if ((err as Error).name !== "AbortError") handlers.onError(translate(readLang(), "err.interrupted"));
   }
 }
