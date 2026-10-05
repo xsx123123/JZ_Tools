@@ -4,6 +4,11 @@
 - `qmuse/qmuse-app/` 是本应用的 **QMuse 平台迁移版**（数据后端 Supabase→QMuse 云服务、Edge Function→云函数、SSE→整包+前端模拟流式、应用内邮箱登录→平台账号）。它与主仓库并行维护，主仓库的改动按 **`qmuse/MIGRATION.md`** 的映射规范同步过去。
 - 改 QMuse 版时遵守 `qmuse/qmuse-app/AGENTS.md` 与其内置 qmuse-cloud 技能契约；改完跑 `npm run check`、`npm run build` 与产物校验器（见 MIGRATION.md 第五节）。
 
+## 文档与文案同步（改一处要连带改的地方）
+- **README 双语**：根 `README.md` 是**英文版**（GitHub 仓库首页默认展示），`docs/README.zh-CN.md` 是**中文版**，两份顶部有互链语言切换行（`**English** | [简体中文](docs/README.zh-CN.md)` / `[English](../README.md) | **简体中文**`）。改功能一览、技术栈、目录、快速开始、致谢等任一章节，**两份都要同步改**，别只动一份。图片/链接用各自所在目录的相对路径：根 README 写 `docs/寻宝鼠.png`、`docs/badges/*.svg`、`src/assets/pet/*`；中文版在 `docs/` 下，写 `寻宝鼠.png`、`badges/*.svg`、`../src/assets/pet/*`。代码块的命令字面量保持原样，只翻译注释。
+- **关于页跟 README**：`src/routes/about.tsx` 是 README 的应用内镜像（核心亮点 / seqout-mcp 后端 / 自托管 / 技术栈 / 致谢）。README 改了这几节，关于页对应改，文案落在 `src/i18n/locales/{zh,en}.ts` 的 `about.*` 键，**中英两份字典同时加**（zh 是键的权威来源，缺 en 键会静默回退中文）。seqout-mcp 段与致谢图标行（`src/assets/badges/`，拷贝自 `docs/badges/`）易漏。
+- **i18n 键约定**：新增界面文案一律走 `t("key")`，不写死在组件里；错误提示若在 service 层（非组件）用 `translate(readLang(), "key")`。改完跑 `npx tsc --noEmit`（键名打错会报错）+ `npx vite build`，并核对 zh/en 键数一致。
+
 ## 依赖
 - `@supabase/supabase-js`：云服务客户端（Auth / Database），仅通过 `src/supabase/client.ts` 生成的单例使用。
 - 无其他第三方运行时依赖；Markdown 渲染为 `react-markdown` + GFM + rehype-highlight（`src/components/chat/Markdown.tsx`，memo 化防止流式时重复解析），动效全部 CSS keyframes（遵守禁 framer-motion 约束）。
