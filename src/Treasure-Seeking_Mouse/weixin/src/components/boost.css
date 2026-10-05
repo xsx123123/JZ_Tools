@@ -1,0 +1,74 @@
+/* 【小程序版】下载加速推荐卡片（Polariseq）样式，对齐现有 .card 体系；全语义变量，dark 可读。 */
+
+.boost {
+  margin-top: 16rpx;
+  padding: 20rpx 24rpx;
+  background-color: var(--card);
+  border: 1rpx solid var(--border);
+  border-left: 6rpx solid var(--strand);
+  border-radius: 12rpx;
+}
+
+.boost__head {
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+}
+
+.boost__title {
+  flex: 1;
+  font-size: 27rpx;
+  font-weight: 600;
+  color: var(--foreground);
+}
+
+.boost__project {
+  font-size: 22rpx;
+  color: var(--helix);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.boost__desc {
+  display: block;
+  margin-top: 14rpx;
+  font-size: 24rpx;
+  line-height: 1.65;
+  color: var(--muted-foreground);
+}
+
+.boost__code {
+  margin-top: 16rpx;
+  padding: 16rpx 20rpx;
+  background-color: var(--secondary);
+  border: 1rpx solid var(--border);
+  border-radius: 12rpx;
+}
+
+.boost__code-text {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: 22rpx;
+  line-height: 1.7;
+  color: var(--foreground);
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+.boost__copy {
+  display: inline-block;
+  margin-top: 12rpx;
+  padding: 6rpx 24rpx;
+  font-size: 22rpx;
+  color: var(--primary-foreground);
+  background-color: var(--helix);
+  border-radius: 999rpx;
+}
+
+.boost__note {
+  display: block;
+  margin-top: 16rpx;
+  font-size: 21rpx;
+  line-height: 1.6;
+  color: var(--muted-foreground);
+}

@@ -20,6 +20,7 @@ function makeRecorder() {
     onTool: (evt) => events.push(["tool", evt.name, evt.status]),
     onCards: (cards) => events.push(["cards", cards.length]),
     onEnd: (p) => events.push(["end", p.cards.length, p.tools.length]),
+    onPolariseq: (accession) => events.push(["polariseq", accession]),
     onError: (msg) => events.push(["error", msg]),
   });
   return { events, parser };
@@ -140,6 +141,21 @@ runCase(
   "一帧拆三个 chunk",
   ['data: {"de', 'lta":"1', '23"}\n\n'],
   [["delta", "123"]],
+);
+
+// 11) 下载加速推荐事件：带 accession + accession 为 null 两种路径
+runCase(
+  "polariseq 事件（带 accession 与 null）",
+  [
+    'data: {"event":"polariseq","accession":"PRJNA636285"}\n\n' +
+      'data: {"event":"polariseq","accession":null}\n\n' +
+      'data: {"event":"polariseq"}\n\n',
+  ],
+  [
+    ["polariseq", "PRJNA636285"],
+    ["polariseq", null],
+    ["polariseq", null],
+  ],
 );
 
 console.log(`\n结果：${passed} 通过，${failed} 失败`);

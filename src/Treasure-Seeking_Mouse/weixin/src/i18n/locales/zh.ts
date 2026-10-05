@@ -66,6 +66,16 @@ export const zh = {
   "card.literature": "查看关联文献（证据链）",
   "card.literatureAria": "查看关联文献",
 
+  // ---- 下载加速推荐（Polariseq） ----
+  "boost.title": "下载加速 · Polariseq",
+  "boost.project": "项目主页",
+  "boost.desc":
+    "Polariseq 是寻宝鼠作者 xsx123 开发的 Rust 高速下载工具（命令行 + 跨平台桌面界面），支持 NCBI SRA / EBI / GEO，默认 AWS S3 全球加速、多线程、断点续传与 MD5 校验。",
+  "boost.note":
+    "GEO 数据把 -A 换成该记录对应的 BioProject 编号（GEO 页面 SRA / BioProject 链接处获取）；deps install 只需跑一次，用于安装 sra-tools。",
+  "boost.copy": "复制",
+  "boost.copied": "已复制",
+
   // ---- 文献卡片 ----
   "lit.title": "文献证据链",
   "lit.loading": "正在检索文献（NCBI / Europe PMC）…",

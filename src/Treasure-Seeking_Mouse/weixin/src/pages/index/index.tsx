@@ -25,6 +25,7 @@ import { SessionSidebar } from '@/components/SessionSidebar'
 import { UsageStatsDialog } from '@/components/UsageStatsDialog'
 import { Leaderboard } from '@/components/Leaderboard'
 import { TreasureMouse, makePetEvent, type PetEvent } from '@/components/TreasureMouse'
+import { PolariseqCard } from '@/components/PolariseqCard'
 import '@/components/panels.css'
 import './index.css'
 
@@ -36,6 +37,8 @@ interface UIMessage {
   content: string
   cards?: DatasetCard[]
   toolLogs?: ToolLog[]
+  /** 下载加速推荐（polariseq 事件；undefined=无卡片，不随消息持久化） */
+  boost?: { accession: string | null }
   streaming?: boolean
   error?: string
 }
@@ -161,6 +164,7 @@ export default function Index() {
               makePetEvent({ type: 'done', cards: Math.max(p.cards.length, petCardsRef.current) }),
             )
           },
+          onPolariseq: (accession) => patch((m) => ({ ...m, boost: { accession } })),
           onError: (msg) => {
             setPetEvent(makePetEvent({ type: 'error' }))
             patch((m) => ({ ...m, error: msg }))
@@ -353,6 +357,8 @@ export default function Index() {
             ) : null}
 
             {m.error ? <Text className='msg__err'>{m.error}</Text> : null}
+
+            {m.boost ? <PolariseqCard accession={m.boost.accession} /> : null}
 
             {evidence && evidence.hostMessageId === m.id ? (
               <LiteratureCardPanel kind={evidence.kind} id={evidence.id} onClose={() => setEvidence(null)} />

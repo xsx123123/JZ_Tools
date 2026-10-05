@@ -3,6 +3,39 @@
 > 记录每轮从主仓库到小程序版的同步。体例参照 `../qmuse/MIGRATION.md`：
 > 每条记 `R<n> — 日期 — 源 commit`。
 
+## R4 — 2026-10-05 下载加速推荐卡片（源：主仓库后端 seqout-chat 新增 polariseq SSE 事件）
+
+### 本轮做了什么
+
+后端在流式中新增 `{"event":"polariseq","accession":...}`（本轮调用过下载链接类工具时推送一次，
+accession 可能为 null），前端在该轮助手消息下方渲染固定文案的 Polariseq 推荐卡片。
+i18n 新增 7 键（`boost.*`），中英各 218 → 224 键，保持相等。
+
+### 文件级结果
+
+| 文件 | 处理 |
+|---|---|
+| `src/services/sseParse.ts` | `SseHandlers` 加 `onPolariseq`；解析链加 polariseq 分支（保持零平台依赖） |
+| `src/services/seqoutChat.ts` | 无需改：`StreamHandlers` 是 `SseHandlers` 类型别名，自动透传 |
+| `src/components/PolariseqCard.tsx` + `boost.css` | 新增：标题/项目主页（复制+toast）/说明/整块命令一键复制/accession 兜底 `PRJNA833659`，样式对齐 .card 体系 |
+| `src/pages/index/index.tsx` | `UIMessage.boost` 字段 + `onPolariseq` 接线 + 渲染；卡片不随消息持久化（纯本轮 UI 反馈） |
+| `src/i18n/locales/{zh,en}.ts` | 各加 7 键 `boost.{title,project,desc,note,copy,copied}` |
+| `scripts/verify-stream.mjs` | 新增 case 11：polariseq 带 accession / accession:null / 缺省字段三种路径 |
+
+### 验证结果（本轮实测）
+
+| 项 | 结果 |
+|---|---|
+| `npm run typecheck` | ✅ 通过 |
+| `npm run build:weapp` | ✅ Compiled successfully，dist **588KB**（+4KB < 30KB 验收线） |
+| `node scripts/verify-stream.mjs` | ✅ 11 case 全过（新增 polariseq case） |
+| `grep oklch(/color-mix(` | ✅ 0 |
+| i18n 字典 | ✅ zh/en 各 224 键，diff 为空 |
+
+### 踩坑记录（本轮新增）
+
+- 无新坑。注意 polariseq 帧不带 `delta`，解析链分支要放在 `typeof obj.error` 之前、且不干扰 cards/end。
+
 ## R3 — 2026-10-05 Web 版剩余功能组件移植（源：主仓库 commit `dc9845e`）
 
 ### 本轮做了什么

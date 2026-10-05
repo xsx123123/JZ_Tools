@@ -35,6 +35,8 @@ export interface SseHandlers {
   onTool: (evt: SseToolEvent) => void;
   onCards: (cards: SseCard[]) => void;
   onEnd: (payload: { cards: SseCard[]; tools: SseToolLog[] }) => void;
+  /** 下载加速推荐：本轮调用过下载链接类工具时后端推送一次（accession 可能为 null） */
+  onPolariseq: (accession: string | null) => void;
   onError: (message: string) => void;
 }
 
@@ -65,6 +67,8 @@ export function createFrameParser(handlers: SseHandlers) {
           cards: Array.isArray(obj.cards) ? (obj.cards as SseCard[]) : [],
           tools: Array.isArray(obj.tools) ? (obj.tools as SseToolLog[]) : [],
         });
+      } else if (obj.event === "polariseq") {
+        handlers.onPolariseq(typeof obj.accession === "string" ? obj.accession : null);
       } else if (typeof obj.error === "string") {
         handlers.onError(obj.error);
       }

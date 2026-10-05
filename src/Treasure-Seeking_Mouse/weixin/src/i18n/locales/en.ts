@@ -68,6 +68,16 @@ export const en = {
   "card.literature": "View linked literature (evidence chain)",
   "card.literatureAria": "View linked literature",
 
+  // ---- 下载加速推荐（Polariseq） ----
+  "boost.title": "Download Boost · Polariseq",
+  "boost.project": "Project page",
+  "boost.desc":
+    "Polariseq is a Rust-based high-speed download tool by GeoMuse's author xsx123 (CLI + cross-platform desktop GUI), supporting NCBI SRA / EBI / GEO — AWS S3 global acceleration by default, multi-threading, resumable downloads and MD5 verification.",
+  "boost.note":
+    "For GEO data, replace -A with the record's BioProject ID (found under the SRA / BioProject links on the GEO page); deps install only runs once to set up sra-tools.",
+  "boost.copy": "Copy",
+  "boost.copied": "Copied",
+
   // ---- 文献卡片 ----
   "lit.title": "Evidence chain",
   "lit.loading": "Fetching literature (NCBI / Europe PMC)…",
