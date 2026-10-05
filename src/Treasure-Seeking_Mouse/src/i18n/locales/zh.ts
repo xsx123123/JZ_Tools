@@ -74,6 +74,9 @@ export const zh = {
   "boost.note": "GEO 数据把 -A 换成该记录对应的 BioProject 编号（GEO 页面 SRA / BioProject 链接处获取）；deps install 只需跑一次，用于安装 sra-tools。",
   "boost.copy": "复制",
   "boost.copied": "已复制",
+  "boost.download": "下载总表",
+  // accession 已知时替换正文里的 {acc}（避免让用户再去 GEO 页面手动找编号）
+  "boost.noteKnown": "-A 已填好本项目的 BioProject 编号 {acc}，直接复制即可；deps install 只需跑一次，用于安装 sra-tools。",
 
   // ---- 文献卡片 ----
   "lit.title": "文献证据链",

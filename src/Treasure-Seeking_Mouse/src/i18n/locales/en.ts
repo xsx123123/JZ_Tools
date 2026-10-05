@@ -76,6 +76,8 @@ export const en = {
   "boost.note": "For GEO data, replace -A with the record's BioProject ID (found under the SRA / BioProject links on the GEO page); deps install only runs once to set up sra-tools.",
   "boost.copy": "Copy",
   "boost.copied": "Copied",
+  "boost.download": "Download sheet",
+  "boost.noteKnown": "-A is pre-filled with this project's BioProject ID {acc} — just copy and run; deps install only runs once to set up sra-tools.",
 
   // ---- 文献卡片 ----
   "lit.title": "Evidence chain",
