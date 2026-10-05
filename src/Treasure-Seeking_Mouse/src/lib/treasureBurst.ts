@@ -4,10 +4,14 @@
 
 let fired = false;
 
-/** 触发一次全屏宝藏烟花（重复调用与已放过的浏览器均为 no-op） */
+/** 触发一次全屏宝藏烟花（重复调用与已放过的浏览器均为 no-op；?reshow-hint=1 可重置） */
 export function fireTreasureBurst(): void {
   if (fired || typeof document === "undefined") return;
   try {
+    if (/[?&]reshow-hint=1/.test(location.search)) {
+      localStorage.removeItem("geo-treasure-burst-fired");
+      fired = false;
+    }
     if (localStorage.getItem("geo-treasure-burst-fired")) {
       fired = true;
       return;
@@ -16,6 +20,7 @@ export function fireTreasureBurst(): void {
   } catch {
     /* 隐私模式下静默失败，但至少本次会话不再放 */
   }
+  if (fired) return;
   fired = true;
 
   const dpr = Math.min(window.devicePixelRatio || 1, 2);

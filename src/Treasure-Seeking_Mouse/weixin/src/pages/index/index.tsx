@@ -321,7 +321,7 @@ export default function Index() {
             <View className='msg__body'>
               {m.content ? (
                 m.role === 'assistant' ? (
-                  <Markdown text={extractFollowups(m.content).main} hostMessageId={m.id} />
+                  <Markdown text={extractFollowups(m.content).main} hostMessageId={m.id} allowLinkHint={!m.streaming} />
                 ) : (
                   <Text className='msg__text'>{m.content}</Text>
                 )

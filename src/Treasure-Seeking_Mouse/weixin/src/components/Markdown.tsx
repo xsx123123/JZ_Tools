@@ -339,13 +339,27 @@ function TextNodes({
   return <>{out}</>
 }
 
-export const Markdown = memo(function Markdown({ text, hostMessageId }: { text: string; hostMessageId?: string }) {
+export const Markdown = memo(function Markdown({
+  text,
+  hostMessageId,
+  allowLinkHint = true,
+}: {
+  text: string;
+  hostMessageId?: string;
+  /** 流式期间传 false：消息定稿后再消费/展示提示（默认 true，历史消息等无需关心） */
+  allowLinkHint?: boolean;
+}) {
   const { t } = useI18n()
   const blocks = useMemo(() => parseBlocks(text), [text])
   // 每条消息一个链接预算（对齐网页版 MAX_LINKS_PER_MESSAGE）
   const budget = useMemo(() => ({ left: MAX_LINKS_PER_MESSAGE }), [text])
-  // 新用户发现性提示：全设备只展示一次（lib/linkHint），6s 自动消失或点出 ActionSheet 即消失
-  const [hintOn, setHintOn] = useState(consumeIdLinkHint)
+  // 新用户发现性提示：全设备只展示一次（lib/linkHint），6s 自动消失或点出 ActionSheet 即消失。
+  // 消费走 effect 并受 allowLinkHint 门控——流式期间不消费，等消息定稿再点亮首个编号
+  const [hintOn, setHintOn] = useState(false)
+  useEffect(() => {
+    if (!allowLinkHint || hintOn) return
+    setHintOn(consumeIdLinkHint())
+  }, [allowLinkHint, hintOn])
   useEffect(() => {
     if (!hintOn) return
     const id = setTimeout(() => setHintOn(false), 6000)

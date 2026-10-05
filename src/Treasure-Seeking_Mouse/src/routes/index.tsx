@@ -530,7 +530,7 @@ function ChatPage(): React.ReactElement {
               ? sessions.find((s) => s.id === activeId)?.title ?? t("brand.name")
               : user
                 ? t("header.newChat")
-                : t("header.guestTrial", { n: GUEST_MAX_SESSIONS, d: GUEST_KEEP_DAYS })}
+                : t("brand.name")}
           </h1>
           <button
             type="button"

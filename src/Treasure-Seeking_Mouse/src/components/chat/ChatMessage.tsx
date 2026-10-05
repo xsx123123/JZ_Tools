@@ -129,7 +129,7 @@ export function ChatMessage({
         ) : null}
         {hasBody ? (
           <div className="rounded-xl rounded-tl-sm border border-border bg-card px-4 py-3 shadow-soft">
-            {main ? <Markdown text={main} hostMessageId={msg.id} /> : null}
+            {main ? <Markdown text={main} hostMessageId={msg.id} allowLinkHint={!msg.streaming} /> : null}
             {!msg.content && msg.streaming ? (
               <span className="text-[13px] text-muted-foreground">{t("msg.thinking")}</span>
             ) : null}

@@ -10,6 +10,8 @@ import { IdLink } from "./IdLink";
 
 /** 宿主消息 id 上下文：IdLink 的"查看证据链"请求据此锚定渲染位置 */
 const HostMessageContext = createContext<string | null>(null);
+/** 流式期间为 false：禁止消费/展示编号发现提示，防止树重挂载把提示「吃掉」（用户根本看不到） */
+export const AllowLinkHintContext = createContext(true);
 
 // ---------- rehype 插件：text 节点切分 + <idlink> 元素注入 ----------
 
@@ -137,17 +139,22 @@ const COMPONENTS = {
 export const Markdown = memo(function Markdown({
   text,
   hostMessageId,
+  allowLinkHint = true,
 }: {
   text: string;
   hostMessageId?: string;
+  /** 流式期间传 false：提示只在消息定稿后消费/展示（默认 true，历史消息等无流式场景无需关心） */
+  allowLinkHint?: boolean;
 }): React.ReactElement {
   return (
     <HostMessageContext.Provider value={hostMessageId ?? null}>
-      <div className="md-body text-[14.5px]">
-        <ReactMarkdown remarkPlugins={REMARK_PLUGINS} rehypePlugins={REHYPE_PLUGINS} components={COMPONENTS}>
-          {text}
-        </ReactMarkdown>
-      </div>
+      <AllowLinkHintContext.Provider value={allowLinkHint}>
+        <div className="md-body text-[14.5px]">
+          <ReactMarkdown remarkPlugins={REMARK_PLUGINS} rehypePlugins={REHYPE_PLUGINS} components={COMPONENTS}>
+            {text}
+          </ReactMarkdown>
+        </div>
+      </AllowLinkHintContext.Provider>
     </HostMessageContext.Provider>
   );
 });
