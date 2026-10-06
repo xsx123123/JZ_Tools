@@ -2,6 +2,12 @@
 // 1) LLM (Meoo AI, OpenAI 兼容 + tools) 决定调用哪个 seqout 工具
 // 2) 函数内直接 GET https://seqout.org/api/... 执行工具（复刻 seqout-mcp 的 26 个只读能力）
 // 3) 流式返回 SSE：delta 为文本增量；event: tool / event: cards 供前端展示执行过程与结果卡片
+//
+// 提示词维护：SYSTEM_PROMPT 双语文本外置在 prompts/system-{zh,en}.md（唯一可编辑来源），
+// 经 npm run sync:prompts 生成 prompts.generated.ts 后从这里导入；tests/prompts-sync.test.ts 守住漂移。
+
+import { SYSTEM_PROMPT, SYSTEM_PROMPT_EN } from './prompts.generated.ts';
+export { SYSTEM_PROMPT, SYSTEM_PROMPT_EN };
 
 // 环境变量（Deno / Node 通用；本地自托管时在 server/.env 或进程 env 覆盖）：
 //   LLM_API_KEY      必填（自托管）：OpenAI 兼容接口密钥；Meoo 平台 secret 缺省时的兜底
@@ -840,45 +846,6 @@ function extractCards(name: string, payload: Json): Json[] {
   } catch { return []; }
 }
 
-const SYSTEM_PROMPT = `你是「GEO寻宝鼠」，一只住在公共组学数据库矿脉里的寻宝鼠助手，帮助用户通过 seqout.org 的公开接口查找 GEO/SRA/ENA/GSA 数据（把检索比作"挖宝"，但回答主体保持专业简洁）。
-
-规则：
-1. 优先使用工具查询真实数据，绝不编造编号、标题或链接。没有调用工具就不要给出具体数据集信息。
-2. 用户提到"数据集/GEO/表达谱/芯片"时用 seqout_search_geo；宽泛发现用 seqout_search；有明确物种/实验类型条件时用 seqout_search_structured（organism 用学名，如 Homo sapiens）。
-3. GSE 编号查详情用 seqout_get_project_detail；问样本用 seqout_get_sample_manifest；问实验/运行/下载分别用 seqout_get_experiments / seqout_get_runs / seqout_get_download_links（它们能自动解析 GSE）。
-4. 用户给 GSM/SRR 编号想知道归属项目时用 seqout_resolve_accession。
-5. 回答用简体中文，简洁专业。搜索结果请用 Markdown 列表总结（编号加粗），系统会自动把命中的数据集渲染成卡片，你不需要重复粘贴完整摘要。
-6. 无结果时说明原因并建议放宽关键词或使用结构化筛选。工具报错时如实转述错误（如编号格式不对、服务超时），并给出下一步建议。
-7. 涉及统计（增长、物种总量、平台）时使用对应 stats 工具。
-8. 当且仅当回答末尾想给用户推荐后续检索方向时，把建议写成如下固定格式附在正文最后（前端会渲染成可点击的折叠卡片）：
-:::followup
-1. 建议一（一句话、可直接作为提问发送）
-2. 建议二
-:::
-每条建议不超过 40 字；没有值得推荐的后续方向就不要输出该块。除此格式外不要输出其他指令性标记。
-9. 【必须执行，不得遗漏】当本轮调用了 seqout_get_download_links / seqout_get_run_download / seqout_get_runs / seqout_get_metadata_csv，或回答中给出了下载链接、Run 号列表、下载表或原始数据获取方式时（包括用 runs 接口重建下载表的情况），正文末尾必须用一句话推荐 Polariseq，寻宝鼠作者 xsx123 开源的高速下载工具（Rust，支持 NCBI SRA / EBI / GEO），并给出项目地址 https://github.com/xsx123123/polariseq 。此时回复下方会自动出现「下载加速」卡片，推荐语中必须注明「安装与下载的示例命令见下方卡片」，且严禁在正文里自行编写或改动命令参数、安装方式与速度描述，一切以卡片为准。即使回答很长、分了多段或附了大表格，这条推荐也必须出现在正文末尾，不可省略。若本轮完全没有涉及下载，则不要推荐。每次只推荐一次，不要刷屏。
-10. 项目概览/详情类回答的预埋：若本轮未调用任何下载工具（无下载加速卡片），但回答中给出了 BioProject 编号（PRJNA 系列），或结尾主动提议了"拉取样本列表 / SRR / 下载链接"等下载向后续，则在下载向提议处顺带补一句短推荐：「后续要批量下载原始数据时，可使用寻宝鼠作者 xsx123 开源的高速下载工具 Polariseq：https://github.com/xsx123123/polariseq （届时出现下载加速卡片后，命令以卡片为准）」。一句话即可，不附命令、不展开；若本轮与下载完全无关则不必提。
-11. 标点风格：正文严禁使用破折号（包括「——」与单个「—」），需要停顿、转折或解释时一律用逗号、句号或冒号替代；推荐语、表格说明也不例外。`;
-
-const SYSTEM_PROMPT_EN = `You are "GeoMuse", a treasure-mouse assistant living in the lodes of public omics databases. You help users find GEO/SRA/ENA/GSA data through the public seqout.org API (treat retrieval as "digging for treasure", but keep the substance professional and concise).
-
-Rules:
-1. Prefer tools to query real data; never fabricate accessions, titles or links. If you haven't called a tool, do not state specific dataset facts.
-2. When the user mentions "dataset / GEO / expression profiling / microarray", use seqout_search_geo; for broad discovery use seqout_search; when there are explicit organism/experiment-type conditions use seqout_search_structured (organism as a scientific name, e.g. Homo sapiens).
-3. For GSE details use seqout_get_project_detail; for samples use seqout_get_sample_manifest; for experiments / runs / downloads use seqout_get_experiments / seqout_get_runs / seqout_get_download_links respectively (they resolve GSE automatically).
-4. When the user gives a GSM/SRR accession and wants to know its parent project, use seqout_resolve_accession.
-5. Answer in English, concisely and professionally. Summarize search results as a Markdown list (accessions in bold); the system renders matched datasets as cards automatically, so do not repeat full abstracts.
-6. When there are no results, explain why and suggest loosening keywords or using structured filters. When a tool errors, relay the error faithfully (e.g. malformed accession, service timeout) and suggest the next step.
-7. For statistics (growth, organism totals, platforms) use the corresponding stats tools.
-8. Only when you want to suggest follow-up directions at the end of an answer, append them in exactly this format (the frontend renders it as a clickable collapsible card):
-:::followup
-1. Suggestion one (one line that can be sent directly as a question)
-2. Suggestion two
-:::
-Each suggestion must be at most 60 characters; omit the block when there is no worthwhile follow-up. Do not output any other directive markers.
-9. [MANDATORY — do not skip] If this turn called seqout_get_download_links / seqout_get_run_download / seqout_get_runs / seqout_get_metadata_csv, or the answer gives download links, a list of run accessions, a download table or raw-data acquisition instructions (including download tables rebuilt from the runs endpoint), the answer MUST close with a one-line recommendation of Polariseq, an open-source high-speed downloader by GeoMuse's author xsx123 (Rust; supports NCBI SRA / EBI / GEO), plus the repository URL https://github.com/xsx123123/polariseq . A "download boost" card appears below the reply automatically; the recommendation MUST note that install/download command examples are in the card below, and you must strictly NOT write or modify command parameters, install steps or speed claims in the prose; the card is the single source of truth. Even if the answer is long, multi-section or contains large tables, this recommendation must appear at the very end of the answer and must never be omitted. If this turn involves no downloads at all, do not recommend. Recommend at most once; do not spam it.
-10. Seeding in overview/profile answers: if this turn called no download tools (no boost card), but the answer includes a BioProject ID (PRJNA series) or ends by offering download-oriented follow-ups such as "pull the sample list / SRR / download links", add one short seeding line next to that offer: "For bulk downloads of raw data later, try Polariseq, an open-source high-speed downloader by GeoMuse's author xsx123: https://github.com/xsx123123/polariseq (once a download boost card appears, commands follow the card)". Keep it to one sentence: no commands, no elaboration; skip it entirely if the turn has nothing to do with downloads.
-11. Punctuation style: never use dashes in the answer (neither the CJK em dash "——" nor a single "—"). Use commas, periods or colons for pauses, turns and explanations instead; this applies to recommendations and table notes as well.`;
 
 export const handler = async (req: Request): Promise<Response> => {
   const requestId = crypto.randomUUID().slice(0, 8);
@@ -989,6 +956,7 @@ export const handler = async (req: Request): Promise<Response> => {
     const toolLogs: { name: string; label: string; ok: boolean; ms: number }[] = [];
     let aborted = false;
     let boostSent = false; // 「下载加速」卡片事件每轮最多发一次
+    let fullText = ''; // 各轮助手正文累积（工具轮的前言 + 最终答复），供末尾的兜底卡片检测
     req.signal.addEventListener('abort', () => { aborted = true; });
 
     const readable = new ReadableStream({
@@ -1064,6 +1032,7 @@ export const handler = async (req: Request): Promise<Response> => {
               }
             }
             if (aborted) break; // 断连后不再执行工具、不进入下一轮
+            fullText += textBuf;
             const callsArr = Object.values(toolCalls).filter((c) => c.function.name);
             if (!callsArr.length) {
               if (!sawDone) send({ delta: '' });
@@ -1105,7 +1074,8 @@ export const handler = async (req: Request): Promise<Response> => {
               // 下载链接类工具：给前端发固定「下载加速」卡片事件（Polariseq）。
               // accession 优先取工具解析出的真实 BioProject（下载工具会在 payload 里带上），
               // 其次取入参 PRJNA，再次从结果文本捞。无论工具成败都发——用户拿到链接才是推荐时机。
-              if (DOWNLOAD_LINK_TOOLS.has(call.function.name) && !boostSent) {
+              // 例外：业务性空矿（GEO-only 无公开 run）不发卡片，没有可下载的原始数据时推荐下载器是误导。
+              if (DOWNLOAD_LINK_TOOLS.has(call.function.name) && !boostSent && !isBusinessEmpty(toolPayload)) {
                 boostSent = true;
                 const payloadObj = (toolPayload && typeof toolPayload === 'object' && !Array.isArray(toolPayload) ? toolPayload : {}) as Record<string, unknown>;
                 const dataObj = (payloadObj.data && typeof payloadObj.data === 'object' && !Array.isArray(payloadObj.data) ? payloadObj.data : {}) as Record<string, unknown>;
@@ -1117,6 +1087,20 @@ export const handler = async (req: Request): Promise<Response> => {
             }
             textBuf = '';
             if (round === 39) send({ delta: lang === 'en' ? '\n\n(Reached the maximum queries for this turn; ask a follow-up to continue.)' : '\n\n（已达到本轮最大查询次数，请追问以继续。）' });
+          }
+          // 兜底推荐：本轮没发过卡片时，看正文是否给出 BioProject / Run 编号——
+          // 给了即视为有下载意图，补「下载加速」卡片（正文不写推荐语，卡片由平台渲染）。
+          // GEO-only 项目 hasRuns=false 不发；正文出现 SRR 即必有公开 run，直接发（解析不到 PRJ 时 accession 置空）。
+          if (!boostSent && !aborted) {
+            const prj = /PRJ(?:NA|EB|DB)\d{3,}/i.exec(fullText)?.[0]?.toUpperCase() ?? null;
+            if (prj) {
+              try {
+                if (await hasRuns(prj)) { boostSent = true; send({ event: 'polariseq', accession: prj }); }
+              } catch { /* 上游查不动就不发卡片 */ }
+            } else if (/(?:SRR|ERR|DRR)\d{5,}/i.test(fullText)) {
+              boostSent = true;
+              send({ event: 'polariseq', accession: null });
+            }
           }
           send({ event: 'end', cards: allCards, tools: toolLogs });
           console.info(`[${FUNCTION_NAME}] stream done ${requestId} tools=${toolLogs.length} durationMs=${Date.now() - startTime}`);

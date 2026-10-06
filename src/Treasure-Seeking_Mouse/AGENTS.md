@@ -27,7 +27,7 @@
 - 复制/重试：ChatMessage 悬停浮现按钮组（用户气泡=复制提问；助手=复制正文+重新挖一次）；handleRegenerate 截断到该助手消息前、取其前最近一条用户提问重发。
 - 后端逻辑集中在 Edge Function `functions/seqout-chat`（verify_jwt=false）：
   - GET → 透传 LLM `/models` 目录（默认模型 **qwen3.8-flash**，非 qwen3.6-plus）。
-  - POST → LLM tool-calling 循环（最多 40 轮，触顶提示文案在 round===39），直接 fetch `https://seqout.org/api`（纯 GET、无鉴权），把 seqout-mcp 的 26 个只读工具以 OpenAI function schema 声明式移植进函数内，不在前端调用、不运行 Python MCP 进程。
+  - POST → LLM tool-calling 循环（最多 40 轮，触顶提示文案在 round===39），直接 fetch `https://seqout.org/api`（纯 GET、无鉴权），把 seqout-mcp 的 26 个只读工具以 OpenAI function schema 声明式移植进函数内，不在前端调用、不运行 Python MCP 进程。SYSTEM_PROMPT 双语文本外置 `prompts/system-{zh,en}.md`（唯一可编辑来源），改后跑 `npm run sync:prompts` 生成 `prompts.generated.ts`（tests/prompts-sync.test.ts 守漂移，详见 docs/ARC/README.md §2.6）。
   - 下行 SSE 自定义协议：`{"delta"}` / `{"event":"tool"}` / `{"event":"cards"}` / `{"event":"end"}` / `{"error"}` / `[DONE]`，每 10s `: ping` 心跳防缓冲；前端 `src/services/seqoutChat.ts` 解析。
   - 自托管：handler 已导出且去 Deno 化（envGet 同时读 Deno/Node 环境），`LLM_API_KEY` / `LLM_BASE_URL` / `LLM_MODEL` / `SEQOUT_BASE_URL` 可覆盖；`pnpm run server`（`server/local.mjs`，Node≥22.6 原生跑 .ts + CORS）本地起服务，前端配 `VITE_CHAT_API` 直连即脱离 Meoo 平台；不配则走平台 Edge Function + `MEOO_PROJECT_API_KEY*` secrets，行为不变。
 - 数据：`profiles` / `chat_sessions` / `chat_messages`（cards、tool_logs 为 JSONB），RLS 全部 `auth.uid()` 本人隔离；未登录时消息仅存 localStorage（key `seqout-local-session`，每条会话记 `ts` 最后活跃时间，最多留 50 条、超过 7 天未活跃的会话读取时过滤；游客策略经侧栏 `storageNote` + 顶栏「临时试用」标题提示）。

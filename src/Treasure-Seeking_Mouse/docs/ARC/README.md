@@ -19,9 +19,10 @@
 
 | 领域 | 位置 | 关键文件 | 备注 |
 |---|---|---|---|
-| 对话编排后端 | `functions/seqout-chat/index.ts` | TOOL_DEFS / executeTool / tool 循环 / resolveStudy / 用量统计 | 平台可移植（Deno/Node），禁 Node-only API |
+| 对话编排后端 | `functions/seqout-chat/index.ts` | TOOL_DEFS / executeTool / tool 循环 / resolveStudy / 用量统计；SYSTEM_PROMPT 从 `prompts.generated.ts` 导入 | 平台可移植（Deno/Node），禁 Node-only API |
+| 对话提示词 | `functions/seqout-chat/prompts/system-{zh,en}.md` | **唯一可编辑来源**（中英双份平行，改一条必须两份同步） | 改完跑 `npm run sync:prompts` 重新生成 `prompts.generated.ts`；`tests/prompts-sync.test.ts` 守漂移，禁手改生成文件 |
 | 自托管服务壳 | `server/` | `local.mjs`（端口/CORS/统计落盘）、`account-api.mjs`（账号/历史/榜单） | DATA_DIR 卷持久化 |
-| 前端入口编排 | `src/routes/index.tsx` | handleSend / 会话切换 / effUser 分支 / petEvent 转发 | 661 行，改动前先通读相关段 |
+| 前端入口编排 | `src/routes/index.tsx` | handleSend / 会话切换 / effUser 分支 / petEvent 转发 | 748 行，改动前先通读相关段 |
 | SSE 客户端 | `src/services/seqoutChat.ts` | chatEndpoint / 协议帧解析 / authHeaders | 加协议帧要前后端同步改 |
 | 账号（自托管） | `src/services/localAuth.ts` + `src/components/auth/AuthDialog.tsx` | token 存取 / 登录合并 | 云端模式走 supabase，勿混 |
 | 排行榜统计 | `src/services/statsStore.ts` | bumpStats / fetchLeaderboard / mergeLocalStatsToAccount | 双模式（云端 RPC / 离线服务端） |
@@ -58,7 +59,13 @@
 1. 服务端 `send({ event: "xxx", … })`；2. `seqoutChat.ts` 解析分发 + `StreamHandlers` 加回调；
 3. `index.tsx` handleSend 挂回调。注意 `trimForLLM` 只瘦身 LLM 输入，给用户的数据走独立事件。
 
-### 2.6 改主题/加色
+### 2.6 改 SYSTEM_PROMPT（对话提示词）
+1. 只改 `functions/seqout-chat/prompts/system-zh.md` / `system-en.md`（**唯一可编辑来源**，两份平行，逐条同步）；
+2. 跑 `npm run sync:prompts` 重新生成 `prompts.generated.ts`（JSON.stringify 嵌入，免转义坑）；
+3. `npm test` 必须全绿：`tests/prompts-sync.test.ts` 会比对 md 与实际导入字符串，改了 md 忘 sync 立即红；
+4. `prompts.generated.ts` 是生成物，**禁手改**。
+
+### 2.7 改主题/加色
 1. `:root` 加 token → `@theme` 映射 `--color-*`；2. `.dark` 必须同步给值；
 3. 组件消费 token utility，**禁 hex / Tailwind 内置色**；4. 图标描边禁透明度修饰符（oklab alpha 渲染 bug，用纯色 token）。
 
@@ -68,6 +75,7 @@
 |---|---|
 | 每次提交前 | `npx tsc --noEmit && npx vite build` |
 | 改了 GSE 解析 | `npm test` + `npm run test:live`（全绿才可提交） |
+| 改了提示词 | `npm run sync:prompts` + `npm test`（prompts-sync 守卫比对 md 与生成物） |
 | 改了 i18n | tsc + 键数比对（zh === en） |
 | 本地起全栈 | `pnpm run server`（8787）+ `pnpm run dev`（3015） |
 | 部署/更新部署 | `make docker-start`（带构建，勿只 restart 容器） |
@@ -81,7 +89,8 @@
 4. 前端不得出现任何密钥（LLM key 只在 `server/.env`）；
 5. 改 `functions/seqout-chat/index.ts` 的解析逻辑必跑测试（见 2.1-4）；
 6. 中英 i18n 键数保持相等；
-7. `qmuse/` 目录是历史归档，不改不同步不删。
+7. `qmuse/` 目录是历史归档，不改不同步不删；
+8. SYSTEM_PROMPT 只改 `prompts/*.md` 并跑 `sync:prompts`，**禁手改 `prompts.generated.ts`**。
 
 ## 5. 文档维护约定
 
