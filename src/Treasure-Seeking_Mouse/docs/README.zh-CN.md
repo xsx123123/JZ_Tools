@@ -59,6 +59,12 @@ pnpm run dev       # 前端 dev server（固定 3015 端口）
 
 环境变量唯一来源是 `server/.env`：本地开发与 Docker 部署共用（vite `envDir` 指向 `server/`，Makefile 起容器带 `--env-file server/.env`），`VITE_*` 构建期变量与 `LLM_*`/`WEB_PORT` 等运行时变量都写在这一份里。
 
+## 阿寻能挖的数据库
+
+叫「GEO 寻宝鼠」只是因为 GEO 是最老的那条矿脉——阿寻其实不只能搜 GEO，一次下铲同时穿透 7 个数据库：
+
+GEO · SRA · ArrayExpress · ENA · GSA · DRA · GEA
+
 ## 功能一览
 
 - **对话式检索**：自然语言提问 → LLM tool-calling 自动选择 seqout 工具（26 个只读工具，GEO/SRA/ENA/GSA）→ 流式回答 + 数据卡片 + 「下一铲建议」

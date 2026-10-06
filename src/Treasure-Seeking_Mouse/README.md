@@ -59,6 +59,12 @@ pnpm run dev       # frontend dev server (fixed to port 3015)
 
 Environment variables have a single source of truth: `server/.env`. Local development and Docker deployment share the same file (Vite's `envDir` points at `server/`, and the Makefile starts containers with `--env-file server/.env`). Both build-time `VITE_*` variables and runtime `LLM_*`/`WEB_PORT` variables live in this one file.
 
+## Databases A-Xun can dig through
+
+A-Xun is not limited to GEO — the name only honours the oldest lode. GeoMuse digs through 7 databases at once:
+
+GEO · SRA · ArrayExpress · ENA · GSA · DRA · GEA
+
 ## Features
 
 - **Conversational retrieval**: ask in natural language → LLM tool-calling automatically picks seqout tools (26 read-only tools, GEO/SRA/ENA/GSA) → streamed answer + data cards + "next dig" suggestions
