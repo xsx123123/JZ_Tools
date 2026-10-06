@@ -1,5 +1,6 @@
 // GEO寻宝鼠：主页（会话栏 + 对话区 + 登录弹窗 + 桌宠）
 import { useCallback, useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { ChevronsLeft, ChevronsRight, Info, Menu, Moon, Sun, BarChart3, PawPrint, Trophy } from "lucide-react";
 import { supabase, isOfflineMode } from "@/supabase/client";
@@ -112,6 +113,17 @@ function ChatPage(): React.ReactElement {
   }, []);
   const [petEvent, setPetEvent] = useState<PetEvent | null>(null); // 桌宠事件流（仅 UI 反馈，不影响消息逻辑）
   const [petPanelOpen, setPetPanelOpen] = useState(false); // 顶栏「阿寻设置」弹层：找回阿寻 / 大小 / 常驻
+  // 设置面板 portal 到 body 定位：顶栏 header 的 backdrop-blur 是 z-auto 层叠上下文，
+  // 面板留在 header 内会被主内容区/抽屉（z-50）压住，故以触发按钮 rect 计算 fixed 坐标
+  const petBtnRef = useRef<HTMLButtonElement | null>(null);
+  const [petPanelPos, setPetPanelPos] = useState({ top: 0, right: 0 });
+  const togglePetPanel = (): void => {
+    if (!petPanelOpen) {
+      const r = petBtnRef.current?.getBoundingClientRect();
+      if (r) setPetPanelPos({ top: r.bottom + 6, right: Math.max(8, window.innerWidth - r.right) });
+    }
+    setPetPanelOpen((o) => !o);
+  };
   // 编号发现提示 ⇆ 桌宠联动：抽签点亮某个编号时让阿寻喊话「那里有宝藏」；
   // 用户悬停/点开该编号（提示消失）时立即收起台词，形成一来一回的对话感
   useEffect(() => {
@@ -646,22 +658,29 @@ function ChatPage(): React.ReactElement {
           <LanguageToggle />
           <span className="relative">
             <button
+              ref={petBtnRef}
               type="button"
-              onClick={() => setPetPanelOpen((o) => !o)}
+              onClick={togglePetPanel}
               title={t("pet.settings.gear")}
               aria-label={t("pet.settings.gear")}
               className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-secondary hover:text-pet-amber-deep"
             >
               <PawPrint size={17} />
             </button>
-            {petPanelOpen ? (
-              <>
-                <div className="fixed inset-0 z-40" onClick={() => setPetPanelOpen(false)} />
-                <div className="absolute right-0 top-full z-50 mt-1.5">
-                  <PetSettingsPanel onClose={() => setPetPanelOpen(false)} />
-                </div>
-              </>
-            ) : null}
+            {petPanelOpen
+              ? createPortal(
+                  <>
+                    <div className="fixed inset-0 z-[60]" onClick={() => setPetPanelOpen(false)} />
+                    <div
+                      className="fixed z-[60]"
+                      style={{ top: petPanelPos.top, right: petPanelPos.right }}
+                    >
+                      <PetSettingsPanel onClose={() => setPetPanelOpen(false)} />
+                    </div>
+                  </>,
+                  document.body,
+                )
+              : null}
           </span>
           <button
             type="button"

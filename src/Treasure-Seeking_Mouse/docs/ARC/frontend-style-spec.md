@@ -148,7 +148,7 @@
 2. **图标描边禁用透明度修饰符**：`text-foreground/75` 这类 alpha 修饰符在 Tailwind v4 走 `color-mix(oklab,…)`，Chromium 对带 alpha 的 oklab SVG 描边有渲染 bug（笔画隐形）。要浅就用纯色 token（如 `--rail-icon`）。
 3. **非整刻度尺寸用任意值语法**：`h-[18px]`（Tailwind v4 动态刻度坑）。
 4. **i18n**：界面文案一律 `t("key")`；service 层用 `translate(readLang(), "key")`；新增键中英字典同步加（zh 为权威），跑 `tsc` 校验 + 核对键数。
-5. **z-index 分层**：桌宠 z-30 < 抽屉 z-40 < 弹窗/遮罩 z-50。
+5. **z-index 分层**：桌宠 z-30 < H5 侧栏抽屉 z-40 < 抽屉/弹窗遮罩 z-50 < **阿寻设置面板 z-[60]（最上层）**。顶栏入口的设置面板必须 `createPortal` 挂到 `document.body` 并按触发按钮 `getBoundingClientRect()` 计算 fixed 坐标——header 的 `backdrop-blur` 构成 z-auto 层叠上下文，面板留在 header 内部时会被任何后绘制的主内容/抽屉盖住（2026-10-06 踩坑：空态 Hero 卡压设置面板）。桌宠齿轮入口的面板在桌宠自身 z-30 上下文内即可（抽屉/弹窗打开时桌宠本就被遮罩盖住，不可达）。
 6. **头像/装饰图用本地资产**（Vite 打包），废弃带鉴权参数的 CDN 图床。
 7. 改主题只动 `styles.css` token + 点名覆盖段；发现组件里出现具体色值即回改。
 
