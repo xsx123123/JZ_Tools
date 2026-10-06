@@ -26,6 +26,25 @@ WEB_PORT := $(PORT)
 endif
 export WEB_PORT
 
+# 启动日志配色（NO_COLOR=1 可关闭，便于 CI 或日志采集）
+ifeq ($(NO_COLOR),1)
+RESET :=
+BOLD :=
+CYAN :=
+GREEN :=
+YELLOW :=
+RED :=
+DIM :=
+else
+RESET := \033[0m
+BOLD := \033[1m
+CYAN := \033[36m
+GREEN := \033[32m
+YELLOW := \033[33m
+RED := \033[31m
+DIM := \033[2m
+endif
+
 .DEFAULT_GOAL := help
 .PHONY: help docker-start docker-stop docker-restart docker-logs docker-status docker-clean check-env check-llm check-port
 
@@ -68,18 +87,41 @@ check-port: check-env ## 预检 WEB_PORT 是否被其他进程占用（被占即
 	fi
 
 docker-start: check-llm check-port ## 预检 LLM 密钥 + 端口占用 → 构建并启动容器（后台运行）
-	@echo ""
-	$(COMPOSE) --env-file $(ENV_FILE) up -d --build
-	@echo ""
-	@echo "✅ 已启动，访问 http://localhost:$(WEB_PORT)/"
-	@echo "   查看日志：make docker-logs"
+	@printf "\n$(BOLD)$(CYAN)━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━$(RESET)\n"
+	@printf "$(BOLD)$(CYAN)  GEO 寻宝鼠 · Docker 启动$(RESET)\n"
+	@printf "$(DIM)  配置: $(ENV_FILE)  |  Web 端口: $(WEB_PORT)$(RESET)\n"
+	@printf "$(BOLD)$(CYAN)━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━$(RESET)\n\n"
+	@printf "$(BOLD)$(CYAN)[1/4]$(RESET) 构建并启动服务…\n"
+	@START=$$(date +%s); \
+	$(COMPOSE) --env-file $(ENV_FILE) up -d --build; \
+	ELAPSED=$$(( $$(date +%s) - START )); \
+	printf "\n$(GREEN)✓$(RESET) 构建与启动完成（用时 $${ELAPSED}s）\n"
+	@printf "\n$(BOLD)$(CYAN)[2/4]$(RESET) 容器状态\n"
+	@$(COMPOSE) --env-file $(ENV_FILE) ps --format 'table {{.Name}}\t{{.Service}}\t{{.State}}\t{{.Ports}}'
+	@printf "\n$(BOLD)$(CYAN)[3/4]$(RESET) Web 健康检查\n"
+	@URL="http://localhost:$(WEB_PORT)/"; \
+	if command -v curl >/dev/null 2>&1 && curl -fsS --max-time 5 -o /dev/null "$$URL"; then \
+	  printf "$(GREEN)✓$(RESET) $$URL 响应正常\n"; \
+	else \
+	  printf "$(YELLOW)!$(RESET) 暂未收到 $$URL 响应（容器可能仍在启动）\n"; \
+	  printf "  可稍后运行: make docker-status\n"; \
+	fi
+	@printf "\n$(BOLD)$(CYAN)[4/4]$(RESET) 使用入口\n"
+	@printf "  $(GREEN)Web$(RESET)    http://localhost:$(WEB_PORT)/\n"
+	@printf "  $(DIM)日志$(RESET)   make docker-logs\n"
+	@printf "  $(DIM)状态$(RESET)   make docker-status\n"
+	@printf "  $(DIM)停止$(RESET)   make docker-stop\n\n"
+	@printf "$(BOLD)$(GREEN)✓ 启动流程完成$(RESET)\n"
 
 docker-stop: ## 停止并移除容器
 	$(COMPOSE) down
 
 docker-restart: ## 重启容器（不重新构建，读取 server/.env 最新值）
-	$(COMPOSE) --env-file $(ENV_FILE) up -d
-	@echo "✅ 已重启（改了 VITE_* 构建期变量需改用 make docker-start 重新构建）"
+	@printf "$(BOLD)$(CYAN)⟳ 重启 GEO 寻宝鼠容器…$(RESET)\n"
+	@$(COMPOSE) --env-file $(ENV_FILE) up -d
+	@$(COMPOSE) --env-file $(ENV_FILE) ps --format 'table {{.Name}}\t{{.Service}}\t{{.State}}\t{{.Ports}}'
+	@printf "$(GREEN)✓$(RESET) 已重启，访问 http://localhost:$(WEB_PORT)/\n"
+	@printf "$(DIM)提示：修改 VITE_* 构建期变量后请使用 make docker-start 重新构建。$(RESET)\n"
 
 docker-logs: ## 跟踪对话服务日志（Ctrl+C 退出）
 	$(COMPOSE) logs -f chat

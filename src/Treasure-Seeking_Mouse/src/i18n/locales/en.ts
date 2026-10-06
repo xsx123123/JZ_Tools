@@ -122,6 +122,7 @@ export const en = {
   "pet.alt": "Muse the treasure mouse",
   "pet.recall": "Recall Muse",
   "pet.chest": "Chest",
+  "pet.attachments": "Muse's treasure attachments",
   "pet.chestHover": "{n} treasures dug so far",
   "pet.chestStock": "The chest holds {n} treasures, every one dug up by Muse!",
   "pet.badgeTitle": "Achievement “{name}” · {n} treasures dug",

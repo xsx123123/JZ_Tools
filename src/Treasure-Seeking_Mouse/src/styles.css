@@ -267,11 +267,24 @@
 
 /* hover 微抬（中性黑低透明阴影） */
 .hover-lift {
-  transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
+  position: relative;
+  transition: transform 0.2s ease, border-color 0.2s ease, background-color 0.2s ease;
+}
+.hover-lift::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  box-shadow: 0 10px 24px -12px rgb(0 0 0 / 0.14), 0 2px 6px -2px rgb(0 0 0 / 0.05);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease;
 }
 .hover-lift:hover {
   transform: translateY(-2px);
-  box-shadow: 0 10px 24px -12px rgb(0 0 0 / 0.14), 0 2px 6px -2px rgb(0 0 0 / 0.05);
+}
+.hover-lift:hover::after {
+  opacity: 1;
 }
 
 /* 链接下划线展开 */
@@ -685,6 +698,9 @@
   background: linear-gradient(90deg, transparent, oklch(0.72 0.16 150 / 0.16), transparent);
 }
 .dark .hover-lift:hover {
+  /* shadow lives on ::after so hover only composites opacity */
+}
+.dark .hover-lift::after {
   box-shadow: 0 10px 24px -12px rgb(0 0 0 / 0.55), 0 2px 6px -2px rgb(0 0 0 / 0.35);
 }
 .dark .pet-mound {
@@ -745,13 +761,93 @@
 }
 
 @keyframes badge-in {
-  0% { opacity: 0; transform: scale(0.3) rotate(-30deg); }
-  60% { transform: scale(1.25) rotate(6deg); }
-  100% { opacity: 1; transform: scale(1) rotate(0deg); }
+  0% { opacity: 0; }
+  100% { opacity: 1; }
 }
 .pet-badge-in { animation: badge-in 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) both; }
 
+/* 环形附件轮盘：固定在桌宠中心附近，附件只做合成层位移 */
+.pet-orbit {
+  position: absolute;
+  z-index: 4;
+  left: 50%;
+  bottom: 18%;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+  --orbit-radius: clamp(42px, calc(var(--pet-size) * 0.43), 78px);
+}
+.pet-orbit-ring {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: calc(var(--orbit-radius) * 2);
+  height: calc(var(--orbit-radius) * 2);
+  border: 1px dashed var(--color-pet-amber);
+  border-radius: 9999px;
+  opacity: 0.2;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+.pet-orbit-item {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  margin: -13px;
+  border: 1px solid var(--color-border);
+  border-radius: 9999px;
+  background: var(--color-card);
+  color: var(--color-foreground);
+  transform: rotate(var(--orbit-angle)) translateY(calc(var(--orbit-radius) * -1)) rotate(calc(var(--orbit-angle) * -1));
+  transition: transform 180ms ease, opacity 180ms ease, box-shadow 180ms ease;
+  pointer-events: auto;
+}
+.pet-orbit-item:hover {
+  transform: rotate(var(--orbit-angle)) translateY(calc((var(--orbit-radius) + 3px) * -1)) rotate(calc(var(--orbit-angle) * -1)) scale(1.12);
+  z-index: 2;
+}
+.pet-orbit-item:active { transform: rotate(var(--orbit-angle)) translateY(calc((var(--orbit-radius) - 1px) * -1)) rotate(calc(var(--orbit-angle) * -1)) scale(0.94); }
+.pet-orbit-chest { width: 32px; height: 32px; margin: -16px; background: var(--color-pet-gold-soft); }
+.pet-orbit-badge { width: 22px; height: 22px; margin: -11px; font-size: 10px; }
+
 @media (prefers-reduced-motion: reduce) {
+  /* Global backstop for utility classes; targeted rules above preserve useful fades. */
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+  .scan-line::after {
+    animation: none;
+    opacity: 0;
+  }
+  .card-in {
+    animation: none;
+    opacity: 1;
+    transform: none;
+  }
+  .hover-lift,
+  .quest-pill {
+    transition: border-color 0.15s ease, background-color 0.15s ease !important;
+  }
+  .hover-lift:hover,
+  .quest-pill:hover {
+    transform: none;
+  }
+  .hover-lift::after,
+  .quest-pill::after {
+    transition: none;
+  }
+  .story-link::after {
+    transition-duration: 0.01ms;
+  }
+  .pet-orbit-item { transition: opacity 150ms ease; transform: rotate(var(--orbit-angle)) translateY(calc(var(--orbit-radius) * -1)) rotate(calc(var(--orbit-angle) * -1)); }
   .pet-idle, .pet-digging, .pet-reveal, .pet-miss, .pet-dust, .pet-poke,
   .pet-spin, .pet-walk, .pet-look, .pet-sleep, .pet-heart, .pet-chest-pop,
   .pet-burst, .pet-celebrate, .pet-halo, .pet-banner, .pet-badge-in,
@@ -770,18 +866,31 @@
 
 /* 探矿任务牌（Actionable Pill）：白底微卡片，hover 上浮 + 金边 + 浅金底 */
 .quest-pill {
+  position: relative;
   border: 1px solid var(--color-border);
   border-radius: 8px;
   background: var(--color-card);
   padding: 0.5rem 0.875rem; /* py-2 px-3.5 */
   cursor: pointer;
-  transition: transform 0.2s ease, border-color 0.2s ease, background-color 0.2s ease, box-shadow 0.2s ease;
+  transition: transform 0.2s ease, border-color 0.2s ease, background-color 0.2s ease;
+}
+.quest-pill::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  box-shadow: 0 6px 16px -8px rgb(120 113 108 / 0.25);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease;
 }
 .quest-pill:hover {
   transform: translateY(-2px);
   border-color: var(--gold);
   background: var(--gold-light);
-  box-shadow: 0 6px 16px -8px rgb(120 113 108 / 0.25);
+}
+.quest-pill:hover::after {
+  opacity: 1;
 }
 .quest-pill:active {
   transform: translateY(0);

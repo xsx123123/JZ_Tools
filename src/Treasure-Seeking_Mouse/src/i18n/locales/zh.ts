@@ -120,6 +120,7 @@ export const zh = {
   "pet.alt": "寻宝鼠阿寻",
   "pet.recall": "唤回寻宝鼠",
   "pet.chest": "宝箱",
+  "pet.attachments": "阿寻的宝藏附件",
   "pet.chestHover": "已累计挖到 {n} 份宝藏",
   "pet.chestStock": "宝箱里已囤 {n} 份宝藏，都是阿寻一铲一铲挖的！",
   "pet.badgeTitle": "成就「{name}」· 累计挖到 {n} 份宝藏",

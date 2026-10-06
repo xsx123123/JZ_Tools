@@ -532,7 +532,7 @@ export function TreasureMouse({ event }: { event: PetEvent | null }): React.Reac
       role="img"
       aria-label={t("pet.alt")}
       className="group fixed z-30 select-none touch-none"
-      style={{ left: pos.x, bottom: pos.y, width: size }}
+      style={{ left: pos.x, bottom: pos.y, width: size, ["--pet-size" as string]: `${size}px` }}
     >
       {/* 悬浮设置齿轮（hover 显现），点开为与顶栏同款的设置面板 */}
       <button
@@ -631,34 +631,39 @@ export function TreasureMouse({ event }: { event: PetEvent | null }): React.Reac
         ) : null}
       </div>
 
-      {/* 宝箱（点击报库存） */}
-      <button
-        type="button"
-        onClick={handleChestClick}
-        title={t("pet.chestHover", { n: treasure })}
-        className="absolute -left-7 bottom-0 block h-8 w-8 transition-transform hover:scale-110 active:scale-95"
-      >
-        <img key={chestPopKey} src={IMG_CHEST} alt={t("pet.chest")} draggable={false} className={`pointer-events-none block h-full w-full drop-shadow-[0_3px_5px_rgb(0_0_0/0.15)] ${chestPopKey > 0 ? "pet-chest-pop" : ""}`} />
-        {treasure > 0 ? (
-          <span className="absolute -right-1 -top-1 min-w-[15px] rounded-full bg-pet-amber-deep px-1 text-center font-mono text-[9px] leading-[15px] text-white shadow-sm">{treasure > 99 ? "99+" : treasure}</span>
-        ) : null}
-      </button>
-
-      {/* 成就徽章行（已获得才展示） */}
-      {earned.length > 0 ? (
-        <div className="absolute -left-8 bottom-8 flex gap-1">
-          {earned.map((a, i) => (
-            <span
-              key={a.threshold}
-              title={t("pet.badgeTitle", { name: t(`pet.achievements.${a.threshold}` as MessageKey), n: a.threshold })}
-              className={`flex h-[18px] w-[18px] items-center justify-center rounded-full text-[9px] leading-none shadow-sm ring-1 ${milestone?.threshold === a.threshold ? "pet-badge-in" : ""}`}
-              style={{ background: a.bg, boxShadow: `0 0 6px ${a.ring}`, ["--tw-ring-color" as string]: a.ring, animationDelay: `${i * 0.12}s` }}
-            >
-              🏅
-            </span>
-          ))}
-        </div>
-      ) : null}
+      {/* 环形附件轮盘：宝箱与成就徽章围绕阿寻分布，避免挤成一排 */}
+      <div className="pet-orbit" aria-label={t("pet.attachments")}>
+        <span className="pet-orbit-ring" aria-hidden />
+        <button
+          type="button"
+          onClick={handleChestClick}
+          title={t("pet.chestHover", { n: treasure })}
+          aria-label={t("pet.chestHover", { n: treasure })}
+          className="pet-orbit-item pet-orbit-chest"
+          style={{ ["--orbit-angle" as string]: "235deg" }}
+        >
+          <img key={chestPopKey} src={IMG_CHEST} alt={t("pet.chest")} draggable={false} className={`pointer-events-none block h-full w-full drop-shadow-[0_3px_5px_rgb(0_0_0/0.15)] ${chestPopKey > 0 ? "pet-chest-pop" : ""}`} />
+          {treasure > 0 ? (
+            <span className="absolute -right-2 -top-2 min-w-[17px] rounded-full bg-pet-amber-deep px-1 text-center font-mono text-[9px] leading-[17px] text-white shadow-sm">{treasure > 99 ? "99+" : treasure}</span>
+          ) : null}
+        </button>
+        {earned.map((a, i) => (
+          <span
+            key={a.threshold}
+            title={t("pet.badgeTitle", { name: t(`pet.achievements.${a.threshold}` as MessageKey), n: a.threshold })}
+            className={`pet-orbit-item pet-orbit-badge ${milestone?.threshold === a.threshold ? "pet-badge-in" : ""}`}
+            style={{
+              ["--orbit-angle" as string]: `${268 + i * 34}deg`,
+              background: a.bg,
+              boxShadow: `0 0 8px ${a.ring}`,
+              ["--tw-ring-color" as string]: a.ring,
+              animationDelay: `${i * 0.12}s`,
+            }}
+          >
+            🏅
+          </span>
+        ))}
+      </div>
 
       {/* 小字提示：触摸端无右键，提示长按 */}
       <p className="mt-0.5 text-center font-mono text-[9px] text-muted-foreground/60">
