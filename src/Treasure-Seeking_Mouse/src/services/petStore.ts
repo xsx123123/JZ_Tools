@@ -7,22 +7,44 @@ const KEY_THEME = "seqout-theme";
 const KEY_ACHIEVED = "seqout-pet-achievements";
 const KEY_SIZE = "seqout-pet-size";
 const KEY_ALWAYS = "seqout-pet-always";
+const KEY_IDLE_ALIVE = "seqout-pet-idle-alive";
 
-/** 桌宠尺寸档位（宽 px）：小 / 中 / 大 */
-export const PET_SIZES = [96, 144, 192] as const;
+/** 桌宠体型：连续档位（宽 px），步进 ±12，显示为相对默认 144 的百分比 */
+export const PET_SIZE_MIN = 72;
+export const PET_SIZE_MAX = 240;
+export const PET_SIZE_STEP = 12;
+export const PET_SIZE_DEFAULT = 144;
 
 export function readPetSize(): number {
   try {
-    const n = Number(localStorage.getItem(KEY_SIZE) ?? "144");
-    return (PET_SIZES as readonly number[]).includes(n) ? n : 144;
+    const n = Number(localStorage.getItem(KEY_SIZE) ?? String(PET_SIZE_DEFAULT));
+    if (!Number.isFinite(n)) return PET_SIZE_DEFAULT;
+    return Math.min(PET_SIZE_MAX, Math.max(PET_SIZE_MIN, Math.round(n)));
   } catch {
-    return 144;
+    return PET_SIZE_DEFAULT;
   }
 }
 
 export function writePetSize(n: number): void {
   try {
-    localStorage.setItem(KEY_SIZE, String(n));
+    localStorage.setItem(KEY_SIZE, String(Math.min(PET_SIZE_MAX, Math.max(PET_SIZE_MIN, Math.round(n)))));
+  } catch {
+    /* ignore */
+  }
+}
+
+/** 闲置时自己活动：关闭后阿寻安静待命（不冒泡/溜达/张望/入睡） */
+export function readPetIdleAlive(): boolean {
+  try {
+    return localStorage.getItem(KEY_IDLE_ALIVE) !== "0";
+  } catch {
+    return true;
+  }
+}
+
+export function writePetIdleAlive(b: boolean): void {
+  try {
+    localStorage.setItem(KEY_IDLE_ALIVE, b ? "1" : "0");
   } catch {
     /* ignore */
   }

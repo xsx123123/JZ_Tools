@@ -1,7 +1,7 @@
 // GEO寻宝鼠：主页（会话栏 + 对话区 + 登录弹窗 + 桌宠）
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { ChevronsLeft, ChevronsRight, Info, Menu, Moon, Sun, BarChart3, Trophy } from "lucide-react";
+import { ChevronsLeft, ChevronsRight, Info, Menu, Moon, Sun, BarChart3, PawPrint, Trophy } from "lucide-react";
 import { supabase, isOfflineMode } from "@/supabase/client";
 import type { Session } from "@supabase/supabase-js";
 import { EmptyState } from "@/components/chat/EmptyState";
@@ -11,11 +11,20 @@ import { SessionSidebar, MobileDrawerHeader } from "@/components/chat/SessionSid
 import { BrandMark } from "@/components/BrandMark";
 import { AuthDialog } from "@/components/auth/AuthDialog";
 import { TreasureMouse, makePetEvent, type PetEvent } from "@/components/pet/TreasureMouse";
+import { PetSettingsPanel } from "@/components/pet/PetSettingsPanel";
 import { onHintShown, onHintDismissed } from "@/lib/hintBus";
 import { useIsTouch } from "@/hooks/use-touch";
 import { useVisualViewport } from "@/hooks/use-visual-viewport";
 import { readTheme, writeTheme, applyTheme, type Theme } from "@/services/petStore";
-import { bumpStats } from "@/services/statsStore";
+import { bumpStats, mergeLocalStatsToAccount } from "@/services/statsStore";
+import {
+  localMe,
+  localLogout,
+  pullServerHistory,
+  pushServerHistory,
+  readLocalUser,
+  type LocalUser,
+} from "@/services/localAuth";
 import { Leaderboard } from "@/components/chat/Leaderboard";
 import { UsageStatsDialog } from "@/components/chat/UsageStatsDialog";
 import { LanguageToggle } from "@/components/LanguageToggle";
@@ -102,6 +111,7 @@ function ChatPage(): React.ReactElement {
     });
   }, []);
   const [petEvent, setPetEvent] = useState<PetEvent | null>(null); // 桌宠事件流（仅 UI 反馈，不影响消息逻辑）
+  const [petPanelOpen, setPetPanelOpen] = useState(false); // 顶栏「阿寻设置」弹层：找回阿寻 / 大小 / 常驻
   // 编号发现提示 ⇆ 桌宠联动：抽签点亮某个编号时让阿寻喊话「那里有宝藏」；
   // 用户悬停/点开该编号（提示消失）时立即收起台词，形成一来一回的对话感
   useEffect(() => {
@@ -144,6 +154,17 @@ function ChatPage(): React.ReactElement {
   }, [messages]);
   const catalogOkRef = useRef(false); // 模型目录是否加载成功；失败时发送空模型名，由服务端 LLM_MODEL 兜底，避免前端兜底模型在网关上不存在
   const user = session?.user ?? null;
+
+  // 自托管本地账号（离线模式）：启动用本地缓存立即恢复，再向服务端校验 token
+  const [localUser, setLocalUser] = useState<LocalUser | null>(() => (isOfflineMode ? readLocalUser() : null));
+  useEffect(() => {
+    if (!isOfflineMode) return;
+    void localMe().then((u) => {
+      if (u) setLocalUser(u);
+    });
+  }, []);
+  /** 有效用户：云端登录优先，其次自托管本地账号；未登录为 null */
+  const effUser = user ?? localUser;
 
   // 模型目录
   useEffect(() => {
@@ -205,6 +226,42 @@ function ChatPage(): React.ReactElement {
   const displaySessions: SessionRow[] = user
     ? sessions
     : localSessions.map((s) => ({ id: s.id, title: s.title, updated_at: new Date(s.ts).toISOString() }));
+
+  // 自托管本地登录：本地会话仍是消息状态的唯一来源，这里把整份快照防抖同步到服务端账号
+  // （localStorage 写入 ⇄ 侧栏刷新都会触发 localSessions 变化，800ms 防抖合并多次落盘）
+  useEffect(() => {
+    if (!isOfflineMode || !localUser) return;
+    const timer = setTimeout(() => {
+      void pushServerHistory(readLocalSessions().filter((s) => s.messages.length > 0)).catch(() => undefined);
+    }, 800);
+    return () => clearTimeout(timer);
+  }, [localUser, localSessions]);
+
+  // 本地登录成功：合并云端与本机会话（同 id 取较新），并把游客期累计成绩并入账号排行榜
+  async function handleLocalAuthSuccess(u: LocalUser): Promise<void> {
+    setLocalUser(u);
+    setAuthOpen(false);
+    try {
+      const remote = await pullServerHistory();
+      if (remote.length > 0) {
+        const local = readLocalSessions();
+        const merged = [...remote];
+        for (const s of local) {
+          const i = merged.findIndex((r) => r.id === s.id);
+          if (i >= 0) {
+            if ((s.ts ?? 0) > ((merged[i] as LocalSession).ts ?? 0)) merged[i] = s;
+          } else {
+            merged.push(s);
+          }
+        }
+        writeLocalSessions(merged as LocalSession[]);
+        setLocalSessions(merged.filter((s) => (s.messages?.length ?? 0) > 0).reverse() as LocalSession[]);
+      }
+    } catch {
+      /* 服务端历史不可达时保留本地现状 */
+    }
+    void mergeLocalStatsToAccount();
+  }
 
   // 切换会话时加载消息（登录走云端；未登录走本地会话）
   // 不依赖 localSessions：它被持久化 effect 高频刷新，靠 ref 读取避免流式期间整组 effect 重跑
@@ -350,7 +407,7 @@ function ChatPage(): React.ReactElement {
     // 排行榜统计上报（fire-and-forget，失败静默）
     void bumpStats(
       { treasures: statRef.current.cards, digs: statRef.current.digs, chats: 1 },
-      { isGuest: !user, userId: user?.id, username: user?.email ?? "" },
+      { isGuest: !effUser, userId: effUser?.id, username: effUser?.email ?? "" },
     );
 
     // 持久化
@@ -421,6 +478,15 @@ function ChatPage(): React.ReactElement {
 
   async function handleLogout(): Promise<void> {
     if (streaming) return;
+    if (isOfflineMode) {
+      // 自托管账号：服务端无状态会话，清本地 token 即登出；本机聊天记录保留在 localStorage
+      localLogout();
+      setLocalUser(null);
+      setMessages([]);
+      setActiveId(null);
+      setLocalId(uid());
+      return;
+    }
     await supabase.auth.signOut();
     setMessages([]);
     setActiveId(null);
@@ -449,12 +515,12 @@ function ChatPage(): React.ReactElement {
     <SessionSidebar
       sessions={displaySessions}
       activeId={activeId}
-      userLabel={user ? user.email ?? user.id.slice(0, 8) : null}
+      userLabel={user ? (user.email ?? user.id.slice(0, 8)) : (localUser?.email ?? null)}
       onSelect={selectSession}
       onNew={startNew}
       onRename={handleRename}
       onDelete={handleDelete}
-      onLogin={isOfflineMode ? undefined : () => setAuthOpen(true)}
+      onLogin={() => setAuthOpen(true)}
       onLogout={handleLogout}
       storageNote={
         user
@@ -462,7 +528,7 @@ function ChatPage(): React.ReactElement {
           : t("sidebar.guestNote", {
               n: GUEST_MAX_SESSIONS,
               d: GUEST_KEEP_DAYS,
-              loginSuffix: isOfflineMode ? "" : t("sidebar.guestNoteLogin"),
+              loginSuffix: t("sidebar.guestNoteLogin"),
             })
       }
     />
@@ -481,20 +547,24 @@ function ChatPage(): React.ReactElement {
             onClick={toggleCollapsed}
             title={t("header.expandSessions")}
             aria-label={t("header.expandSessions")}
-            className="flex h-9 w-9 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+            className="flex h-9 w-9 items-center justify-center rounded-lg text-rail-icon transition-colors hover:bg-secondary hover:text-foreground"
           >
             <ChevronsRight size={17} />
           </button>
           <span className="mt-4 flex h-8 w-8 items-center justify-center rounded-lg bg-helix-soft text-helix ring-1 ring-helix/20">
             <BrandMark size={16} />
           </span>
-          <LanguageToggle size={16} className="mt-auto" />
+          {/* 窄边条背景是浅米面板，muted-foreground 太淡近乎看不见；
+              用 rail-icon 纯色（见 styles.css：alpha 修饰符的 oklab 描边在 Chromium 有渲染 bug） */}
+          <div className="mt-auto [&_button]:text-rail-icon">
+            <LanguageToggle size={16} />
+          </div>
           <button
             type="button"
             onClick={toggleTheme}
             title={theme === "dark" ? t("header.themeDark") : t("header.themeLight")}
             aria-label={t("header.themeAria")}
-            className="mt-1.5 flex h-9 w-9 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-secondary hover:text-pet-amber-deep"
+            className="mt-1.5 flex h-9 w-9 items-center justify-center rounded-lg text-rail-icon transition-colors hover:bg-secondary hover:text-pet-amber-deep"
           >
             {theme === "dark" ? <Sun size={16} /> : <Moon size={16} />}
           </button>
@@ -570,6 +640,25 @@ function ChatPage(): React.ReactElement {
             <Info size={17} />
           </Link>
           <LanguageToggle />
+          <span className="relative">
+            <button
+              type="button"
+              onClick={() => setPetPanelOpen((o) => !o)}
+              title={t("pet.settings.gear")}
+              aria-label={t("pet.settings.gear")}
+              className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-secondary hover:text-pet-amber-deep"
+            >
+              <PawPrint size={17} />
+            </button>
+            {petPanelOpen ? (
+              <>
+                <div className="fixed inset-0 z-40" onClick={() => setPetPanelOpen(false)} />
+                <div className="absolute right-0 top-full z-50 mt-1.5">
+                  <PetSettingsPanel onClose={() => setPetPanelOpen(false)} />
+                </div>
+              </>
+            ) : null}
+          </span>
           <button
             type="button"
             onClick={toggleTheme}
@@ -579,11 +668,6 @@ function ChatPage(): React.ReactElement {
           >
             {theme === "dark" ? <Sun size={17} /> : <Moon size={17} />}
           </button>
-          {!user ? (
-            <span className={`${user ? "ml-auto" : ""} rounded-full border border-helix/20 bg-helix-soft px-2.5 py-1 font-mono text-[10.5px] text-helix`}>
-              {t("header.guestBadge")}
-            </span>
-          ) : null}
         </header>
 
         <div ref={scrollContainerRef} className="flex-1 overflow-y-auto">
@@ -618,7 +702,12 @@ function ChatPage(): React.ReactElement {
       <AuthDialog
         open={authOpen}
         onClose={() => setAuthOpen(false)}
-        onSuccess={() => {
+        onSuccess={(u) => {
+          if (u) {
+            // 自托管本地登录：保留当前画面，合并服务端历史 + 排行榜成绩
+            void handleLocalAuthSuccess(u);
+            return;
+          }
           setAuthOpen(false);
           setMessages([]);
           setActiveId(null);
@@ -628,8 +717,8 @@ function ChatPage(): React.ReactElement {
       {/* 寻宝鼠桌宠 */}
       <TreasureMouse event={petEvent} />
 
-      {/* 挖宝排行榜 */}
-      <Leaderboard open={boardOpen} onClose={() => setBoardOpen(false)} ownUserId={user?.id ?? null} />
+      {/* 挖宝排行榜：离线本地账号的 id 即邮箱，行键 u:<email> 可直接高亮"我" */}
+      <Leaderboard open={boardOpen} onClose={() => setBoardOpen(false)} ownUserId={effUser?.id ?? null} />
       <UsageStatsDialog open={statsOpen} onClose={() => setStatsOpen(false)} />
     </div>
   );

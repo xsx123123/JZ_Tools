@@ -8,6 +8,71 @@ const KEY_POKE = "seqout-pet-poke";
 const KEY_TREASURE = "seqout-pet-treasure";
 const KEY_THEME = "seqout-theme";
 const KEY_ACHIEVED = "seqout-pet-achievements";
+const KEY_SIZE = "seqout-pet-size";
+const KEY_ALWAYS = "seqout-pet-always";
+const KEY_IDLE_ALIVE = "seqout-pet-idle-alive";
+
+/** 桌宠体型：连续值（宽 rpx），步进 ±12，显示为相对默认 144 的百分比 */
+export const PET_SIZE_MIN = 72;
+export const PET_SIZE_MAX = 240;
+export const PET_SIZE_STEP = 12;
+export const PET_SIZE_DEFAULT = 144;
+
+function clampPetSize(n: number): number {
+  return Math.min(PET_SIZE_MAX, Math.max(PET_SIZE_MIN, Math.round(n)));
+}
+
+export function readPetSize(): number {
+  try {
+    const n = Number(getItem(KEY_SIZE) ?? String(PET_SIZE_DEFAULT));
+    if (!Number.isFinite(n)) return PET_SIZE_DEFAULT;
+    return clampPetSize(n);
+  } catch {
+    return PET_SIZE_DEFAULT;
+  }
+}
+
+export function writePetSize(n: number): void {
+  try {
+    setItem(KEY_SIZE, String(clampPetSize(n)));
+  } catch {
+    /* ignore */
+  }
+}
+
+/** 闲置时自己活动：关闭后阿寻安静待命（不冒泡/探头/入睡） */
+export function readPetIdleAlive(): boolean {
+  try {
+    return getItem(KEY_IDLE_ALIVE) !== "0";
+  } catch {
+    return true;
+  }
+}
+
+export function writePetIdleAlive(b: boolean): void {
+  try {
+    setItem(KEY_IDLE_ALIVE, b ? "1" : "0");
+  } catch {
+    /* ignore */
+  }
+}
+
+/** 是否一直存在：关闭后阿寻闲置时会自动藏起来（流式互动会再出现），可经设置找回 */
+export function readPetAlways(): boolean {
+  try {
+    return getItem(KEY_ALWAYS) !== "0";
+  } catch {
+    return true;
+  }
+}
+
+export function writePetAlways(b: boolean): void {
+  try {
+    setItem(KEY_ALWAYS, b ? "1" : "0");
+  } catch {
+    /* ignore */
+  }
+}
 
 export interface PetPos {
   x: number; // 距视口左缘 px

@@ -39,14 +39,18 @@ export const en = {
   "sidebar.guestNoteLogin": "; sign in to keep them forever",
 
   // ---- 空态 ----
+  "empty.headline": "GEO Treasure Mouse · your lab-mate for bio-discovery",
+  "empty.subHeadline":
+    "“No labyrinths, just treasure. Name a topic and Muse dons its miner hat and digs!”",
   "empty.intro":
-    "Tell Muse which lode to dig. Its nose is sharp — it dives into GEO, SRA, ENA and GSA, sniffs out high-impact datasets, chews through cryptic accessions, and drops a bundle of samples right at your feet.",
+    "Muse's little nose is razor-sharp! It dives into GEO, SRA, ENA and GSA, sniffs out high-impact datasets, chews through cryptic accessions, and drops a bundle of sample treasures right at your feet.",
+  "empty.groupFit": "For: {caption}",
 
   // ---- 输入区 ----
   "composer.placeholder":
-    "Tell Muse where to dig, e.g. single-cell RNA-seq datasets of mouse heart development… (Enter to send)",
+    "Tell Muse what to dig, e.g. “help me find human brain RNA-seq related to Alzheimer's”…",
   "composer.stop": "Stop generating",
-  "composer.send": "Send",
+  "composer.send": "⛏ Dig",
   "composer.disclaimer":
     "Muse's treasures are retrieved from global public omics databases — check the original NCBI / NGDC entries for details",
 
@@ -115,6 +119,25 @@ export const en = {
   "pet.foundData": "Found {n} datasets!",
   "pet.worthIt": "Worth the dig!",
   "pet.readNoReply": "…squeak… (seen, not replying)",
+  "pet.settings.gear": "Pet settings",
+  "pet.settings.title": "Muse settings",
+  "pet.settings.close": "Close",
+  "pet.settings.size": "Size",
+  "pet.settings.sizeDesc": "Adjust Muse's size on screen",
+  "pet.settings.shrink": "Shrink",
+  "pet.settings.grow": "Grow",
+  "pet.settings.quiet": "Hide from desktop",
+  "pet.settings.quietDesc": "Only a small recall entry stays in the corner; bring Muse back anytime",
+  "pet.settings.idle": "Wander when idle",
+  "pet.settings.idleDesc": "When off, Muse waits quietly — no bubbles, strolls or naps",
+  "pet.settings.always": "Always around",
+  "pet.settings.alwaysDesc": "When off, Muse hides after being idle",
+  "pet.settings.reset": "Reset position",
+  "pet.settings.resetDesc": "Put Muse back at the default bottom-right spot",
+  "pet.settings.resetBtn": "Reset",
+  "pet.settings.recall": "Bring Muse back",
+  "pet.settings.treasure": "{n} treasures stashed",
+  "pet.settings.note": "These preferences live in this browser only — change them anytime here.",
   "pet.achievements.10": "First-Gen Digger",
   "pet.achievements.50": "Lode Veteran",
   "pet.achievements.100": "Omics Gold King",

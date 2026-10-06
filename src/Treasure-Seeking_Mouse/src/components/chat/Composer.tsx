@@ -1,7 +1,8 @@
-// 对话输入区：多行输入 + 模型选择 + 发送/停止
+// 对话输入区（下铲指挥台）：多行输入 + 模型选择 + 下铲/停止
 import { useEffect, useRef, useState } from "react";
-import { Send, Square } from "lucide-react";
+import { Shovel, Square } from "lucide-react";
 import { useI18n } from "@/i18n/provider";
+import { emitPetTyping } from "@/lib/petBus";
 
 export function Composer({
   models,
@@ -31,6 +32,12 @@ export function Composer({
     ta.style.height = `${Math.min(ta.scrollHeight, 160)}px`;
   }, [value]);
 
+  // 输入联动：有字符时阿寻竖起耳朵随时准备出发（桌宠经 petBus 感知）
+  useEffect(() => {
+    emitPetTyping(value.trim().length > 0);
+    return () => emitPetTyping(false);
+  }, [value]);
+
   function submit(): void {
     const t = value.trim();
     if (!t || streaming || disabled) return;
@@ -41,7 +48,7 @@ export function Composer({
   return (
     <div className="safe-b border-t border-border bg-background/80 px-4 py-3 backdrop-blur-sm sm:px-6">
       <div className="mx-auto max-w-3xl">
-        <div className="flex items-end gap-2 rounded-xl border border-border bg-card p-2 shadow-soft transition-all focus-within:border-helix focus-within:ring-2 focus-within:ring-helix/20 focus-within:shadow-[0_1px_3px_0_rgb(0_0_0/0.04),0_8px_24px_-12px_oklch(0.6_0.118_184.704/0.25)]">
+        <div className="flex items-end gap-2 rounded-xl border border-border bg-card p-2 shadow-soft transition-all focus-within:border-miner-green focus-within:ring-2 focus-within:ring-miner-green/20 focus-within:shadow-[0_1px_3px_0_rgb(0_0_0/0.04),0_8px_24px_-12px_rgb(21_128_61/0.25)]">
           <textarea
             ref={taRef}
             rows={1}
@@ -71,10 +78,11 @@ export function Composer({
               type="button"
               onClick={submit}
               disabled={!value.trim() || disabled}
-              title={t("composer.send")}
-              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground shadow-sm transition-all hover:bg-[oklch(0.53_0.11_184.7)] active:scale-95 disabled:cursor-not-allowed disabled:opacity-40"
+              title={t("composer.sendAria")}
+              className="flex h-9 shrink-0 items-center gap-1.5 justify-center rounded-lg bg-miner-green px-3 text-[13px] font-medium text-white shadow-sm transition-all hover:bg-miner-green-hover active:scale-95 disabled:cursor-not-allowed disabled:opacity-40"
             >
-              <Send size={15} />
+              <Shovel size={15} />
+              <span className="hidden sm:inline">{t("composer.send")}</span>
             </button>
           )}
         </div>
@@ -84,7 +92,7 @@ export function Composer({
             <select
               value={model}
               onChange={(e) => onModelChange(e.target.value)}
-              className="rounded-md border border-border bg-card px-2 py-1 font-mono text-[11.5px] text-muted-foreground shadow-sm outline-none transition-colors hover:border-helix/50 focus:border-helix"
+              className="rounded-md border border-border bg-card px-2 py-1 font-mono text-[11.5px] text-muted-foreground shadow-sm outline-none transition-colors hover:border-miner-green/50 focus:border-miner-green"
             >
               {models.map((m) => (
                 <option key={m} value={m}>{m}</option>

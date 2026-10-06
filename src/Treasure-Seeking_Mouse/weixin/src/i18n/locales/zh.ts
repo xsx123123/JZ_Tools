@@ -38,14 +38,17 @@ export const zh = {
   "sidebar.guestNoteLogin": "；登录可云端永久保存",
 
   // ---- 空态 ----
+  "empty.headline": "GEO 寻宝鼠 · 你的同门生信探险搭子",
+  "empty.subHeadline": "“不查迷宫，只挖宝藏。随口说出课题，阿寻戴上矿工帽这就下铲！”",
   "empty.intro":
-    "告诉阿寻你想挖哪片矿脉，它的小鼻子可灵了！一头扎进 GEO、SRA、ENA、GSA 数据库里刨拉半天，不仅能嗅出高分数据集、啃透繁杂编号，还能把打包好的样本宝藏一口气叼到你跟前。",
+    "阿寻的小鼻子可灵了！一头扎进 GEO、SRA、ENA、GSA 数据库里刨拉半天，不仅能嗅出高分数据集、啃透繁杂编号，还能把打包好的样本宝藏一口气叼到你跟前。",
+  "empty.groupFit": "适合：{caption}",
 
   // ---- 输入区 ----
   "composer.placeholder":
-    "告诉阿寻去哪儿挖宝，如：搜索小鼠心脏发育的单细胞测序数据集…（Enter 发送）",
+    "随口告诉阿寻你想挖什么，比如：“帮我找找阿尔茨海默病相关的人脑 RNA-seq”…",
   "composer.stop": "停止生成",
-  "composer.send": "发送",
+  "composer.send": "⛏ 下铲挖宝",
   "composer.disclaimer": "阿寻挖的宝藏检索自全球公共组学数据库，具体信息请以 NCBI / NGDC 原始条目为准",
 
   // ---- 消息 ----
@@ -113,6 +116,25 @@ export const zh = {
   "pet.foundData": "找到 {n} 份数据!",
   "pet.worthIt": "这一铲，值了!",
   "pet.readNoReply": "…吱…（已读不回）",
+  "pet.settings.gear": "桌宠设置",
+  "pet.settings.title": "阿寻设置",
+  "pet.settings.close": "关闭",
+  "pet.settings.size": "体型大小",
+  "pet.settings.sizeDesc": "调整阿寻在桌面上的尺寸",
+  "pet.settings.shrink": "缩小",
+  "pet.settings.grow": "放大",
+  "pet.settings.quiet": "从桌面收起",
+  "pet.settings.quietDesc": "收起后只在右下角留一个小入口，随时可召回",
+  "pet.settings.idle": "闲置时自己活动",
+  "pet.settings.idleDesc": "关闭后阿寻会安静待命，不再冒泡与溜达",
+  "pet.settings.always": "一直存在",
+  "pet.settings.alwaysDesc": "关闭后，闲置时阿寻会自己藏起来",
+  "pet.settings.reset": "位置复位",
+  "pet.settings.resetDesc": "把阿寻放回右下角默认位置",
+  "pet.settings.resetBtn": "复位",
+  "pet.settings.recall": "找回阿寻",
+  "pet.settings.treasure": "已囤 {n} 份宝藏",
+  "pet.settings.note": "这些偏好只保存在本机浏览器，随时可在设置里改回。",
   "pet.achievements.10": "初代寻宝鼠",
   "pet.achievements.50": "矿脉老手",
   "pet.achievements.100": "组学淘金王",

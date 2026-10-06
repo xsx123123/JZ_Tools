@@ -3,6 +3,107 @@
 > 记录每轮从主仓库到小程序版的同步。体例参照 `../qmuse/MIGRATION.md`：
 > 每条记 `R<n> — 日期 — 源 commit`。
 
+## R8 — 2026-10-06 桌宠设置面板行式重设计 + 连续体型/闲置自活动（源：主仓库 PetSettingsPanel 重写，参考 docs/2026-10-06_14.04.23.png）
+
+### 本轮做了什么
+
+对齐 Web 版设置面板的行式重设计：三档分段改为连续体型步进（72–240 步进 ±12，百分比读数），
+新增「从桌面收起」（= 静默，switch 直控）与「闲置时自己活动」（idleAlive，关闭则闲置剧场
+整体停演）两行，面板自身经 petBus 回同步桌宠侧改动（长按静默等）。i18n `pet.settings.*`
+由 11 键变为 19 键（删 sizeS/sizeM/sizeL 与旧 quiet 文案，新增 close/sizeDesc/shrink/grow/
+quiet(从桌面收起)/quietDesc/idle/idleDesc/reset/resetDesc/resetBtn/note），与主仓库逐字一致。
+
+### 文件级结果
+
+| 文件 | 处理 |
+|---|---|
+| `src/services/petStore.ts` | 删 `PET_SIZES` 三档常量；新增 `PET_SIZE_MIN/MAX/STEP/DEFAULT = 72/240/12/144`，`readPetSize`/`writePetSize` 改 clamp [72,240]（不再校验档位）；新增 `readPetIdleAlive`/`writePetIdleAlive`（key `seqout-pet-idle-alive`，默认 true）；`readPetAlways` 不变 |
+| `src/lib/petBus.ts` | 加 `emitPetResetPos`/`onPetResetPos`（位置复位通道）。主仓库另有 typing 输入联动通道，属另一轮改造，本轮不同步 |
+| `src/components/PetSettingsPanel.tsx` | 🔧 整体重写为行式设计（参考图同款）：标题栏 🐾+关闭 / 体型行（‹ › 步进 + 百分比读数，边界禁用）/ 从桌面收起 switch（on→emitPetQuiet / off→emitPetRecall）/ 闲置时自己活动 switch / 一直存在 switch / 底部找回阿寻通栏 + 宝藏计数 + 本机说明小字；面板 `useEffect` 订阅 settingsChanged 回同步 size/always/idleAlive/quiet |
+| `src/components/TreasureMouse.tsx` | 加 `idleAlive` state + `idleAliveRef`；settingsChanged 监听加 `setIdleAlive(readPetIdleAlive())`；闲置剧场 effect 早退改 `quiet || !idleAliveRef.current`（整个闲置 interval 停演，含闲置自藏/入睡，与 Web 版单 effect 行为一致），deps 加 `idleAlive`；`toggleQuiet` 末尾加 `emitPetSettingsChanged()`（长按静默后面板「从桌面收起」开关回同步） |
+| `src/components/pet.css` | `.petset*` 全部重写为行式体系（head/row/icon/main/divider/steppers/pct/foot/note，宽 600rpx ≈ 300px）；删三档分段与旧 always/quiet 样式；switch 尺寸微调（80×44rpx，行程 38rpx）；`.petset-dialog` 容器 max-width 620rpx |
+| `src/i18n/locales/{zh,en}.ts` | `pet.settings.*` 块整段替换为与主仓库逐字一致（各 19 键；字典总数各 236 → 247，键数保持一致） |
+| `src/pages/index/index.tsx` | 无改动（面板组件 API 不变，顶栏 ⚙️ 与弹层骨架复用 R7） |
+
+### 差异决策（相对 Web 版）
+
+- **「位置复位」行省略**：Web 版复位的是 pointer 拖拽产生的 pos（存 localStorage）；小程序版 R3 起
+  桌宠位置固定在 CSS（right:24rpx/bottom:240rpx），无拖拽、无 pos 消费方，复位无可作用对象。
+  `petBus` 仍保留 resetPos 通道与主仓库同名同形，日后加拖拽可无缝接上；i18n 三个 reset 键保留（键 parity）。
+- **typing 输入联动不同步**：主仓库 petBus 的 `emitPetTyping`/`onPetTyping`（输入时桌宠竖耳跃动
+  `pet-ears-perk`）与气泡轮播（cycleBubble/idleLineIdx）属另一轮改造，本轮不在清单内，未同步。
+- **闲置自活动关闭时连带停掉闲置自藏**：Web 版隐藏/入睡/冒泡/探头在同一个闲置 interval 里，
+  `!idleAlive` 早退整 effect——小程序版逐字对齐该行为（不是只停冒泡）。
+- 面板宽 300px → 600rpx（750rpx 设计屏宽下 1:1）；宠物上方锚定，右缘对齐宠物右缘，手机屏不溢出。
+- 步进按钮用字符 ‹ ›（Web 版 lucide Minimize2/Maximize2 无小程序等价），边界禁用用 `.petset__step--off`（opacity 0.35）。
+
+### 验证结果（本轮实测）
+
+| 项 | 结果 |
+|---|---|
+| `npm run typecheck` | ✅ 通过 |
+| `npm run build:weapp` | ✅ Compiled successfully，dist **776KB**（+8KB < 30KB 验收线） |
+| 产物资源 | ✅ `index.wxss` 含 `petset__row` 新体系；`dist/common.js` 含「从桌面收起」/「Wander when idle」文案 |
+| `node scripts/verify-stream.mjs` | ✅ 仍 11 case 全过 |
+| `grep oklch(/color-mix(` | ✅ 0 |
+| `grep window./document./localStorage/navigator./getReader` | ✅ 0 |
+| i18n 字典 | ✅ zh/en 各 247 键（236+11），键数一致；`pet.settings.*` 19 键与主仓库逐字一致（脚本比对 identical） |
+
+### 踩坑记录（本轮新增）
+
+- 无新坑。注意与主仓库 locales 全量 diff 里有 about/auth/sidebar.compass 等 20+ 键差异，
+  均为其他轮次的功能（关于页/自托管账号/侧栏指南等），勿在桌宠轮顺手「补齐」。
+
+## R7 — 2026-10-06 桌宠设置面板（尺寸三档 / 一直存在 / 找回与静默）（源：主仓库 `src/components/pet/PetSettingsPanel.tsx` + `petBus.ts` + 桌宠 R7 改造）
+
+### 本轮做了什么
+
+对齐 Web 版桌宠「设置面板」功能：`petStore` 新增尺寸档位（96/144/192）与「一直存在」偏好，
+新增迷你 pub/sub `petBus.ts`（设置变更 / 找回阿寻 / 静默三通道），新组件 `PetSettingsPanel`。
+桌宠侧接入尺寸动态化（rpx 内联）、闲置 15s 自动隐藏（关闭「一直存在」时）、
+常驻齿轮（替代 Web 版 hover 显现）与设置面板；顶栏加 ⚙️ 入口开同款面板（找回/静默经 petBus
+直达桌宠，宠物被遮罩盖住也能响应）。i18n 新增 11 键 `pet.settings.*`（中英各 225 → 236）。
+
+### 文件级结果
+
+| 文件 | 处理 |
+|---|---|
+| `src/services/petStore.ts` | 加 `PET_SIZES`/`readPetSize`/`writePetSize`（key `seqout-pet-size`，默认 144）/`readPetAlways`/`writePetAlways`（key `seqout-pet-always`，默认 true），存储走 device 层，与 Web 版键名/默认值/校验口径一致（单位注释为 rpx） |
+| `src/lib/petBus.ts` | ✅ 新增：与主仓库逐字一致（纯 TS 零平台依赖），on* 返回退订函数 |
+| `src/components/PetSettingsPanel.tsx` | 🔧 改写：Taro View/Text；lucide 图标 → emoji（🐾/🔇）；原生 checkbox → 自绘 switch（View + `--on` 类切换，避免 CheckboxGroup 重量）；找回/大小/一直存在/静默/宝藏计数布局对齐 Web 版 |
+| `src/components/TreasureMouse.tsx` | 🔧 接入 R7：`sizePref`/`always`/`hidden`/`panelOpen` state + `alwaysRef`；挂 onPetSettingsChanged（重读 size/always，always 为真清 hidden，更新 lastAct）/onPetRecall（清 stateTimer + 退出 quiet/hidden 回 idle）/onPetQuiet（进 quiet）；「有剧情开演收起面板」effect；事件 effect 开头 `setHidden(false)`；闲置 interval 加 `!always && 闲置>15s → hidden` 分支；`hidden` 时 return null；常驻 ⚙️ 齿轮挂宠物右上角（点开面板锚在宠物正上方，点开时顺带清气泡避免遮挡） |
+| `src/pages/index/index.tsx` | 🔧 顶栏加 ⚙️ icon-btn；面板走既有弹层模式（`.dialog-wrap` + `.mask` 遮罩点击关闭，z-50），找回/静默不依赖宠物可见性 |
+| `src/components/pet.css` | 加 `.pet__gear`（常驻半透，`:active` 全亮）/`.pet__panel`（锚宠物上方）/`.petset*` 全套（分段/自绘 switch/底部计数）；色值全走 var token |
+| `src/i18n/locales/{zh,en}.ts` | 各加 11 键 `pet.settings.{gear,title,size,sizeS,sizeM,sizeL,always,alwaysDesc,quiet,recall,treasure}`，文案与主仓库逐字一致 |
+
+### 差异决策（相对 Web 版）
+
+- **hover → 常驻**：Web 版齿轮 `opacity-0 group-hover:opacity-100`；小程序无 hover → 常驻半透（0.85），`:active` 全亮。
+- **尺寸单位与移动端封顶**：Web 版尺寸为 px 且移动端 `min(sizePref, 120)`；小程序版尺寸为 rpx（96/144/192rpx，
+  CSS 默认 144rpx 不变），rpx 本就随屏宽缩放，标准屏 192rpx ≈ 96px < 120px 封顶线，故不再额外 cap
+  （平板大屏可能略超，可接受）。
+- **clampPos/拖拽**：Web 版 `clampPos(p, size)` 为 pointer 拖拽服务，小程序版 R3 起无拖拽，无调用点可补，省略。
+- **checkbox → 自绘 switch**：小程序 Checkbox 需包 CheckboxGroup 才有样式语义，自绘 switch（仅类选择器）更轻。
+- **顶栏面板形态**：Web 版顶栏是「点击捕捉层 + 按钮下方下拉」；小程序版复用 R3 既有 `.dialog-wrap`+`.mask`
+  居中弹层模式（z-50），交互等价且与统计/排行榜弹窗一致。
+- 宠物静默态（🐭 角落唤回钮）维持 R3 形态，与 Web 版 quiet 小圆钮语义一致。
+
+### 验证结果（本轮实测）
+
+| 项 | 结果 |
+|---|---|
+| `npm run typecheck` | ✅ 通过 |
+| `npm run build:weapp` | ✅ Compiled successfully，dist **768KB**（+8KB < 30KB 验收线） |
+| 产物资源 | ✅ `dist/pages/index/index.wxss` 含 `petset`/`pet__gear`；`dist/common.js` 与 `index.js` 含「找回阿寻」/「treasures stashed」文案 |
+| `node scripts/verify-stream.mjs` | ✅ 仍 11 case 全过 |
+| `grep oklch(/color-mix(` | ✅ 0 |
+| `grep window./document./localStorage/navigator./getReader` | ✅ 0 |
+| i18n 字典 | ✅ zh/en 各 236 键（225+11），键数一致；`pet.settings.*` 11 键逐字对齐主仓库 |
+
+### 踩坑记录（本轮新增）
+
+- 无新坑。注意 rpx 内联样式写字符串（`` `${size}rpx` ``）直接透传，Taro 不做单位转换。
+
 ## R6 — 2026-10-06 桌宠 10 新造型 + 入睡/探头状态（源：主仓库 `src/components/pet/TreasureMouse.tsx` 多造型改造）
 
 ### 本轮做了什么

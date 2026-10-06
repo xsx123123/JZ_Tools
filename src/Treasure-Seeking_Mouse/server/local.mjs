@@ -31,6 +31,11 @@ try {
 // 2) 再加载 Edge Function 模块（Node 24 原生 type-stripping 直接跑 .ts）
 const { handler, restoreUsageStats, dumpUsageStats } = await import(pathToFileURL(resolve(root, 'functions/seqout-chat/index.ts')).href);
 
+// 2b) 自托管账号体系：注册/登录/历史快照/排行榜（数据与统计同卷，见 DATA_DIR）
+const { createAccountApi, defaultDataDir } = await import(pathToFileURL(resolve(here, 'account-api.mjs')).href);
+const accountApi = createAccountApi({ dataDir: defaultDataDir(root) });
+const ACCOUNT_ROUTES = ['/auth/', '/history', '/leaderboard', '/stats/'];
+
 // 使用统计持久化：启动时恢复上次快照，之后每 15s 有变化就落盘（tmp + rename，防写一半）
 // 路径可用 STATS_FILE 覆盖（Docker 挂载命名卷到 /app/data，容器重建不丢统计）
 const STATS_FILE = process.env.STATS_FILE || resolve(root, 'server/.stats.json');
@@ -57,8 +62,8 @@ const PORT = Number(process.env.CHAT_API_PORT || 8787);
 const HOST = process.env.CHAT_API_HOST || '127.0.0.1';
 const CORS = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Methods': 'GET,POST,OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type,Authorization,OneDay-App-Id,X-Meoo-Project-Url-Id',
+  'Access-Control-Allow-Methods': 'GET,POST,PUT,DELETE,OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type,Authorization,OneDay-App-Id,X-Meoo-Project-Url-Id,X-Stats-Actor',
 };
 
 const MAX_BODY = 1024 * 1024; // 请求体上限 1MB（对话请求远小于此，防异常大请求打满内存）
@@ -83,6 +88,12 @@ createServer(async (req, res) => {
     for (const [k, v] of Object.entries(req.headers)) {
       if (v === undefined) continue;
       headers[k] = Array.isArray(v) ? v.join(', ') : v;
+    }
+    const pathname = new URL(req.url, `http://localhost:${PORT}`).pathname;
+    if (ACCOUNT_ROUTES.some((r) => pathname.startsWith(r))) {
+      for (const [k, v] of Object.entries(CORS)) res.setHeader(k, v); // dev 跨域（3015 → 8788）需要
+      const handled = await accountApi(req, res, pathname, Buffer.concat(chunks).toString('utf8'));
+      if (handled !== false) return;
     }
     const request = new Request(`http://localhost:${PORT}${req.url}`, {
       method: req.method,

@@ -60,21 +60,52 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 120rpx 40rpx;
+  padding: 60rpx 32rpx;
+}
+
+.chat__empty-hero {
+  width: 100%;
+  padding: 48rpx 36rpx;
+  background-color: var(--card);
+  border: 1rpx solid var(--border);
+  border-radius: 32rpx;
+  box-shadow: 0 8rpx 40rpx -4rpx rgba(120, 113, 108, 0.08);
 }
 
 .chat__empty-title {
+  display: block;
   font-size: 40rpx;
-  font-weight: 600;
+  font-weight: 700;
   color: var(--foreground);
+  text-align: center;
+}
+
+.chat__empty-title-green {
+  color: var(--miner-green);
+}
+
+.chat__empty-title-gold {
+  color: var(--gold);
+}
+
+.chat__empty-sub {
+  display: block;
+  margin-top: 20rpx;
+  font-size: 26rpx;
+  color: var(--muted-foreground);
+  text-align: center;
 }
 
 .chat__empty-desc {
-  margin-top: 24rpx;
+  display: block;
+  margin-top: 28rpx;
+  padding: 28rpx 24rpx;
   font-size: 26rpx;
   line-height: 1.7;
   color: var(--muted-foreground);
   text-align: center;
+  background-color: var(--secondary);
+  border-radius: 24rpx;
 }
 
 /* 消息 */

@@ -6,12 +6,17 @@
 //     mouse-sniff 已拷入 assets 备 look 状态启用），
 //     <Image> + theme.css 已有 .pet-* CSS 关键帧（idle 浮动/挖掘/跳跃/转圈/庆祝/探头/入睡呼吸）
 //   - 拖拽与闲置散步省略（无 pointer 事件体系，价值/成本比低）；静音改成长按 600ms
+//   - R7/R8：连续体型（72–240 步进 ±12）/ 一直存在（闲置 15s 自动藏）/ 闲置自活动 / 设置面板
+//     （常驻齿轮，无 hover；R8 行式重设计），走 petBus 与页面层互通
 //   - 状态机/事件协议（makePetEvent 的 seq 去重、cards/done 重复计数防护、成就里程碑）与网页版一致
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { View, Text, Image } from '@tarojs/components'
 import {
   readPetQuiet,
   writePetQuiet,
+  readPetSize,
+  readPetAlways,
+  readPetIdleAlive,
   bumpPokeCount,
   readTreasureCount,
   addTreasure,
@@ -20,6 +25,8 @@ import {
   earnedAchievements,
   type Achievement,
 } from '@/services/petStore'
+import { onPetSettingsChanged, onPetRecall, onPetQuiet, emitPetSettingsChanged } from '@/lib/petBus'
+import { PetSettingsPanel } from '@/components/PetSettingsPanel'
 import { useI18n } from '@/i18n/provider'
 import { petLines, type MessageKey } from '@/i18n'
 import IMG_BASE from '@/assets/pet/mouse-base.webp'
@@ -61,9 +68,17 @@ interface Heart {
 }
 let heartId = 0
 
-export function TreasureMouse({ event, dark }: { event: PetEvent | null; dark?: boolean }): React.ReactElement {
+export function TreasureMouse({ event, dark }: { event: PetEvent | null; dark?: boolean }): React.ReactElement | null {
   const { t, lang } = useI18n()
   const L = petLines(lang)
+  // R7：尺寸档位（rpx）/ 一直存在 / 闲置隐藏 / 设置面板。小程序 rpx 已随屏宽缩放，
+  // 192rpx 在标准屏 ≈ 96px < 网页版移动端 120px 封顶，故不再额外 cap
+  const [sizePref, setSizePref] = useState<number>(() => readPetSize())
+  const [always, setAlways] = useState<boolean>(() => readPetAlways())
+  const [idleAlive, setIdleAlive] = useState<boolean>(() => readPetIdleAlive()) // 闲置时自己活动（冒泡/探头/入睡）
+  const [hidden, setHidden] = useState(false)
+  const [panelOpen, setPanelOpen] = useState(false) // 常驻齿轮设置面板
+  const size = sizePref // 实际渲染宽度（rpx）
   const [quiet, setQuiet] = useState<boolean>(() => readPetQuiet())
   const [state, setState] = useState<PetState>('idle')
   const [bubble, setBubble] = useState<string | null>(null)
@@ -81,6 +96,47 @@ export function TreasureMouse({ event, dark }: { event: PetEvent | null; dark?: 
   const pokeStreak = useRef<{ n: number; at: number }>({ n: 0, at: 0 })
   const countedRef = useRef(false)
   const longPressRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const alwaysRef = useRef(always)
+  alwaysRef.current = always
+  const idleAliveRef = useRef(idleAlive)
+  idleAliveRef.current = idleAlive
+
+  // 页面层设置入口（顶栏 ⚙️ / 宠物常驻齿轮）⇆ 桌宠：改设置即时生效、找回退出静默与隐藏
+  useEffect(() => {
+    const offSettings = onPetSettingsChanged(() => {
+      lastAct.current = Date.now() // 用户在调设置，别睡着了/藏起来
+      setSizePref(readPetSize())
+      setAlways(readPetAlways())
+      setIdleAlive(readPetIdleAlive())
+      if (readPetAlways()) setHidden(false)
+    })
+    const offRecall = onPetRecall(() => {
+      lastAct.current = Date.now()
+      if (stateTimer.current) clearTimeout(stateTimer.current)
+      writePetQuiet(false)
+      setQuiet(false)
+      setHidden(false)
+      setState('idle')
+      setBubble(null)
+    })
+    const offQuiet = onPetQuiet(() => {
+      writePetQuiet(true)
+      setQuiet(true)
+      setPanelOpen(false)
+      setState('idle')
+      setBubble(null)
+    })
+    return () => {
+      offSettings()
+      offRecall()
+      offQuiet()
+    }
+  }, [])
+
+  // 有剧情开演时收起设置面板
+  useEffect(() => {
+    if (state !== 'idle' && panelOpen) setPanelOpen(false)
+  }, [state, panelOpen])
 
   /** 临时状态：ms 后回 idle */
   const transient = useCallback((s: PetState, line: string | null, ms: number) => {
@@ -145,6 +201,7 @@ export function TreasureMouse({ event, dark }: { event: PetEvent | null; dark?: 
     if (event.seq <= lastSeq.current) return
     lastSeq.current = event.seq
     lastAct.current = Date.now()
+    setHidden(false) // 「一直存在」关闭时，有互动就回来
     if (state === 'sleep') { // 有动静就醒
       setState('idle')
       setBubble(null)
@@ -177,11 +234,17 @@ export function TreasureMouse({ event, dark }: { event: PetEvent | null; dark?: 
   }, [event, quiet, transient, state, revealStow, L, t])
 
   // 闲置剧场：45s 无互动入睡 / 偶尔冒一句台词 / 探头张望（无 DOM 散步动画，简化为气泡与探头）
+  // 关掉「闲置时自己活动」时整个闲置剧场（含闲置自藏/入睡）都停演，与网页版单 effect 行为一致
   useEffect(() => {
-    if (quiet) return
+    if (quiet || !idleAliveRef.current) return
     idleTimer.current = setInterval(() => {
       if (state === 'sleep') return // 睡着时保持安静，等互动唤醒
       if (state !== 'idle') return // 有剧情在演，闲置行为让路
+      // 未开「一直存在」：闲置 15s 后藏起来（互动/流式事件/找回会叫它回来）
+      if (!alwaysRef.current && Date.now() - lastAct.current > 15_000) {
+        setHidden(true)
+        return
+      }
       // 45s 无互动 → 趴在土堆上睡着
       if (Date.now() - lastAct.current > 45_000) {
         setState('sleep')
@@ -200,7 +263,7 @@ export function TreasureMouse({ event, dark }: { event: PetEvent | null; dark?: 
       if (idleTimer.current) clearInterval(idleTimer.current)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [quiet, state, lang, transient])
+  }, [quiet, idleAlive, state, lang, transient])
 
   useEffect(
     () => () => {
@@ -217,6 +280,7 @@ export function TreasureMouse({ event, dark }: { event: PetEvent | null; dark?: 
       setState('idle')
       setBubble(null)
     }
+    emitPetSettingsChanged() // 通知设置面板刷新「从桌面收起」开关等状态
   }
 
   function handlePoke(): void {
@@ -270,6 +334,8 @@ export function TreasureMouse({ event, dark }: { event: PetEvent | null; dark?: 
     }
   }
 
+  if (hidden) return null // 「一直存在」关闭时的闲置隐藏，经顶栏/设置面板「找回阿寻」恢复
+
   if (quiet) {
     return (
       <Text className='pet__recall' onClick={() => toggleQuiet(false)}>
@@ -320,7 +386,23 @@ export function TreasureMouse({ event, dark }: { event: PetEvent | null; dark?: 
                     : IMG_BASE
 
   return (
-    <View className='pet'>
+    <View className='pet' style={{ width: `${size}rpx` }}>
+      {/* 常驻设置齿轮（小程序无 hover，替代网页版 hover 显现），点开为与顶栏同款的设置面板 */}
+      <Text
+        className='pet__gear'
+        onClick={() => {
+          setBubble(null)
+          setPanelOpen((o) => !o)
+        }}
+      >
+        ⚙️
+      </Text>
+      {panelOpen ? (
+        <View className='pet__panel'>
+          <PetSettingsPanel onClose={() => setPanelOpen(false)} />
+        </View>
+      ) : null}
+
       {milestone ? (
         <View className='pet__bubble'>
           <View className='pet-banner'>
@@ -336,7 +418,7 @@ export function TreasureMouse({ event, dark }: { event: PetEvent | null; dark?: 
         </View>
       ) : null}
 
-      <View className='pet__stage'>
+      <View className='pet__stage' style={{ width: `${size}rpx` }}>
         {hearts.map((h) => (
           <Text key={h.id} className='pet-heart'>
             {h.glyph}
@@ -365,7 +447,7 @@ export function TreasureMouse({ event, dark }: { event: PetEvent | null; dark?: 
         ) : null}
 
         <View className={animCls} onTouchStart={onTouchStart} onTouchEnd={onTouchEnd} onClick={handlePoke}>
-          <Image className='pet__img' src={imgSrc} mode='aspectFit' />
+          <Image className='pet__img' src={imgSrc} mode='aspectFit' style={{ width: `${size}rpx`, height: `${size}rpx` }} />
         </View>
 
         {state === 'reveal' && gemCount !== null ? (

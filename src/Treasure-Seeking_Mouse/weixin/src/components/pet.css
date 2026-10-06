@@ -111,6 +111,230 @@
   color: var(--muted-foreground);
 }
 
+/* ---------- R7：设置面板（网页版悬浮齿轮 hover 显现 → 小程序常驻半透） ---------- */
+
+/* 常驻齿轮：叠在宠物右上角，无 hover 故常显 */
+.pet__gear {
+  position: absolute;
+  top: -20rpx;
+  right: -12rpx;
+  z-index: 31;
+  width: 48rpx;
+  height: 48rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 28rpx;
+  color: var(--muted-foreground);
+  background-color: var(--card);
+  border: 1rpx solid var(--border);
+  border-radius: 999rpx;
+  box-shadow: 0 1rpx 3px rgba(0, 0, 0, 0.2);
+  opacity: 0.85;
+}
+
+.pet__gear:active {
+  opacity: 1;
+}
+
+/* 面板锚在宠物正上方（网页版同款绝对定位），随 .pet 的 z-30  stacking context 低于遮罩 z-40 */
+.pet__panel {
+  position: absolute;
+  right: 0;
+  bottom: 100%;
+  margin-bottom: 16rpx;
+  z-index: 31;
+}
+
+/* 顶栏 ⚙️ 入口：居中弹层容器（复用 panels.css 的 .dialog-wrap/.mask 骨架） */
+.petset-dialog {
+  width: 100%;
+  max-width: 620rpx;
+}
+
+/* R8 行式设计（参考 docs/2026-10-06_14.04.23.png）：宽 300px ≈ 600rpx */
+.petset {
+  width: 600rpx;
+  background-color: var(--card);
+  border: 1rpx solid var(--border);
+  border-radius: 32rpx;
+  box-shadow: 0 4rpx 18rpx -6rpx rgba(0, 0, 0, 0.5), 0 1rpx 3px rgba(0, 0, 0, 0.35);
+  overflow: hidden;
+}
+
+/* 标题栏：🐾 标题 + 右侧关闭 */
+.petset__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 24rpx 28rpx;
+  border-bottom: 1rpx solid var(--border);
+}
+
+.petset__head-title {
+  font-size: 27rpx;
+  font-weight: 600;
+  color: var(--foreground);
+}
+
+.petset__close {
+  font-size: 24rpx;
+  color: var(--muted-foreground);
+}
+
+.petset__close:active {
+  color: var(--foreground);
+}
+
+/* 行式条目：图标方块 + 标题/描述 + 右侧控件 */
+.petset__row {
+  display: flex;
+  align-items: center;
+  gap: 20rpx;
+  padding: 24rpx 28rpx;
+}
+
+.petset__icon {
+  flex-shrink: 0;
+  width: 56rpx;
+  height: 56rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 28rpx;
+  color: var(--helix);
+  background-color: var(--secondary);
+  border-radius: 20rpx;
+}
+
+.petset__main {
+  flex: 1;
+  min-width: 0;
+}
+
+.petset__row-title {
+  display: block;
+  font-size: 26rpx;
+  font-weight: 600;
+  color: var(--foreground);
+}
+
+.petset__row-desc {
+  display: block;
+  margin-top: 6rpx;
+  font-size: 22rpx;
+  line-height: 1.5;
+  color: var(--muted-foreground);
+}
+
+.petset__divider {
+  border-top: 1rpx solid var(--border);
+  opacity: 0.7;
+}
+
+/* 体型步进：‹ 读数 › */
+.petset__steppers {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+}
+
+.petset__step {
+  width: 56rpx;
+  height: 56rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 36rpx;
+  line-height: 1;
+  color: var(--muted-foreground);
+  border: 1rpx solid var(--border);
+  border-radius: 16rpx;
+}
+
+.petset__step--off {
+  opacity: 0.35;
+}
+
+.petset__pct {
+  width: 88rpx;
+  text-align: center;
+  font-size: 25rpx;
+  font-family: var(--font-mono);
+  color: var(--foreground);
+}
+
+/* 自绘 switch（小程序 checkbox 组件需 CheckboxGroup，自绘更轻；仅用类选择器） */
+.petset__switch {
+  position: relative;
+  flex-shrink: 0;
+  width: 80rpx;
+  height: 44rpx;
+  background-color: var(--secondary);
+  border: 1rpx solid var(--border);
+  border-radius: 999rpx;
+}
+
+.petset__knob {
+  position: absolute;
+  top: 4rpx;
+  left: 4rpx;
+  width: 34rpx;
+  height: 34rpx;
+  background-color: var(--card);
+  border-radius: 999rpx;
+  box-shadow: 0 1rpx 3px rgba(0, 0, 0, 0.3);
+  transition: transform 0.15s ease;
+}
+
+.petset__switch--on {
+  background-color: var(--helix);
+  border-color: var(--helix);
+}
+
+.petset__switch--on .petset__knob {
+  transform: translateX(38rpx);
+}
+
+/* 底部：找回阿寻通栏 + 宝藏计数 + 本机说明 */
+.petset__foot {
+  padding: 24rpx 28rpx;
+  border-top: 1rpx solid var(--border);
+}
+
+.petset__recall {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12rpx;
+  padding: 20rpx 0;
+  font-size: 25rpx;
+  font-weight: 500;
+  color: var(--helix);
+  background-color: var(--helix-soft);
+  border-radius: 20rpx;
+}
+
+.petset__treasure {
+  display: block;
+  margin-top: 16rpx;
+  text-align: center;
+  font-size: 20rpx;
+  font-family: var(--font-mono);
+  color: var(--muted-foreground);
+}
+
+.petset__note {
+  display: block;
+  margin-top: 12rpx;
+  text-align: center;
+  font-size: 21rpx;
+  line-height: 1.5;
+  color: var(--muted-foreground);
+  opacity: 0.75;
+}
+
 /* 静默态：角落唤回按钮（对齐网页版 quiet 模式的小圆钮） */
 .pet__recall {
   position: fixed;

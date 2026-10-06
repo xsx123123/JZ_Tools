@@ -38,8 +38,8 @@ const TOOL_DEFS = [
   tool('seqout_get_experiments', '列出研究的实验。支持 GSE（自动解析为 SRA/BioProject 编号）。', { study_accession: reqStr('研究编号，GSE 或 SRA/PRJ 编号') }, ['study_accession']),
   tool('seqout_get_runs', '列出研究的测序运行（SRR 编号列表）。支持 GSE 自动解析。', { study_accession: reqStr('研究编号') }, ['study_accession']),
   tool('seqout_get_run_download', '获取单个测序运行的下载链接。', { run_accession: reqStr('运行编号，如 SRR 开头') }, ['run_accession']),
-  tool('seqout_get_download_links', '获取研究全部运行的下载链接表（含 fastq/sra 直链、大小、MD5）。支持 GSE 自动解析。', { study_accession: reqStr('研究编号') }, ['study_accession']),
-  tool('seqout_get_metadata_csv', '获取研究合并样本/运行元数据表（测序策略、平台、样本属性等）。支持 GSE 自动解析。', { study_accession: reqStr('研究编号') }, ['study_accession']),
+  tool('seqout_get_download_links', '获取研究全部运行的下载链接表（含 fastq/sra 直链、大小、MD5）。支持 GSE 自动解析。GEO-only 项目若无公开 run 会返回空表说明。', { study_accession: reqStr('研究编号') }, ['study_accession']),
+  tool('seqout_get_metadata_csv', '获取研究合并样本/运行元数据表（测序策略、平台、样本属性等）。支持 GSE 自动解析。GEO-only 项目若无实验会返回空结果说明。', { study_accession: reqStr('研究编号') }, ['study_accession']),
   tool('seqout_get_sample_metadata', '获取样本元数据；GSM 编号自动使用 sample-detail 通道。', { accession: reqStr('样本编号，如 GSM4581240') }, ['accession']),
   tool('seqout_get_sample_detail', '获取完整样本详细信息。', { accession: reqStr('样本编号，如 GSM4581240') }, ['accession']),
   tool('seqout_get_sample_manifest', '获取 GEO 项目（GSE）的样本清单预览。', { accession: reqStr('GSE 项目编号'), max_samples: intOpt('最多展示的样本数，默认20') }, ['accession']),
@@ -273,13 +273,48 @@ async function executeTool(name, args) {
     case 'seqout_get_experiments': { const s = await resolveStudy(String(args.study_accession)); return wrap(await seqoutGet(`/project/${encodeURIComponent(s)}/experiments`)); }
     case 'seqout_get_runs': { const s = await resolveStudy(String(args.study_accession)); return wrap({ ...(await seqoutGet(`/project/${encodeURIComponent(s)}/runs`)), study_accession: s, bioproject: await resolveBioproject(s) }); }
     case 'seqout_get_run_download': return wrap(await seqoutGet(`/run/${encodeURIComponent(String(args.run_accession).toUpperCase())}`));
-    case 'seqout_get_download_links': { const s = await resolveStudy(String(args.study_accession)); const tsv = await seqoutGetText(`/project/${encodeURIComponent(s)}/runs/download`); return wrap({ ...parseDelimited(tsv), study_accession: s, bioproject: await resolveBioproject(s) }); }
-    case 'seqout_get_metadata_csv': { const s = await resolveStudy(String(args.study_accession)); const csv = await seqoutGetText(`/project/${encodeURIComponent(s)}/metadata/download`); return wrap({ ...parseDelimited(csv), study_accession: s }); }
+    case 'seqout_get_download_links': {
+      const s = await resolveStudy(String(args.study_accession));
+      let tsv;
+      try {
+        tsv = await seqoutGetText(`/project/${encodeURIComponent(s)}/runs/download`);
+      } catch (err) {
+        // GEO-only 类项目无实验，seqout 可能以 404 "No experiments found" 表达——如实返回空，不算工具失败
+        if (err instanceof Error && /No experiments found|no runs/i.test(err.message)) {
+          return emptyStudyResult(s, `${s} 没有任何已公开的运行（run），故无下载链接可导。这类 GEO-only 项目通常只有加工矩阵，无原始数据。`);
+        }
+        throw err;
+      }
+      const parsed = parseDelimited(tsv);
+      // 200 但只有表头的空表同理：上游无公开 raw 数据是「事实」，不是错误
+      if (parsed.total_rows === 0) return emptyStudyResult(s, `${s} 的运行表为空（上游无公开 raw 数据，GEO-only 项目常见）。`);
+      return wrap({ ...parsed, study_accession: s, bioproject: await resolveBioproject(s) });
+    }
+    case 'seqout_get_metadata_csv': {
+      const s = await resolveStudy(String(args.study_accession));
+      let csv;
+      try {
+        csv = await seqoutGetText(`/project/${encodeURIComponent(s)}/metadata/download`);
+      } catch (err) {
+        if (err instanceof Error && /No experiments found/i.test(err.message)) {
+          return emptyStudyResult(s, `${s} 无实验级元数据（GEO-only 加工矩阵类数据集通常如此），故无 CSV 可导。`);
+        }
+        throw err;
+      }
+      return wrap({ ...parseDelimited(csv), study_accession: s });
+    }
     case 'seqout_get_sample_metadata': { const a = validateSample(String(args.accession)); const path = /^GSM/i.test(a) ? `/sample-detail/${a}` : `/sample/${a}`; return wrap(await seqoutGet(path)); }
     case 'seqout_get_sample_detail': { const a = validateSample(String(args.accession)); return wrap(await seqoutGet(`/sample-detail/${encodeURIComponent(a)}`)); }
     case 'seqout_get_sample_manifest': { const a = String(args.accession).toUpperCase(); return wrap(await seqoutGet(`/geo/series/${encodeURIComponent(a)}/samples`, args.max_samples ? { max_samples: String(args.max_samples) } : undefined)); }
     case 'seqout_resolve_accession': return wrap(await seqoutGet(`/accession/${encodeURIComponent(String(args.accession).toUpperCase())}/project`));
-    case 'seqout_resolve_prj': return wrap(await seqoutGet(`/prj/${encodeURIComponent(String(args.prj_accession).toUpperCase())}`));
+    case 'seqout_resolve_prj': {
+      // 前置校验：seqout 对非 PRJ 编号返回 422 + 原始 FastAPI 英文报文，对模型不友好，先挡掉
+      const acc = String(args.prj_accession).trim().toUpperCase();
+      if (!/^PRJ[A-Z]+\d+$/.test(acc)) {
+        throw new Error(`BioProject 编号格式不正确：${acc}（应为 PRJNA/PRJEB/PRJDB + 数字，如 PRJNA732811）。若要解析 SRP/GSE 等其它编号，请用 seqout_resolve_accession。`);
+      }
+      return wrap(await seqoutGet(`/prj/${encodeURIComponent(acc)}`));
+    }
     case 'seqout_get_ontology_term': return wrap(await seqoutGet('/ontology/term', { term: String(args.term) }));
     case 'seqout_get_organisms': return wrap(await seqoutGet('/organisms'));
     case 'seqout_get_common_name': return wrap(await seqoutGet('/common-name', { scientific_name: String(args.scientific_name) }));
@@ -300,6 +335,16 @@ function compact(obj) {
 
 function wrap(data) {
   return { success: true, data };
+}
+
+/** 业务性空结果（GEO-only 无实验/无 run）：success 形态返回，data.empty 标记供统计计为「空矿」而非错误 */
+function emptyStudyResult(study, note) {
+  return { success: true, data: { columns: [], rows: [], total_rows: 0, study_accession: study, empty: true, note } };
+}
+
+function isBusinessEmpty(payload) {
+  const d = payload && typeof payload === 'object' && !Array.isArray(payload) ? payload.data : null;
+  return !!d && typeof d === 'object' && !Array.isArray(d) && d.empty === true;
 }
 
 // ---------- T2：PubMed 文献联动（NCBI E-utilities 主路 + Europe PMC 兜底；与主仓库同策略） ----------

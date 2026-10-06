@@ -3,6 +3,7 @@
 // 所有写入均为 fire-and-forget，失败静默，绝不打断对话主流程。
 import { isOfflineMode, supabase } from "@/supabase/client";
 import { readLang, translate } from "@/i18n";
+import { mergeServerStats, pullServerLeaderboard, pushServerNickname, pushServerStats } from "@/services/localAuth";
 
 const KEY_DEVICE = "seqout-device-id";
 const KEY_LOCAL_STATS = "seqout-local-stats";
@@ -138,9 +139,10 @@ export async function bumpStats(
   if (delta.chats) inc.chats = delta.chats;
   if (Object.keys(inc).length === 0) return;
 
-  // 离线模式：走 localStorage 本地统计（本地开发无 Supabase 配置时排行榜也有数据）
+  // 离线模式：localStorage 记一份本机镜像（登录时合并进账号用），同时上报自托管服务端排行榜
   if (isOfflineMode) {
     bumpLocalStats(delta);
+    void pushServerStats(delta).catch(() => undefined);
     return;
   }
 
@@ -183,21 +185,21 @@ export async function updateNickname(nick: string): Promise<{ ok: boolean; messa
   const name = nick.trim().slice(0, 16);
   if (name.length < 1) return { ok: false, message: translate(readLang(), "err.nickEmpty") };
 
-  // 离线模式：改本地统计行的昵称
+  // 离线模式：改本地统计行的昵称 + 上报服务端
   if (isOfflineMode) {
     const row = readLocalStats();
     if (row) {
       row.display_name = name;
       writeLocalStats(row);
-      return { ok: true };
+    } else {
+      bumpLocalStats({});
+      const fresh = readLocalStats();
+      if (fresh) {
+        fresh.display_name = name;
+        writeLocalStats(fresh);
+      }
     }
-    // 还没有统计行也允许先占位昵称
-    bumpLocalStats({});
-    const fresh = readLocalStats();
-    if (fresh) {
-      fresh.display_name = name;
-      writeLocalStats(fresh);
-    }
+    void pushServerNickname(name).catch(() => undefined);
     return { ok: true };
   }
   try {
@@ -219,24 +221,41 @@ export async function updateNickname(nick: string): Promise<{ ok: boolean; messa
 
 /** 拉取双榜（合并排序用）；两张表 RLS 均为公开可读 */
 export async function fetchLeaderboard(): Promise<{ users: StatRow[]; guests: StatRow[] }> {
-  // 离线模式：本地统计行作为访客榜（users 恒为空，登录/云同步未接入）
+  // 离线模式：自托管服务端聚合双榜（登录榜 + 访客榜）；服务端不可用时回退本机镜像
   if (isOfflineMode) {
-    const row = readLocalStats();
-    const guests: StatRow[] = row && (row.treasures > 0 || row.chats > 0)
-      ? [{
-          key: `g:${row.device_id}`,
-          name: row.display_name?.trim() || guestName(row.device_id),
-          treasures: row.treasures,
-          digs: row.digs,
-          chats: row.chats,
-          weekTreasures: row.week_treasures,
-          weekDigs: row.week_digs,
-          weekChats: row.week_chats,
-          updated_at: row.updated_at,
-          isGuest: true,
-        }]
-      : [];
-    return { users: [], guests };
+    try {
+      const { users, guests } = await pullServerLeaderboard();
+      const map = (r: import("@/services/localAuth").ServerStatRow): StatRow => ({
+        key: r.key,
+        name: r.name,
+        treasures: r.treasures,
+        digs: r.digs,
+        chats: r.chats,
+        weekTreasures: r.week_treasures,
+        weekDigs: r.week_digs,
+        weekChats: r.week_chats,
+        updated_at: r.updated_at,
+        isGuest: r.isGuest,
+      });
+      return { users: users.map(map), guests: guests.map(map) };
+    } catch {
+      const row = readLocalStats();
+      const guests: StatRow[] = row && (row.treasures > 0 || row.chats > 0)
+        ? [{
+            key: `g:${row.device_id}`,
+            name: row.display_name?.trim() || guestName(row.device_id),
+            treasures: row.treasures,
+            digs: row.digs,
+            chats: row.chats,
+            weekTreasures: row.week_treasures,
+            weekDigs: row.week_digs,
+            weekChats: row.week_chats,
+            updated_at: row.updated_at,
+            isGuest: true,
+          }]
+        : [];
+      return { users: [], guests };
+    }
   }
   const [u, g] = await Promise.all([
     supabase
@@ -283,4 +302,17 @@ export async function fetchLeaderboard(): Promise<{ users: StatRow[]; guests: St
 /** 当前访客设备的 device_id（用于在榜单里高亮"我"） */
 export function myGuestKey(): string {
   return `g:${getDeviceId()}`;
+}
+
+/** 登录时把本机游客期累计成绩并入服务端账号行，随后清零本机镜像（防重复合并） */
+export async function mergeLocalStatsToAccount(): Promise<void> {
+  const row = readLocalStats();
+  if (!row || (row.treasures <= 0 && row.digs <= 0 && row.chats <= 0)) return;
+  try {
+    await mergeServerStats({ treasures: row.treasures, digs: row.digs, chats: row.chats });
+    const monday = mondayOf(new Date());
+    writeLocalStats({ ...row, treasures: 0, digs: 0, chats: 0, week_base: monday, week_treasures: 0, week_digs: 0, week_chats: 0 });
+  } catch {
+    /* 合并失败保留本机镜像，下次登录再试 */
+  }
 }

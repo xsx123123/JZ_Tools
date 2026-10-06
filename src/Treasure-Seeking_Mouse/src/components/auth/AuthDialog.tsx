@@ -1,6 +1,8 @@
 // 邮箱验证码 + 密码：登录 / 注册（signUp→verifyOtp 两步状态机）/ 忘记密码
+// 离线自托管模式：走本地服务端账号（server/account-api.mjs），无邮箱验证，注册即登录
 import { useState } from "react";
-import { supabase } from "@/supabase/client";
+import { supabase, isOfflineMode } from "@/supabase/client";
+import { localLogin, localRegister, type LocalUser } from "@/services/localAuth";
 import { useI18n } from "@/i18n/provider";
 import type { TFunc } from "@/i18n";
 import { Button } from "@/components/ui/button";
@@ -30,13 +32,15 @@ export function AuthDialog({
 }: {
   open: boolean;
   onClose: () => void;
-  onSuccess: () => void;
+  /** 离线自托管登录成功时回传 LocalUser；云端登录回传 undefined */
+  onSuccess: (user?: LocalUser) => void;
 }): React.ReactElement {
   const { t } = useI18n();
   const [mode, setMode] = useState<Mode>("login");
-  const [step, setStep] = useState<"form" | "verify">("form"); // 注册两步状态机
+  const [step, setStep] = useState<"form" | "verify">("form"); // 注册两步状态机（仅云端）
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [name, setName] = useState(""); // 离线注册昵称
   const [token, setToken] = useState("");
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<{ type: "error" | "ok"; text: string } | null>(null);
@@ -59,6 +63,11 @@ export function AuthDialog({
     setBusy(true);
     setMsg(null);
     try {
+      if (isOfflineMode) {
+        const user = await localLogin(email.trim(), password);
+        onSuccess(user);
+        return;
+      }
       const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
       if (error) throw error;
       onSuccess();
@@ -77,6 +86,11 @@ export function AuthDialog({
     setBusy(true);
     setMsg(null);
     try {
+      if (isOfflineMode) {
+        const user = await localRegister(email.trim(), password, name.trim());
+        onSuccess(user);
+        return;
+      }
       const prefix = email.trim().split("@")[0]?.replace(/[^a-zA-Z0-9_]/g, "").slice(0, 20);
       const username = `${prefix || "user"}_${Math.random().toString(36).slice(2, 8)}`;
       setPendingUsername(username);
@@ -150,13 +164,15 @@ export function AuthDialog({
                 : t("auth.forgotTitle")}
           </DialogTitle>
           <p className="text-[12.5px] text-muted-foreground">
-            {mode === "login"
-              ? t("auth.loginSub")
-              : mode === "register"
-                ? step === "verify"
-                  ? t("auth.verifySub", { email })
-                  : t("auth.registerSub")
-                : t("auth.forgotSub")}
+            {isOfflineMode
+              ? t("auth.localSub")
+              : mode === "login"
+                ? t("auth.loginSub")
+                : mode === "register"
+                  ? step === "verify"
+                    ? t("auth.verifySub", { email })
+                    : t("auth.registerSub")
+                  : t("auth.forgotSub")}
           </p>
         </DialogHeader>
 
@@ -205,6 +221,20 @@ export function AuthDialog({
             </div>
           ) : null}
 
+          {isOfflineMode && mode === "register" ? (
+            <div className="space-y-1.5">
+              <Label htmlFor="auth-name" className="text-xs text-muted-foreground">{t("auth.nickname")}</Label>
+              <Input
+                id="auth-name"
+                maxLength={24}
+                placeholder={t("auth.nicknamePlaceholder")}
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                className={fieldCls}
+              />
+            </div>
+          ) : null}
+
           {msg ? (
             <p className={`rounded-md border px-3 py-2 text-[12.5px] leading-relaxed ${msg.type === "error" ? "border-destructive/30 bg-destructive/5 text-destructive" : "border-helix/30 bg-helix-soft text-helix"}`}>
               {msg.text}
@@ -244,7 +274,9 @@ export function AuthDialog({
             {mode === "login" ? (
               <>
                 <button type="button" className="story-link hover:text-helix" onClick={() => switchMode("register")}>{t("auth.createAccount")}</button>
-                <button type="button" className="story-link hover:text-helix" onClick={() => switchMode("forgot")}>{t("auth.forgotLink")}</button>
+                {!isOfflineMode ? (
+                  <button type="button" className="story-link hover:text-helix" onClick={() => switchMode("forgot")}>{t("auth.forgotLink")}</button>
+                ) : null}
               </>
             ) : (
               <button type="button" className="mx-auto story-link hover:text-helix" onClick={() => switchMode("login")}>

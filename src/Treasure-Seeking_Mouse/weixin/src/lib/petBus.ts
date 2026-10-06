@@ -1,5 +1,6 @@
-// 页面层 ⇆ 桌宠的轻量桥：设置项变更通知 + 「找回阿寻」召回 + 静默指令 + 输入联动。
-// 桌宠挂在路由层、设置入口在顶栏/悬浮齿轮，两边不直传 props，走迷你 pub/sub（同 hintBus 模式）。
+// 页面层 ⇆ 桌宠的轻量桥：设置项变更通知 + 「找回阿寻」召回 + 静默指令 + 位置复位。
+// 桌宠挂在页面层、设置入口在顶栏 ⚙️ / 宠物角落常驻齿轮，两边不直传 props，走迷你 pub/sub（同 evidenceBus 模式）。
+// 纯 TS 零平台依赖（resetPos 通道与主仓库对齐；主仓库另有 typing 输入联动通道，属另一轮改造，未同步）。
 
 type Cb = () => void;
 
@@ -7,7 +8,6 @@ const settingsCbs = new Set<Cb>();
 const recallCbs = new Set<Cb>();
 const quietCbs = new Set<Cb>();
 const resetPosCbs = new Set<Cb>();
-const typingCbs = new Set<(active: boolean) => void>();
 
 /** 尺寸 / 常驻等设置被改写后调用，桌宠据此重读偏好 */
 export function emitPetSettingsChanged(): void {
@@ -19,19 +19,15 @@ export function emitPetRecall(): void {
   for (const cb of recallCbs) cb();
 }
 
-/** 让阿寻进入静默（等价右键菜单） */
+/** 让阿寻进入静默（等价长按 600ms） */
 export function emitPetQuiet(): void {
   for (const cb of quietCbs) cb();
 }
 
-/** 位置复位：把阿寻放回右下角默认位置 */
+/** 位置复位：把阿寻放回默认位置。网页版为右下角坐标复位；小程序版桌宠位置固定在 CSS
+ *  （R3 起无拖拽/无 pos 存储），通道保留作 API 对齐，面板侧不展示该行（见 MIGRATION.md R8）。 */
 export function emitPetResetPos(): void {
   for (const cb of resetPosCbs) cb();
-}
-
-/** 用户是否正在输入框键入（active=有字符）：桌宠据此挂「竖起耳朵随时出发」的跃动 class */
-export function emitPetTyping(active: boolean): void {
-  for (const cb of typingCbs) cb(active);
 }
 
 export function onPetSettingsChanged(cb: Cb): () => void {
@@ -52,9 +48,4 @@ export function onPetQuiet(cb: Cb): () => void {
 export function onPetResetPos(cb: Cb): () => void {
   resetPosCbs.add(cb);
   return () => resetPosCbs.delete(cb);
-}
-
-export function onPetTyping(cb: (active: boolean) => void): () => void {
-  typingCbs.add(cb);
-  return () => typingCbs.delete(cb);
 }

@@ -1,8 +1,8 @@
 # AGENTS.md
 
-## QMuse 平台版（迁移副本）
-- `qmuse/qmuse-app/` 是本应用的 **QMuse 平台迁移版**（数据后端 Supabase→QMuse 云服务、Edge Function→云函数、SSE→整包+前端模拟流式、应用内邮箱登录→平台账号）。它与主仓库并行维护，主仓库的改动按 **`qmuse/MIGRATION.md`** 的映射规范同步过去。
-- 改 QMuse 版时遵守 `qmuse/qmuse-app/AGENTS.md` 与其内置 qmuse-cloud 技能契约；改完跑 `npm run check`、`npm run build` 与产物校验器（见 MIGRATION.md 第五节）。
+## QMuse 平台版（迁移副本，已停止维护）
+- `qmuse/qmuse-app/` 是本应用的 **QMuse 平台迁移版**（数据后端 Supabase→QMuse 云服务、Edge Function→云函数、SSE→整包+前端模拟流式、应用内邮箱登录→平台账号）。**自 2026-10-06 起停止维护：新改动不再同步过去，回归测试与构建校验也只需跑主仓库**；目录保留作历史归档，勿删。
+- （存档）改 QMuse 版时遵守 `qmuse/qmuse-app/AGENTS.md` 与其内置 qmuse-cloud 技能契约；改完跑 `npm run check`、`npm run build` 与产物校验器（见 MIGRATION.md 第五节）。
 
 ## 文档与文案同步（改一处要连带改的地方）
 - **README 双语**：根 `README.md` 是**英文版**（GitHub 仓库首页默认展示），`docs/README.zh-CN.md` 是**中文版**。两份顶部有互链语言切换行（`**English** | [简体中文](docs/README.zh-CN.md)` / `[English](../README.md) | **简体中文**`），且**正文前部**各有一个 `## Documentation` / `## 文档` 段互列中英 README + 详细文档入口（中文版排在前）。改功能一览、技术栈、目录、快速开始、致谢等任一章节，**两份都要同步改**，别只动一份；章节顺序也保持一致。图片/链接用各自所在目录的相对路径：根 README 写 `docs/寻宝鼠.png`、`docs/badges/*.svg`、`src/assets/pet/*`；中文版在 `docs/` 下，写 `寻宝鼠.png`、`badges/*.svg`、`../src/assets/pet/*`。代码块的命令字面量保持原样，只翻译注释。
@@ -30,15 +30,15 @@
 - 数据：`profiles` / `chat_sessions` / `chat_messages`（cards、tool_logs 为 JSONB），RLS 全部 `auth.uid()` 本人隔离；未登录时消息仅存 localStorage（key `seqout-local-session`，每条会话记 `ts` 最后活跃时间，最多留 50 条、超过 7 天未活跃的会话读取时过滤；游客策略经侧栏 `storageNote` + 顶栏「临时试用」标题提示）。
 - 排行榜：`user_stats`（登录用户，auth.uid 本人 upsert）/ `guest_stats`（访客按匿名 device_id upsert，localStorage key `seqout-device-id`），两表 RLS 公开可读、仅本人可写；每表含累计列（treasures/digs/chats）+ 周列（week_treasures/week_digs/week_chats + week_base 周一日期，写入方 RPC 内自动跨周归零）+ display_name 自定义昵称。累加走 SECURITY INVOKER RPC `bump_user_stats` / `bump_guest_stats`（前端 `src/services/statsStore.ts` 在 handleSend 结束后 fire-and-forget 调用，treasures=出土卡片数、digs=工具回合数、chats=每轮+1）。面板 `src/components/chat/Leaderboard.tsx`（右滑抽屉 z-50，Tab 切登录榜/访客榜 + 本周/累计时间维度切换 + 行内铅笔/虚线按钮打开昵称浮层，前 3 名奖牌，当前身份——登录经 ownUserId、访客经设备指纹——高亮「我」并可改名），入口为顶栏 Trophy 图标。
 - 认证：邮箱验证码 + 密码（signUp → verifyOtp type:'signup' → getUser → upsert profiles），忘记密码走 resetPasswordForEmail + `/reset-password` recovery 页。
-- 桌宠「寻宝鼠」：`src/components/pet/TreasureMouse.tsx` 状态机（idle/digging/reveal/stow/miss/poke/spin/walk/look/celebrate/peek/sleep）+ pointer 拖拽，造型为本地抠图（`src/assets/pet/`，Vite 打包；用户提供的 2048² PNG 原图已压成 512px webp，文件名即行为，如 `mouse-shovel`=挖土、`mouse-night`=夜探矿洞（暗色主题 digging 专用，经 MutationObserver 跟随 `<html>.dark`）、`mouse-sleep`=45s 无互动入睡，互动即醒）；`src/routes/index.tsx` 在 handleSend 的 onTool/onCards/onEnd/onError 里经 `makePetEvent()`（自增 seq 去重）转发事件；偏好/宝藏计数/成就存 localStorage（`src/services/petStore.ts`）。z-30，低于抽屉 z-40/dialog z-50。
+- 桌宠「寻宝鼠」：`src/components/pet/TreasureMouse.tsx` 状态机（idle/digging/reveal/stow/miss/poke/spin/walk/look/celebrate/peek/sleep）+ pointer 拖拽，造型为本地抠图（`src/assets/pet/`，Vite 打包；用户提供的 2048² PNG 原图已压成 512px webp，文件名即行为，如 `mouse-shovel`=挖土、`mouse-night`=夜探矿洞（暗色主题 digging 专用，经 MutationObserver 跟随 `<html>.dark`）、`mouse-sleep`=45s 无互动入睡，互动即醒）；`src/routes/index.tsx` 在 handleSend 的 onTool/onCards/onEnd/onError 里经 `makePetEvent()`（自增 seq 去重）转发事件；偏好/宝藏计数/成就存 localStorage（`src/services/petStore.ts`）。z-30，低于抽屉 z-40/dialog z-50。设置双入口（hover 宠物浮现的齿轮 + 顶栏 PawPrint 按钮）共用 `src/components/pet/PetSettingsPanel.tsx`（行式设计，参考 docs/2026-10-06_14.04.23.png：标题+关闭 / 体型步进 ±12px 显示百分比（72–240 连续值，`seqout-pet-size`）/ 从桌面收起（=quiet 开关，`seqout-pet-quiet`）/ 闲置时自己活动（`seqout-pet-idle-alive`，关闭则闲置剧场整体停演）/ 一直存在（`seqout-pet-always`，关闭则闲置 15s 自动隐藏）/ 位置复位（petBus `resetPos` 通道回默认右下角）/ 找回阿寻），面板 ⇆ 桌宠双向同步走 `src/lib/petBus.ts`（settingsChanged/recall/quiet/resetPos 迷你 pub-sub；桌宠 toggleQuiet 后也会 emit 供面板回读）。
 - 成就系统：累计挖宝 10/50/100 三档（ACHIEVEMENTS 常量），跨档一次性 celebrate 小剧场（星尘爆发+光环+横幅），领取记录存 localStorage `seqout-pet-achievements`（幂等去重）；存量高计数用户初始化时经 `earnedAchievements()` 直接补徽章、不播动画。cards 与 done 事件同轮可能都触发出货，用 `countedRef` 防止重复累加计数。
 - 主题：亮色 `:root` + 夜探矿洞 `.dark` 双套 token（`src/styles.css`），组件一律消费 theme utility（`bg-card` 等），禁止再写 `bg-white` 类硬编码。切换由顶栏/折叠边条按钮触发，偏好写 localStorage `seqout-theme`；`index.html` 内联 bootstrap 脚本在 React 加载前挂 `.dark` 类防闪白（同时支持 `?theme=dark` URL 参数——这是沙箱截图取证通道，因为截图工具的 DOM 探针不支持 oklch，无法替我们点按钮）。暗色下 `--pet-amber-deep` 反转为亮金文字档，桌宠周边（土堆/气泡/尘埃/网格）均有 `.dark` 覆盖段。
-- 自托管离线模式：未配置 `VITE_SUPABASE_URL`/`VITE_SUPABASE_ANON_KEY` 时 `client.ts` 创建 Proxy 桩客户端（导出 `isOfflineMode`）——auth 固定未登录、任意调用链 await 得 `{data:null, error:null}`；`SessionSidebar` 的 `onLogin` 改可选，离线时隐藏登录按钮，应用以纯游客 + localStorage 运行。环境变量唯一来源 `server/.env`（vite `envDir` 指向 `server/`，Makefile 起容器带 `--env-file server/.env`；`.dockerignore` 排除该文件，容器构建只认 Dockerfile 注入的构建期变量）。dev 默认 `VITE_CHAT_API=http://localhost:<CHAT_API_PORT>` 直连本地对话服务；改成 `/chat-api` 则走 `vite.config.ts` `server.proxy` 同源代理（`CHAT_API_PROXY_TARGET` 可覆盖目标），单端口且局域网可用。
+- 自托管离线模式：未配置 `VITE_SUPABASE_URL`/`VITE_SUPABASE_ANON_KEY` 时 `client.ts` 创建 Proxy 桩客户端（导出 `isOfflineMode`）——auth 固定未登录、任意调用链 await 得 `{data:null, error:null}`；应用以游客 + localStorage 运行，**但登录不缺席**：自托管账号体系由 `server/account-api.mjs` 挂在对话服务同端口（`/auth/*` `/history` `/leaderboard` `/stats/*`），scrypt 口令哈希 + Bearer token，数据落盘 `DATA_DIR`（默认 `server/data`，容器内 `/app/data` 命名卷，与统计同卷）。前端 `src/services/localAuth.ts` + `AuthDialog` 离线分支；聊天记录整快照防抖同步（登录时合并服务端与本地方，同 id 取较新），排行榜登录时把游客期本机累计 `mergeLocalStatsToAccount()` 并入账号行后清零本地镜像；`Leaderboard` 默认页签按 `ownUserId` 有无选榜。环境变量唯一来源 `server/.env`（vite `envDir` 指向 `server/`，Makefile 起容器带 `--env-file server/.env`；`.dockerignore` 排除该文件，容器构建只认 Dockerfile 注入的构建期变量）。dev 默认 `VITE_CHAT_API=http://localhost:<CHAT_API_PORT>` 直连本地对话服务；改成 `/chat-api` 则走 `vite.config.ts` `server.proxy` 同源代理（`CHAT_API_PROXY_TARGET` 可覆盖目标），单端口且局域网可用。⚠️ local.mjs 的 CORS 必须允许 `PUT`（历史快照同步）与 `X-Stats-Actor` 头，否则前端推送静默失败。
 
 ## 回归测试（改平台后必须通过）
-- **命令**：根目录 `npm test`（离线，用 fixtures，秒级）；`npm run test:live`（额外打真实 seqout API 校验，需联网）。QMuse 迁移版：`cd qmuse/qmuse-app && npm test`。
-- **触发条件**：任何改动 `functions/seqout-chat/index.ts`（或 QMuse `functions/seqout-chat/src/main.js`）里的 **GSE→研究编号解析**（`resolveStudy` / `studyCandidates` / `hasRuns` / `describeSeqoutError`）后，**必须跑测试，全绿才可提交/部署/导入**。改一处平台就测一处——主仓库与 QMuse 两版都要测（两版测试各自独立，QMuse 版为迁移副本的平价测试）。
-- **测试位置**：主仓库 `functions/seqout-chat/tests/resolveStudy.test.ts`（fixtures 为真实 seqout 响应，gzip 存于 `tests/fixtures/`）；QMuse `qmuse/qmuse-app/functions/seqout-chat/tests/resolveStudy.test.mjs`（共用主仓库 fixtures）。
+- **命令**：根目录 `npm test`（离线，用 fixtures，秒级）；`npm run test:live`（额外打真实 seqout API 校验，需联网）。（QMuse 版已停止维护，不再要求其测试。）
+- **触发条件**：任何改动 `functions/seqout-chat/index.ts` 里的 **GSE→研究编号解析**（`resolveStudy` / `studyCandidates` / `hasRuns` / `describeSeqoutError`）后，**必须跑测试，全绿才可提交/部署**。
+- **测试位置**：主仓库 `functions/seqout-chat/tests/resolveStudy.test.ts`（fixtures 为真实 seqout 响应，gzip 存于 `tests/fixtures/`）。
 - **黄金用例（期望值来自 NCBI/ENA 人工核实，勿随意修改）**：
 
   | GSE | 正确研究号 | runs | 关键约束 |
@@ -54,6 +54,8 @@
   4. 404 要区分"镜像库未同步"与"项目无数据"。
 
 ## 踩坑记录
+- ❌ **`.bg-grid::before` 整面蒙板把普通内容洗成幽灵（2026-10-06 定位并修复）**：视觉重设计为调淡点阵底纹，加了 `inset:0` + `background:var(--background)` + `opacity:0.955` 的 pointer-events-none 蒙板。它能被 hit-test 忽略（elementFromPoint 完全正常），但绘制层压在所有**不建堆叠上下文**的子内容之上——侧栏图标、普通文本全部被罩成 95.5% 背景色（连强制 `#FF0000` 描边都只剩淡粉 ghosts）。有 backdrop-filter/transform 的元素（顶栏、卡片）不受影响，所以极难排查。**修法：底纹要淡就直接把透明度画进底纹本身**（`rgb(120 113 108 / 0.045)` 画点），禁用整面蒙板手法。教训：排查"颜色不对"先做像素级取证（元素截图+灰度 min/max），别信 computed style。
+- ⚠️ **GEO-only 项目的「无数据」被 seqout 表达成 404（2026-10-06 定位并修复）**：`/project/{PRJ}/metadata/download` 对无实验项目返回 404 "No experiments found"，`/runs/download` 则返回 200 空表头——同一事实两种表达。曾导致 `get_metadata_csv` 全灭并被统计为工具失败。修法：两个下载类工具把这类 404/空表统一转为 `emptyStudyResult`（success + `data.empty: true` + 中文 note），统计单列 `empties`（「空矿」）与真错误分开；`resolve_prj` 前置 `/^PRJ[A-Z]+\d+$/` 校验，挡住 seqout 的 422 原始英文报文。QMuse 版无统计子系统，empties 为其 no-op 平价副本。
 - ❌ **GSE→SRA 解析的 neighbors 污染（2026-10-05 定位并修复）**：`resolveStudy` 曾递归搜索整棵项目详情 JSON，因 JSON 键序 `neighbors` 在 `relation` 之前，会先命中 `neighbors[].accession`（300 条相似数据集里**别的项目**的真实编号）就返回。实测 GSE117176 被解析成 `SRP349691`（真身 `PRJNA786951`，另一个项目）→ `runs/download` 报空矿或指向错误项目；正确映射 `PRJNA481344` 在 `relation` 里从未被读到。修法见 `docs/gse-resolution-fix.md`，回归测试见上节。**教训：解析权威映射只读专用字段，绝不整树递归。**
 - ❌ Edge Function preflight TS2698（`Spread types may only be created from object types`）：Supabase `Json` 联合类型不能直接 spread → 先显式收窄为 `Record<string, Json>` 再展开。
 - ❌ web-fetch / curl raw.githubusercontent 超时失败 → 用 `api.github.com/repos/.../contents/<path>` + base64 解码取证 GitHub 文件。

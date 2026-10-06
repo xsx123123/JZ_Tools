@@ -45,9 +45,12 @@ const HIGHLIGHTS = [
 
 const STACK_BASE = ["React 19", "TypeScript", "Vite 7", "Tailwind CSS v4", "TanStack Router"];
 const STACK_TAIL: Record<"zh" | "en", string[]> = {
-  zh: ["Supabase 兼容", "OpenAI 兼容 LLM", "Docker Compose"],
-  en: ["Supabase-compatible", "OpenAI-compatible LLM", "Docker Compose"],
+  zh: ["Supabase 兼容后端（可选）", "任意 OpenAI 兼容 LLM 网关", "Docker Compose 双容器"],
+  en: ["Supabase-compatible backend (optional)", "Any OpenAI-compatible LLM gateway", "Docker Compose (dual container)"],
 };
+
+/** 阿寻一次下铲同时穿透的数据库（与 README「阿寻能挖的数据库」一节一致） */
+const DATABASES = ["GEO", "SRA", "ArrayExpress", "ENA", "GSA", "DRA", "GEA"];
 
 const linkBtn =
   "flex items-center gap-1.5 rounded-lg border border-border bg-card px-3 py-1.5 text-[12.5px] text-muted-foreground shadow-sm transition-colors hover:border-helix/50 hover:text-helix";
@@ -109,6 +112,24 @@ function AboutPage(): React.ReactElement {
           <p className="mt-2 text-[13px] font-medium leading-relaxed text-foreground/85">{t("about.why.1")}</p>
           <p className="mt-2 text-[12.5px] leading-relaxed text-muted-foreground">{t("about.why.2")}</p>
           <p className="mt-2 text-[12.5px] leading-relaxed text-muted-foreground">{t("about.why.3")}</p>
+        </section>
+
+        {/* 阿寻能挖的数据库（与 README 同名一节对齐） */}
+        <section className={sectionCls}>
+          <h2 className={h2Cls}>
+            <Database size={16} className="text-pet-amber-deep" /> {t("about.dbs")}
+          </h2>
+          <p className="mt-2 text-[12.5px] leading-relaxed text-muted-foreground">{t("about.dbsIntro")}</p>
+          <div className="mt-3 flex flex-wrap gap-1.5">
+            {DATABASES.map((db) => (
+              <span
+                key={db}
+                className="rounded-full border border-helix/25 bg-helix-soft/50 px-2.5 py-1 font-mono text-[11.5px] text-helix"
+              >
+                {db}
+              </span>
+            ))}
+          </div>
         </section>
 
         {/* 核心亮点（与 README 功能一览逐条对齐） */}
@@ -201,7 +222,7 @@ make docker-start                    # ${t("about.deploySteps")}`}
         </section>
 
         <p className="mt-4 text-center font-mono text-[11px] text-muted-foreground/70">
-          {t("about.footer")}
+          {t("about.footer")} · {t("about.version")}
         </p>
 
         <div className="mt-4 flex flex-wrap justify-center gap-2">

@@ -42,76 +42,97 @@
   --color-pet-amber: var(--pet-amber);
   --color-pet-amber-deep: var(--pet-amber-deep);
   --color-pet-gold-soft: var(--pet-gold-soft);
+  --color-gold: var(--gold);
+  --color-gold-hover: var(--gold-hover);
+  --color-gold-light: var(--gold-light);
+  --color-miner-green: var(--miner-green);
+  --color-miner-green-hover: var(--miner-green-hover);
+  --color-miner-green-light: var(--miner-green-light);
   --font-sans: var(--font-sans);
   --font-mono: var(--font-mono);
   --font-display: var(--font-display);
 }
 
 :root {
-  --radius: 0.5rem;
+  --radius: 0.75rem;
   --font-sans: "Noto Sans SC Variable", "PingFang SC", "Microsoft YaHei", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "JetBrains Mono", "SFMono-Regular", ui-monospace, Menlo, Consolas, monospace;
   --font-display: "Fraunces", "Noto Serif SC", Georgia, serif;
 
-  /* gray-50 画布 + 纯白内容面 + teal-600 强调 */
-  --background: oklch(0.985 0.001 247.839);          /* #F9FAFB */
-  --foreground: oklch(0.21 0.025 262.54);            /* #111827 */
-  --card: oklch(1 0 0);                              /* #FFFFFF */
-  --card-foreground: oklch(0.21 0.025 262.54);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.21 0.025 262.54);
-  --primary: oklch(0.6 0.118 184.704);               /* #0D9488 teal-600 */
-  --primary-foreground: oklch(0.985 0.001 247.839);
-  --secondary: oklch(0.968 0.002 247.896);           /* #F3F4F6 */
-  --secondary-foreground: oklch(0.21 0.025 262.54);
-  --muted: oklch(0.968 0.002 247.896);               /* gray-100 */
-  --muted-foreground: oklch(0.55 0.02 256);          /* #4B5563 一档 */
-  --accent: oklch(0.968 0.007 247.896);              /* hover 浅 slate */
-  --accent-foreground: oklch(0.21 0.025 262.54);
-  --destructive: oklch(0.58 0.2 27.5);               /* red-600 档 */
-  --destructive-foreground: oklch(0.985 0.001 247.839);
-  --border: oklch(0.922 0.004 247.86);               /* #E5E7EB */
-  --input: oklch(0.922 0.004 247.86);
-  --ring: oklch(0.6 0.118 184.704 / 0.35);
+  /* 暖米白画布（藏宝图纸感）+ 纯白内容面 + 矿工绿主行动色 + 探矿金强调 */
+  --background: #FAF8F5;                             /* 暖米白主背景 */
+  --foreground: #292524;                             /* 温暖深炭黑 */
+  --card: #FFFFFF;                                   /* 纯白主卡片 */
+  --card-foreground: #292524;
+  --popover: #FFFFFF;
+  --popover-foreground: #292524;
+  --primary: #15803D;                                /* 矿工绿：主行动按钮/状态标签 */
+  --primary-foreground: #FFFFFF;
+  --secondary: #F6F3EE;                              /* 便签与次级卡片底 */
+  --secondary-foreground: #292524;
+  --muted: #F6F3EE;                                  /* 浅米便签 */
+  --muted-foreground: #78716C;                       /* 温暖次级灰 */
+  --accent: #F1EDE6;                                 /* hover 浅米 */
+  --accent-foreground: #292524;
+  --destructive: #DC2626;                            /* red-600 档 */
+  --destructive-foreground: #FFFFFF;
+  --border: #E7E5E4;                                 /* 柔和边界线 */
+  --input: #E7E5E4;
+  --ring: #15803D59;                                 /* 矿工绿 35% */
 
   /* 自定义语义色 */
-  --helix: oklch(0.6 0.118 184.704);                 /* teal-600 */
-  --helix-soft: oklch(0.96 0.02 185);                /* teal-50 */
-  --strand: oklch(0.52 0.1 220);                     /* 沉稳青蓝（RNA） */
-  --panel: oklch(0.968 0.002 247.896);               /* 侧栏/头部 gray-100 */
+  --helix: #15803D;                                  /* 主强调 = 矿工绿 */
+  --helix-soft: #DCFCE7;                             /* 浅绿胶囊底 */
+  --strand: #B45309;                                 /* 探矿金深档（链接/RNA 辅助色） */
+  --panel: #F6F3EE;                                  /* 侧栏/头部暖米面板 */
+
+  /* 探矿金/琥珀色系（重点词、金块、hover 焦点） */
+  --gold: #D97706;
+  --gold-hover: #B45309;
+  --gold-light: #FEF3C7;
+  --miner-green: #15803D;
+  --miner-green-hover: #166534;
+  --miner-green-light: #DCFCE7;
 
   /* 寻宝琥珀金点缀（桌宠/空态/宝箱彩蛋专用） */
-  --pet-amber: oklch(0.72 0.15 75);                  /* 琥珀金 */
-  --pet-amber-deep: oklch(0.55 0.13 65);             /* 深琥珀（文字档） */
-  --pet-gold-soft: oklch(0.965 0.045 85);            /* 浅金底 */
+  --pet-amber: #D97706;                              /* 琥珀金 */
+  --pet-amber-deep: #B45309;                         /* 深琥珀（文字档） */
+  --pet-gold-soft: #FEF3C7;                          /* 浅金底 */
 }
 
 /* 夜探矿洞：深蓝灰底、卡片亮一档、teal/琥珀金提亮发光 */
 .dark {
-  --background: oklch(0.17 0.015 255);
-  --foreground: oklch(0.93 0.01 245);
-  --card: oklch(0.225 0.018 254);
-  --card-foreground: oklch(0.93 0.01 245);
-  --popover: oklch(0.24 0.018 254);
-  --popover-foreground: oklch(0.93 0.01 245);
-  --primary: oklch(0.72 0.125 184);                  /* teal-400 档，暗底更亮 */
-  --primary-foreground: oklch(0.18 0.02 230);
-  --secondary: oklch(0.27 0.017 254);
-  --secondary-foreground: oklch(0.93 0.01 245);
-  --muted: oklch(0.27 0.017 254);
-  --muted-foreground: oklch(0.71 0.02 250);
-  --accent: oklch(0.3 0.02 252);
-  --accent-foreground: oklch(0.93 0.01 245);
+  --background: oklch(0.21 0.012 70);                /* 暖深褐矿洞底 */
+  --foreground: oklch(0.93 0.008 80);
+  --card: oklch(0.26 0.014 70);
+  --card-foreground: oklch(0.93 0.008 80);
+  --popover: oklch(0.28 0.014 70);
+  --popover-foreground: oklch(0.93 0.008 80);
+  --primary: oklch(0.72 0.16 150);                   /* 亮矿工绿 */
+  --primary-foreground: oklch(0.18 0.03 150);
+  --secondary: oklch(0.3 0.015 70);
+  --secondary-foreground: oklch(0.93 0.008 80);
+  --muted: oklch(0.3 0.015 70);
+  --muted-foreground: oklch(0.72 0.015 75);
+  --accent: oklch(0.33 0.018 70);
+  --accent-foreground: oklch(0.93 0.008 80);
   --destructive: oklch(0.68 0.19 25);
-  --destructive-foreground: oklch(0.16 0.02 230);
-  --border: oklch(0.33 0.018 254);
-  --input: oklch(0.33 0.018 254);
-  --ring: oklch(0.72 0.125 184 / 0.4);
+  --destructive-foreground: oklch(0.16 0.02 25);
+  --border: oklch(0.36 0.016 70);
+  --input: oklch(0.36 0.016 70);
+  --ring: oklch(0.72 0.16 150 / 0.4);
 
-  --helix: oklch(0.72 0.125 184);
-  --helix-soft: oklch(0.26 0.035 190);
-  --strand: oklch(0.7 0.09 220);
-  --panel: oklch(0.21 0.016 254);
+  --helix: oklch(0.72 0.16 150);
+  --helix-soft: oklch(0.29 0.04 150);
+  --strand: oklch(0.78 0.13 80);                     /* 暗底亮金链接 */
+  --panel: oklch(0.24 0.013 70);
+
+  --gold: oklch(0.78 0.14 78);
+  --gold-hover: oklch(0.84 0.12 82);
+  --gold-light: oklch(0.32 0.055 80);
+  --miner-green: oklch(0.72 0.16 150);
+  --miner-green-hover: oklch(0.78 0.15 150);
+  --miner-green-light: oklch(0.29 0.04 150);
 
   --pet-amber: oklch(0.78 0.15 78);
   --pet-amber-deep: oklch(0.85 0.13 82);             /* 暗底上"深琥珀"反转为亮金文字档 */
@@ -135,10 +156,10 @@
   }
 
   ::selection {
-    background: oklch(0.6 0.118 184.704 / 0.18);
+    background: #15803D2E;
   }
   .dark ::selection {
-    background: oklch(0.72 0.125 184 / 0.3);
+    background: oklch(0.72 0.16 150 / 0.3);
   }
 
   /* 细滚动条 */
@@ -147,11 +168,11 @@
     height: 8px;
   }
   ::-webkit-scrollbar-thumb {
-    background: oklch(0.86 0.005 247);
+    background: oklch(0.87 0.01 75);
     border-radius: 8px;
   }
   ::-webkit-scrollbar-thumb:hover {
-    background: oklch(0.75 0.01 247);
+    background: oklch(0.78 0.02 75);
   }
   .dark ::-webkit-scrollbar-thumb {
     background: oklch(0.36 0.02 254);
@@ -166,19 +187,27 @@
 
 /* ---------- 全局装饰与动效 token ---------- */
 
-/* 极淡纸感底纹（亮色下几乎不可见，避免发脏） */
+/* 藏宝图纸微点阵（工程图纸质感，opacity ≈ 0.04） */
 .bg-grid {
-  background-image:
-    linear-gradient(oklch(0.55 0.02 247 / 0.035) 1px, transparent 1px),
-    linear-gradient(90deg, oklch(0.55 0.02 247 / 0.035) 1px, transparent 1px);
-  background-size: 42px 42px;
+  background-image: radial-gradient(#78716C 1px, transparent 1px);
+  background-size: 24px 24px;
+  background-position: -12px -12px;
+  opacity: 1;
+}
+.bg-grid::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: var(--background);
+  opacity: 0.955;
+  pointer-events: none;
 }
 
-/* 顶部极淡 teal 晕染 */
+/* 顶部暖光晕染（矿灯金 + 矿工绿） */
 .ambient-glow {
   background:
-    radial-gradient(60% 45% at 18% 0%, oklch(0.6 0.118 184.704 / 0.05) 0%, transparent 60%),
-    radial-gradient(50% 40% at 85% 8%, oklch(0.52 0.1 220 / 0.045) 0%, transparent 65%);
+    radial-gradient(60% 45% at 18% 0%, #D9770614 0%, transparent 60%),
+    radial-gradient(50% 40% at 85% 8%, #15803D12 0%, transparent 65%);
 }
 
 /* 统一轻投影体系 */
@@ -211,7 +240,7 @@
   animation: caret-blink 1s steps(1) infinite;
 }
 
-/* 工具执行中的扫描线（teal 淡扫） */
+/* 工具执行中的扫描线（矿工绿淡扫） */
 @keyframes scan-sweep {
   0% { transform: translateX(-100%); }
   100% { transform: translateX(220%); }
@@ -225,7 +254,7 @@
   position: absolute;
   inset: 0;
   width: 45%;
-  background: linear-gradient(90deg, transparent, oklch(0.6 0.118 184.704 / 0.14), transparent);
+  background: linear-gradient(90deg, transparent, #15803D24, transparent);
   animation: scan-sweep 1.4s ease-in-out infinite;
 }
 
@@ -275,6 +304,10 @@
   text-decoration: none;
   border-bottom: 1px dashed color-mix(in oklch, var(--color-helix) 45%, transparent);
   transition: color 0.2s ease, border-color 0.2s ease;
+  /* 编号是原子 token（GSE123/SRR456/PRJNA…），绝不允许从中间折断换行 */
+  word-break: normal;
+  overflow-wrap: normal;
+  white-space: nowrap;
 }
 .id-link:hover,
 .id-link:focus-visible {
@@ -283,15 +316,51 @@
   border-bottom-style: solid;
 }
 
+/* 新用户发现性提示：游戏式「任务感叹号」标记（由 IdLink 在 hintOn 时挂载 .id-link-quest，
+   6s 自动消失）。学习 MMO 的任务指示语言：黄色 "!" = 这里有宝藏可领，不破坏排版、不像外挂 UI。
+   台词由桌宠阿寻承担（lib/hintBus → TreasureMouse hint 事件）。 */
+@keyframes idlink-quest-bounce {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-3px); }
+}
+.id-link--hint {
+  border-bottom-style: solid;
+  border-bottom-color: var(--color-helix);
+  text-shadow: 0 0 12px color-mix(in oklch, var(--color-helix) 55%, transparent);
+}
+.id-link-quest {
+  position: absolute;
+  top: -0.85em;
+  right: -0.45em;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 13px;
+  height: 13px;
+  border-radius: 999px;
+  background: linear-gradient(180deg, #ffd34d, #f5a623);
+  color: #5a3a00;
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 1;
+  font-family: var(--font-sans);
+  box-shadow: 0 1px 4px rgb(0 0 0 / 0.28), 0 0 0 2px rgb(255 255 255 / 0.65);
+  pointer-events: none;
+  animation: idlink-quest-bounce 0.9s ease-in-out infinite;
+}
+
 /* Markdown 消息排版（亮色档） */
 .md-body {
   line-height: 1.75;
-  word-break: break-word;
+  /* 英文模式：优先按词边界换行，只在长 token（URL/编号）确实溢出时才断，避免单词被拦腰折断 */
+  word-break: normal;
+  overflow-wrap: break-word;
 }
 .md-body p { margin: 0.35em 0; }
 .md-body p:first-child { margin-top: 0; }
 .md-body p:last-child { margin-bottom: 0; }
-.md-body strong { color: oklch(0.53 0.11 184.7); font-weight: 600; }
+.md-body strong { color: #15803D; font-weight: 600; }
 .md-body em { color: var(--color-strand); font-style: normal; }
 .md-body del { color: var(--color-muted-foreground); }
 .md-body h1, .md-body h2, .md-body h3 {
@@ -314,14 +383,14 @@
 .md-body code {
   font-family: var(--font-mono);
   font-size: 0.86em;
-  background: oklch(0.968 0.002 247.896);
+  background: #F6F3EE;
   border: 1px solid var(--color-border);
   border-radius: 4px;
   padding: 0.08em 0.4em;
-  color: oklch(0.4 0.05 250);
+  color: #57534E;
 }
 .md-body pre {
-  background: oklch(0.982 0.002 247.839);
+  background: #FAF8F5;
   border: 1px solid var(--color-border);
   border-radius: 8px;
   padding: 0.8em 1em;
@@ -332,9 +401,9 @@
   background: transparent;
   border: none;
   padding: 0;
-  color: oklch(0.32 0.04 250);
+  color: #44403C;
 }
-.dark .md-body strong { color: oklch(0.75 0.11 184); }
+.dark .md-body strong { color: oklch(0.78 0.15 150); }
 .dark .md-body code {
   background: oklch(0.27 0.017 254);
   color: oklch(0.82 0.03 200);
@@ -346,8 +415,8 @@
   color: oklch(0.87 0.015 245);
 }
 .dark .md-body th {
-  background: oklch(0.27 0.017 254);
-  color: oklch(0.75 0.11 184);
+  background: oklch(0.3 0.015 70);
+  color: oklch(0.78 0.15 150);
 }
 .dark .md-body tbody tr:nth-child(even) {
   background: oklch(0.21 0.015 255);
@@ -380,11 +449,11 @@
   padding: 0.3em 0.7em;
 }
 .md-body th {
-  background: oklch(0.968 0.002 247.896);
-  color: oklch(0.53 0.11 184.7);
+  background: #F6F3EE;
+  color: #15803D;
 }
 .md-body tbody tr:nth-child(even) {
-  background: oklch(0.982 0.002 247.839);
+  background: #FAF8F5;
 }
 
 /* 代码块：语言标签 + highlight.js 亮色配色（GitHub-light 取向） */
@@ -607,17 +676,15 @@
 
 /* ---------- 夜探矿洞：暗色下装饰覆盖 ---------- */
 .dark .bg-grid {
-  background-image:
-    linear-gradient(oklch(0.7 0.03 247 / 0.05) 1px, transparent 1px),
-    linear-gradient(90deg, oklch(0.7 0.03 247 / 0.05) 1px, transparent 1px);
+  background-image: radial-gradient(oklch(0.85 0.02 80) 1px, transparent 1px);
 }
 .dark .ambient-glow {
   background:
-    radial-gradient(60% 45% at 18% 0%, oklch(0.72 0.125 184 / 0.08) 0%, transparent 60%),
-    radial-gradient(50% 40% at 85% 8%, oklch(0.7 0.09 220 / 0.07) 0%, transparent 65%);
+    radial-gradient(60% 45% at 18% 0%, oklch(0.78 0.14 78 / 0.07) 0%, transparent 60%),
+    radial-gradient(50% 40% at 85% 8%, oklch(0.72 0.16 150 / 0.06) 0%, transparent 65%);
 }
 .dark .scan-line::after {
-  background: linear-gradient(90deg, transparent, oklch(0.72 0.125 184 / 0.16), transparent);
+  background: linear-gradient(90deg, transparent, oklch(0.72 0.16 150 / 0.16), transparent);
 }
 .dark .hover-lift:hover {
   box-shadow: 0 10px 24px -12px rgb(0 0 0 / 0.55), 0 2px 6px -2px rgb(0 0 0 / 0.35);
@@ -689,5 +756,79 @@
 @media (prefers-reduced-motion: reduce) {
   .pet-idle, .pet-digging, .pet-reveal, .pet-miss, .pet-dust, .pet-poke,
   .pet-spin, .pet-walk, .pet-look, .pet-sleep, .pet-heart, .pet-chest-pop,
-  .pet-burst, .pet-celebrate, .pet-halo, .pet-banner, .pet-badge-in { animation: none; }
+  .pet-burst, .pet-celebrate, .pet-halo, .pet-banner, .pet-badge-in,
+  .pet-hover-bounce, .pet-ears-perk { animation: none; }
+}
+
+/* ---------- 探矿工坊 UI 组件样式 ---------- */
+
+/* Hero 圆润卡片：暖米白底 + 柔和阴影 + 统一大圆角 */
+.hero-card {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  box-shadow: 0 4px 20px -2px rgb(120 113 108 / 0.08);
+  background: var(--color-card);
+}
+
+/* 探矿任务牌（Actionable Pill）：白底微卡片，hover 上浮 + 金边 + 浅金底 */
+.quest-pill {
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-card);
+  padding: 0.5rem 0.875rem; /* py-2 px-3.5 */
+  cursor: pointer;
+  transition: transform 0.2s ease, border-color 0.2s ease, background-color 0.2s ease, box-shadow 0.2s ease;
+}
+.quest-pill:hover {
+  transform: translateY(-2px);
+  border-color: var(--gold);
+  background: var(--gold-light);
+  box-shadow: 0 6px 16px -8px rgb(120 113 108 / 0.25);
+}
+.quest-pill:active {
+  transform: translateY(0);
+}
+.dark .quest-pill {
+  background: var(--color-card);
+}
+.dark .quest-pill:hover {
+  border-color: var(--gold);
+  background: var(--gold-light);
+}
+
+/* 桌宠 hover 立绘：轻微回弹缩放 */
+@keyframes pet-hover-bounce {
+  0%, 100% { transform: scale(1); }
+  40% { transform: scale(1.05); }
+  70% { transform: scale(0.98); }
+}
+.pet-hover-bounce {
+  animation: pet-hover-bounce 0.55s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+/* 输入联动：用户键入时阿寻「竖起耳朵随时出发」的跃动感 */
+@keyframes pet-ears-perk {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  30% { transform: translateY(-5px) rotate(-3deg); }
+  60% { transform: translateY(-2px) rotate(2deg); }
+}
+.pet-ears-perk {
+  animation: pet-ears-perk 0.7s cubic-bezier(0.34, 1.56, 0.64, 1) infinite;
+}
+
+/* ---------- 移动端适配 ---------- */
+
+/* 安全区（全面屏 / 刘海屏）：需 index.html 的 viewport-fit=cover 才生效。
+   用 max(设计基线, env) 而非纯 env：无刘海设备取基线（与 py-2.5 / py-3 一致，视觉不变），
+   有刘海时才多出让位空间。基线值与对应元素的原 padding 保持一致。
+   横向（safe-x）不单独处理：竖屏无影响，横屏时内容区自身已有 px-4 缓冲。 */
+.safe-t { padding-top: max(0.625rem, env(safe-area-inset-top)); }    /* header 原 py-2.5 */
+.safe-b { padding-bottom: max(0.75rem, env(safe-area-inset-bottom)); } /* composer 原 py-3 */
+
+/* 触摸端禁用点击高亮与长按系统菜单，避免对话气泡被选中弹菜单 */
+@media (hover: none) {
+  .touch-clean {
+    -webkit-tap-highlight-color: transparent;
+    -webkit-touch-callout: none;
+  }
 }

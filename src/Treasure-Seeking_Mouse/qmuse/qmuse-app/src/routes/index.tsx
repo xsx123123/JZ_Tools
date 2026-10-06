@@ -1,7 +1,7 @@
 // GEO寻宝鼠：主页（会话栏 + 对话区 + 账号弹窗 + 桌宠）
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { ChevronsLeft, ChevronsRight, Info, Menu, Moon, Sun, Trophy } from "lucide-react";
+import { ChevronsLeft, ChevronsRight, Info, Menu, Moon, PawPrint, Sun, Trophy } from "lucide-react";
 import { subscribeAuth, type AuthUser } from "@/services/authSession";
 import { EmptyState } from "@/components/chat/EmptyState";
 import { ChatMessage, type ChatUIMessage } from "@/components/chat/ChatMessage";
@@ -10,6 +10,7 @@ import { SessionSidebar, MobileDrawerHeader } from "@/components/chat/SessionSid
 import { BrandMark } from "@/components/BrandMark";
 import { AuthDialog } from "@/components/auth/AuthDialog";
 import { TreasureMouse, makePetEvent, type PetEvent } from "@/components/pet/TreasureMouse";
+import { PetSettingsPanel } from "@/components/pet/PetSettingsPanel";
 import { readTheme, writeTheme, applyTheme, type Theme } from "@/services/petStore";
 import { bumpStats } from "@/services/statsStore";
 import { Leaderboard } from "@/components/chat/Leaderboard";
@@ -92,6 +93,7 @@ function ChatPage(): React.ReactElement {
     });
   }, []);
   const [petEvent, setPetEvent] = useState<PetEvent | null>(null); // 桌宠事件流（仅 UI 反馈，不影响消息逻辑）
+  const [petPanelOpen, setPetPanelOpen] = useState(false); // 顶栏桌宠设置面板
   const petCardsRef = useRef(0);
   const [boardOpen, setBoardOpen] = useState(false); // 排行榜抽屉
   const statRef = useRef({ digs: 0, cards: 0 }); // 本轮挖宝统计（下铲次数 / 出土卡片数）
@@ -482,6 +484,26 @@ function ChatPage(): React.ReactElement {
           >
             <Info size={17} />
           </Link>
+          {/* 桌宠设置入口：与桌宠悬浮齿轮共用同款面板 */}
+          <span className="relative">
+            <button
+              type="button"
+              onClick={() => setPetPanelOpen((o) => !o)}
+              title="桌宠设置"
+              aria-label="桌宠设置"
+              className={`rounded-md p-1.5 transition-colors hover:bg-secondary hover:text-pet-amber-deep ${petPanelOpen ? "text-pet-amber-deep" : "text-muted-foreground"}`}
+            >
+              <PawPrint size={17} />
+            </button>
+            {petPanelOpen ? (
+              <>
+                <span className="fixed inset-0 z-40" onClick={() => setPetPanelOpen(false)} />
+                <span className="absolute right-0 top-full z-50 mt-1.5 block">
+                  <PetSettingsPanel onClose={() => setPetPanelOpen(false)} />
+                </span>
+              </>
+            ) : null}
+          </span>
           <button
             type="button"
             onClick={toggleTheme}

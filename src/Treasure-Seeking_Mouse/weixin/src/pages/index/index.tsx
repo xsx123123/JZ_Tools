@@ -27,6 +27,7 @@ import { SessionSidebar } from '@/components/SessionSidebar'
 import { UsageStatsDialog } from '@/components/UsageStatsDialog'
 import { Leaderboard } from '@/components/Leaderboard'
 import { TreasureMouse, makePetEvent, type PetEvent } from '@/components/TreasureMouse'
+import { PetSettingsPanel } from '@/components/PetSettingsPanel'
 import { PolariseqCard } from '@/components/PolariseqCard'
 import '@/components/panels.css'
 import './index.css'
@@ -64,6 +65,7 @@ export default function Index() {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [statsOpen, setStatsOpen] = useState(false)
   const [boardOpen, setBoardOpen] = useState(false)
+  const [petPanelOpen, setPetPanelOpen] = useState(false) // 桌宠设置面板（顶栏 ⚙️，与宠物常驻齿轮同款）
   const [evidence, setEvidence] = useState<EvidenceRequest | null>(null)
   const [petEvent, setPetEvent] = useState<PetEvent | null>(null) // 桌宠事件流（仅 UI 反馈，不影响消息逻辑）
   const petCardsRef = useRef(0)
@@ -288,6 +290,9 @@ export default function Index() {
         <Text className='icon-btn' onClick={() => setBoardOpen(true)}>
           🏆
         </Text>
+        <Text className='icon-btn' onClick={() => setPetPanelOpen(true)}>
+          ⚙️
+        </Text>
         <Text className='chat__theme' onClick={toggleTheme}>
           {theme === 'dark' ? '☀️' : '🌙'}
         </Text>
@@ -299,8 +304,15 @@ export default function Index() {
       <ScrollView className='chat__list' scrollY scrollIntoView={anchor} enhanced showScrollbar={false}>
         {messages.length === 0 ? (
           <View className='chat__empty'>
-            <Text className='chat__empty-title'>{t('brand.name')}</Text>
-            <Text className='chat__empty-desc'>{t('empty.intro')}</Text>
+            <View className='chat__empty-hero'>
+              <Text className='chat__empty-title'>
+                <Text className='chat__empty-title-green'>GEO寻宝</Text>
+                <Text className='chat__empty-title-gold'>鼠</Text>
+                <Text> · 你的同门生信探险搭子</Text>
+              </Text>
+              <Text className='chat__empty-sub'>{t('empty.subHeadline')}</Text>
+              <Text className='chat__empty-desc'>{t('empty.intro')}</Text>
+            </View>
           </View>
         ) : null}
 
@@ -419,6 +431,16 @@ export default function Index() {
       ) : null}
       <UsageStatsDialog open={statsOpen} onClose={() => setStatsOpen(false)} />
       <Leaderboard open={boardOpen} onClose={() => setBoardOpen(false)} />
+
+      {/* 桌宠设置面板（顶栏 ⚙️ 入口；遮罩点击关闭，找回/静默经 petBus 直达桌宠） */}
+      {petPanelOpen ? (
+        <View className='dialog-wrap'>
+          <View className='mask' onClick={() => setPetPanelOpen(false)} />
+          <View className='petset-dialog'>
+            <PetSettingsPanel onClose={() => setPetPanelOpen(false)} />
+          </View>
+        </View>
+      ) : null}
     </View>
   )
 }

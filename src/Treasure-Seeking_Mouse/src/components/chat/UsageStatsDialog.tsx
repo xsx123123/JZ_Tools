@@ -129,6 +129,7 @@ export function UsageStatsDialog({ open, onClose }: { open: boolean; onClose: ()
                         </span>
                         <span className="shrink-0 font-mono text-[12px] text-foreground">
                           {fmt(tool.count)}
+                          {tool.empties > 0 ? <span className="ml-1 text-[10.5px] text-pet-amber-deep">{t("stats.toolBlank", { n: fmt(tool.empties) })}</span> : null}
                           {tool.errors > 0 ? <span className="ml-1 text-[10.5px] text-red-500">{t("stats.toolFailed", { n: fmt(tool.errors) })}</span> : null}
                         </span>
                       </div>

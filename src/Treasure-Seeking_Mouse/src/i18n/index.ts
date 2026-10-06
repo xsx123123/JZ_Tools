@@ -156,7 +156,13 @@ export interface PetLines {
 
 const PET_LINES: Record<Lang, PetLines> = {
   zh: {
-    idle: ["这片土里有单细胞的味道…", "今天也来挖 GSE 吧！", "嗅到了高分文献的气息", "我的铲子呢…哦在背包里", "宝藏藏在第三铲之后"],
+    idle: [
+      "师兄师姐催数据了？别慌，告诉我你想挖哪篇！",
+      "刚进组看不懂 GSE/GSM 编号？把代号丢给我，阿寻去刨底细！",
+      "今天想找小鼠还是人的转录组？阿寻的小铲子已经磨利了~",
+      "哪怕只有一个模糊的研究方向，阿寻也能顺藤摸瓜！",
+      "这片土里有单细胞的味道…", "今天也来挖 GSE 吧！", "嗅到了高分文献的气息", "我的铲子呢…哦在背包里", "宝藏藏在第三铲之后",
+    ],
     dig: ["挖挖挖…", "GEO? SRA?", "这块土有点硬", "快出来了快出来了", "阿寻挖矿中，请勿投喂"],
     poke: ["吱!", "别戳啦~", "背包里掉出一张 GSM 卡片", "给你看我的宝贝收藏", "再戳就咬你哦（轻轻）"],
     spin: ["转圈圈！宝藏多多！", "被爱了吱吱吱", "嘿嘿，痒"],
@@ -167,7 +173,13 @@ const PET_LINES: Record<Lang, PetLines> = {
     treasureStash: (n) => `本鼠已囤 ${n} 份宝藏，富甲一方！`,
   },
   en: {
-    idle: ["I smell single cells in this soil…", "Let's dig up a GSE today!", "I sense a high-impact paper", "Where's my shovel… oh, in the pack", "Treasure lies past the third dig"],
+    idle: [
+      "Seniors pushing you for data? Tell me what to dig, no panic!",
+      "New to the lab and baffled by GSE/GSM codes? Drop one here — I'll dig up the details!",
+      "Mouse or human transcriptomes today? My little shovel is freshly sharpened~",
+      "Even a vague research idea works — I'll follow the vine to the treasure!",
+      "I smell single cells in this soil…", "Let's dig up a GSE today!", "I sense a high-impact paper", "Where's my shovel… oh, in the pack", "Treasure lies past the third dig",
+    ],
     dig: ["Dig, dig, dig…", "GEO? SRA?", "This soil's a bit hard", "Almost out, almost out", "Muse is digging — do not feed"],
     poke: ["Squeak!", "Don't poke me~", "A GSM card fell out of my pack", "Wanna see my collection?", "Poke again and I'll bite (gently)"],
     spin: ["Spinning! So much treasure!", "Loved it, squeak squeak", "Hehe, that tickles"],

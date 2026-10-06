@@ -12,42 +12,50 @@
 /* 主题：亮色 :root + 夜探矿洞 .dark 两套 */
 
 :root {
-  --radius: 0.5rem;
+  --radius: 0.75rem;
   --font-sans: "Noto Sans SC Variable", "PingFang SC", "Microsoft YaHei", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "JetBrains Mono", "SFMono-Regular", ui-monospace, Menlo, Consolas, monospace;
   --font-display: "Fraunces", "Noto Serif SC", Georgia, serif;
 
-  /* gray-50 画布 + 纯白内容面 + teal-600 强调 */
-  --background: rgb(249, 250, 251);          /* #F9FAFB */
-  --foreground: rgb(18, 24, 36);            /* #111827 */
-  --card: rgb(255, 255, 255);                              /* #FFFFFF */
-  --card-foreground: rgb(18, 24, 36);
+  /* 暖米白画布（藏宝图纸感）+ 纯白内容面 + 矿工绿主行动色 + 探矿金强调 */
+  --background: rgb(250, 248, 245);          /* #FAF8F5 暖米白 */
+  --foreground: rgb(41, 37, 36);            /* #292524 温暖深炭黑 */
+  --card: rgb(255, 255, 255);               /* #FFFFFF */
+  --card-foreground: rgb(41, 37, 36);
   --popover: rgb(255, 255, 255);
-  --popover-foreground: rgb(18, 24, 36);
-  --primary: rgb(0, 150, 137);               /* #0D9488 teal-600 */
-  --primary-foreground: rgb(249, 250, 251);
-  --secondary: rgb(243, 244, 246);           /* #F3F4F6 */
-  --secondary-foreground: rgb(18, 24, 36);
-  --muted: rgb(243, 244, 246);               /* gray-100 */
-  --muted-foreground: rgb(106, 114, 125);          /* #4B5563 一档 */
-  --accent: rgb(241, 245, 249);              /* hover 浅 slate */
-  --accent-foreground: rgb(18, 24, 36);
-  --destructive: rgb(215, 53, 47);               /* red-600 档 */
-  --destructive-foreground: rgb(249, 250, 251);
-  --border: rgb(227, 229, 232);               /* #E5E7EB */
-  --input: rgb(227, 229, 232);
-  --ring: rgba(0, 150, 137, 0.35);
+  --popover-foreground: rgb(41, 37, 36);
+  --primary: rgb(21, 128, 61);              /* #15803D 矿工绿 */
+  --primary-foreground: rgb(255, 255, 255);
+  --secondary: rgb(246, 243, 238);          /* #F6F3EE 浅米便签 */
+  --secondary-foreground: rgb(41, 37, 36);
+  --muted: rgb(246, 243, 238);
+  --muted-foreground: rgb(120, 113, 108);   /* #78716C 温暖次级灰 */
+  --accent: rgb(241, 237, 230);             /* hover 浅米 */
+  --accent-foreground: rgb(41, 37, 36);
+  --destructive: rgb(220, 38, 38);          /* red-600 档 */
+  --destructive-foreground: rgb(255, 255, 255);
+  --border: rgb(231, 229, 228);             /* #E7E5E4 柔和边界 */
+  --input: rgb(231, 229, 228);
+  --ring: rgba(21, 128, 61, 0.35);
 
   /* 自定义语义色 */
-  --helix: rgb(0, 150, 137);                 /* teal-600 */
-  --helix-soft: rgb(228, 246, 243);                /* teal-50 */
-  --strand: rgb(0, 117, 144);                     /* 沉稳青蓝（RNA） */
-  --panel: rgb(243, 244, 246);               /* 侧栏/头部 gray-100 */
+  --helix: rgb(21, 128, 61);                /* 主强调 = 矿工绿 */
+  --helix-soft: rgb(220, 252, 231);         /* #DCFCE7 浅绿胶囊底 */
+  --strand: rgb(180, 83, 9);                /* #B45309 探矿金深档 */
+  --panel: rgb(246, 243, 238);              /* 侧栏/头部暖米面板 */
+
+  /* 探矿金/琥珀色系（重点词、金块、hover 焦点） */
+  --gold: rgb(217, 119, 6);                 /* #D97706 */
+  --gold-hover: rgb(180, 83, 9);            /* #B45309 */
+  --gold-light: rgb(254, 243, 199);         /* #FEF3C7 */
+  --miner-green: rgb(21, 128, 61);          /* #15803D */
+  --miner-green-hover: rgb(22, 101, 52);    /* #166534 */
+  --miner-green-light: rgb(220, 252, 231);  /* #DCFCE7 */
 
   /* 寻宝琥珀金点缀（桌宠/空态/宝箱彩蛋专用） */
-  --pet-amber: rgb(218, 149, 11);                  /* 琥珀金 */
-  --pet-amber-deep: rgb(164, 94, 0);             /* 深琥珀（文字档） */
-  --pet-gold-soft: rgb(255, 242, 210);            /* 浅金底 */
+  --pet-amber: rgb(217, 119, 6);            /* 琥珀金 */
+  --pet-amber-deep: rgb(180, 83, 9);        /* 深琥珀（文字档） */
+  --pet-gold-soft: rgb(254, 243, 199);      /* 浅金底 */
 
   /* R2 补漏：网页版这些 --color-* 别名由 Tailwind v4 的 `@theme inline` 自动生成，
      R1 转换时随 Tailwind 指令一起被剥掉，导致全文 var(--color-*) 引用悬空。
@@ -79,34 +87,47 @@
   --color-pet-amber: var(--pet-amber);
   --color-pet-amber-deep: var(--pet-amber-deep);
   --color-pet-gold-soft: var(--pet-gold-soft);
+  --color-gold: var(--gold);
+  --color-gold-hover: var(--gold-hover);
+  --color-gold-light: var(--gold-light);
+  --color-miner-green: var(--miner-green);
+  --color-miner-green-hover: var(--miner-green-hover);
+  --color-miner-green-light: var(--miner-green-light);
 }
 
-/* 夜探矿洞：深蓝灰底、卡片亮一档、teal/琥珀金提亮发光 */
+/* 夜探矿洞：暖深褐矿洞底、卡片亮一档、矿工绿/琥珀金提亮发光 */
 .dark {
-  --background: rgb(11, 16, 22);
-  --foreground: rgb(227, 233, 238);
-  --card: rgb(22, 28, 36);
-  --card-foreground: rgb(227, 233, 238);
-  --popover: rgb(25, 32, 40);
-  --popover-foreground: rgb(227, 233, 238);
-  --primary: rgb(20, 189, 173);                  /* teal-400 档，暗底更亮 */
-  --primary-foreground: rgb(8, 19, 25);
-  --secondary: rgb(33, 39, 47);
-  --secondary-foreground: rgb(227, 233, 238);
-  --muted: rgb(33, 39, 47);
-  --muted-foreground: rgb(152, 163, 174);
-  --accent: rgb(39, 47, 56);
-  --accent-foreground: rgb(227, 233, 238);
-  --destructive: rgb(247, 93, 89);
-  --destructive-foreground: rgb(5, 15, 20);
-  --border: rgb(47, 54, 63);
-  --input: rgb(47, 54, 63);
-  --ring: rgba(20, 189, 173, 0.4);
+  --background: rgb(41, 33, 28);             /* 暖深褐矿洞底 */
+  --foreground: rgb(236, 231, 222);
+  --card: rgb(52, 43, 37);
+  --card-foreground: rgb(236, 231, 222);
+  --popover: rgb(56, 46, 40);
+  --popover-foreground: rgb(236, 231, 222);
+  --primary: rgb(110, 200, 140);            /* 亮矿工绿 */
+  --primary-foreground: rgb(14, 36, 20);
+  --secondary: rgb(60, 50, 43);
+  --secondary-foreground: rgb(236, 231, 222);
+  --muted: rgb(60, 50, 43);
+  --muted-foreground: rgb(186, 176, 164);
+  --accent: rgb(66, 55, 47);
+  --accent-foreground: rgb(236, 231, 222);
+  --destructive: rgb(248, 113, 105);
+  --destructive-foreground: rgb(41, 15, 12);
+  --border: rgb(74, 62, 53);
+  --input: rgb(74, 62, 53);
+  --ring: rgba(110, 200, 140, 0.4);
 
-  --helix: rgb(20, 189, 173);
-  --helix-soft: rgb(12, 41, 40);
-  --strand: rgb(87, 172, 197);
-  --panel: rgb(19, 25, 32);
+  --helix: rgb(110, 200, 140);
+  --helix-soft: rgb(35, 56, 42);
+  --strand: rgb(233, 178, 92);              /* 暗底亮金链接 */
+  --panel: rgb(47, 39, 33);
+
+  --gold: rgb(235, 178, 92);
+  --gold-hover: rgb(243, 202, 128);
+  --gold-light: rgb(72, 56, 24);
+  --miner-green: rgb(110, 200, 140);
+  --miner-green-hover: rgb(128, 212, 155);
+  --miner-green-light: rgb(35, 56, 42);
 
   --pet-amber: rgb(235, 170, 45);
   --pet-amber-deep: rgb(248, 197, 98);             /* 暗底上"深琥珀"反转为亮金文字档 */
@@ -130,10 +151,10 @@
   }
 
   ::selection {
-    background: rgba(0, 150, 137, 0.18);
+    background: rgba(21, 128, 61, 0.18);
   }
   .dark ::selection {
-    background: rgba(20, 189, 173, 0.3);
+    background: rgba(110, 200, 140, 0.3);
   }
 
   /* 细滚动条 */
@@ -161,19 +182,18 @@
 
 /* ---------- 全局装饰与动效 token ---------- */
 
-/* 极淡纸感底纹（亮色下几乎不可见，避免发脏） */
+/* 藏宝图纸微点阵（工程图纸质感，opacity ≈ 0.04） */
 .bg-grid {
-  background-image:
-    linear-gradient(rgba(105, 115, 125, 0.035) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(105, 115, 125, 0.035) 1px, transparent 1px);
-  background-size: 42px 42px;
+  background-image: radial-gradient(rgb(120, 113, 108) 1px, transparent 1px);
+  background-size: 24px 24px;
+  background-position: -12px -12px;
 }
 
-/* 顶部极淡 teal 晕染 */
+/* 顶部暖光晕染（矿灯金 + 矿工绿） */
 .ambient-glow {
   background:
-    radial-gradient(60% 45% at 18% 0%, rgba(0, 150, 137, 0.05) 0%, transparent 60%),
-    radial-gradient(50% 40% at 85% 8%, rgba(0, 117, 144, 0.045) 0%, transparent 65%);
+    radial-gradient(60% 45% at 18% 0%, rgba(217, 119, 6, 0.08) 0%, transparent 60%),
+    radial-gradient(50% 40% at 85% 8%, rgba(21, 128, 61, 0.07) 0%, transparent 65%);
 }
 
 /* 统一轻投影体系 */
@@ -206,7 +226,7 @@
   animation: caret-blink 1s steps(1) infinite;
 }
 
-/* 工具执行中的扫描线（teal 淡扫） */
+/* 工具执行中的扫描线（矿工绿淡扫） */
 @keyframes scan-sweep {
   0% { transform: translateX(-100%); }
   100% { transform: translateX(220%); }
@@ -220,7 +240,7 @@
   position: absolute;
   inset: 0;
   width: 45%;
-  background: linear-gradient(90deg, transparent, rgba(0, 150, 137, 0.14), transparent);
+  background: linear-gradient(90deg, transparent, rgba(21, 128, 61, 0.14), transparent);
   animation: scan-sweep 1.4s ease-in-out infinite;
 }
 
@@ -263,13 +283,13 @@
   transform-origin: bottom left;
 }
 
-/* v2.1 正文内嵌编号链接（teal 主色 + hover 下划线展开，双主题自适应）
+/* v2.1 正文内嵌编号链接（矿工绿主色 + hover 下划线展开，双主题自适应）
    注：原用 color-mix 混色函数生成半透明主色，小程序不支持 → 直接写死 rgba 等价色 */
 .id-link {
   position: relative;
   color: var(--color-helix);
   text-decoration: none;
-  border-bottom: 1px dashed rgba(0, 150, 137, 0.45);
+  border-bottom: 1px dashed rgba(21, 128, 61, 0.45);
   transition: color 0.2s ease, border-color 0.2s ease;
   /* 编号是原子 token（GSE123/SRR456/PRJNA…），绝不允许从中间折断换行 */
   word-break: normal;
@@ -291,7 +311,7 @@
 .md-body p { margin: 0.35em 0; }
 .md-body p:first-child { margin-top: 0; }
 .md-body p:last-child { margin-bottom: 0; }
-.md-body strong { color: rgb(0, 128, 116); font-weight: 600; }
+.md-body strong { color: rgb(21, 128, 61); font-weight: 600; }
 .md-body em { color: var(--color-strand); font-style: normal; }
 .md-body del { color: var(--color-muted-foreground); }
 .md-body h1, .md-body h2, .md-body h3 {
@@ -314,14 +334,14 @@
 .md-body code {
   font-family: var(--font-mono);
   font-size: 0.86em;
-  background: rgb(243, 244, 246);
+  background: rgb(246, 243, 238);
   border: 1px solid var(--color-border);
   border-radius: 4px;
   padding: 0.08em 0.4em;
-  color: rgb(51, 74, 98);
+  color: rgb(87, 83, 78);
 }
 .md-body pre {
-  background: rgb(248, 249, 250);
+  background: rgb(250, 248, 245);
   border: 1px solid var(--color-border);
   border-radius: 8px;
   padding: 0.8em 1em;
@@ -332,9 +352,9 @@
   background: transparent;
   border: none;
   padding: 0;
-  color: rgb(35, 52, 71);
+  color: rgb(68, 64, 60);
 }
-.dark .md-body strong { color: rgb(74, 197, 182); }
+.dark .md-body strong { color: rgb(134, 219, 155); }
 .dark .md-body code {
   background: rgb(33, 39, 47);
   color: rgb(175, 202, 204);
@@ -346,8 +366,8 @@
   color: rgb(204, 213, 222);
 }
 .dark .md-body th {
-  background: rgb(33, 39, 47);
-  color: rgb(74, 197, 182);
+  background: rgb(60, 50, 43);
+  color: rgb(134, 219, 155);
 }
 /* WXSS 不支持 :nth-child(even)（带参伪类），改为显式类名 .row-even，由渲染层在生成表格行时打标 */
 .dark .md-body tbody tr.row-even {
@@ -381,8 +401,8 @@
   padding: 0.3em 0.7em;
 }
 .md-body th {
-  background: rgb(243, 244, 246);
-  color: rgb(0, 128, 116);
+  background: rgb(246, 243, 238);
+  color: rgb(21, 128, 61);
 }
 /* 同上：条纹表格由渲染层打 .row-even */
 .md-body tbody tr.row-even {
@@ -415,7 +435,7 @@
 .hljs-title, .hljs-title.function_, .hljs-section { color: rgb(0, 79, 139); }
 .hljs-variable, .hljs-params, .hljs-attr, .hljs-selector-class { color: rgb(0, 100, 105); }
 .hljs-built_in, .hljs-type { color: rgb(0, 112, 142); }
-.hljs-symbol, .hljs-bullet, .hljs-link { color: rgb(0, 128, 116); }
+.hljs-symbol, .hljs-bullet, .hljs-link { color: rgb(21, 128, 61); }
 .hljs-deletion { color: var(--color-destructive); }
 .hljs-meta { color: rgb(124, 129, 134); }
 
@@ -610,17 +630,15 @@
 
 /* ---------- 夜探矿洞：暗色下装饰覆盖 ---------- */
 .dark .bg-grid {
-  background-image:
-    linear-gradient(rgba(144, 161, 177, 0.05) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(144, 161, 177, 0.05) 1px, transparent 1px);
+  background-image: radial-gradient(rgb(214, 196, 168) 1px, transparent 1px);
 }
 .dark .ambient-glow {
   background:
-    radial-gradient(60% 45% at 18% 0%, rgba(20, 189, 173, 0.08) 0%, transparent 60%),
-    radial-gradient(50% 40% at 85% 8%, rgba(87, 172, 197, 0.07) 0%, transparent 65%);
+    radial-gradient(60% 45% at 18% 0%, rgba(235, 170, 45, 0.07) 0%, transparent 60%),
+    radial-gradient(50% 40% at 85% 8%, rgba(110, 200, 140, 0.06) 0%, transparent 65%);
 }
 .dark .scan-line::after {
-  background: linear-gradient(90deg, transparent, rgba(20, 189, 173, 0.16), transparent);
+  background: linear-gradient(90deg, transparent, rgba(110, 200, 140, 0.16), transparent);
 }
 .dark .hover-lift:hover {
   box-shadow: 0 10px 24px -12px rgb(0 0 0 / 0.55), 0 2px 6px -2px rgb(0 0 0 / 0.35);
@@ -692,7 +710,30 @@
 @media (prefers-reduced-motion: reduce) {
   .pet-idle, .pet-digging, .pet-reveal, .pet-miss, .pet-dust, .pet-poke,
   .pet-spin, .pet-walk, .pet-look, .pet-sleep, .pet-heart, .pet-chest-pop,
-  .pet-burst, .pet-celebrate, .pet-halo, .pet-banner, .pet-badge-in { animation: none; }
+  .pet-burst, .pet-celebrate, .pet-halo, .pet-banner, .pet-badge-in,
+  .pet-hover-bounce, .pet-ears-perk { animation: none; }
+}
+
+/* ---------- 探矿工坊 UI 组件样式 ---------- */
+
+/* Hero 圆润卡片：暖米白底 + 柔和阴影 + 统一大圆角 */
+.hero-card {
+  border: 1rpx solid var(--color-border);
+  border-radius: var(--radius);
+  box-shadow: 0 8rpx 40rpx -4rpx rgba(120, 113, 108, 0.08);
+  background-color: var(--color-card);
+}
+
+/* 探矿任务牌（Actionable Pill）：白底微卡片，点按变金边浅金底（小程序无 hover） */
+.quest-pill {
+  border: 1rpx solid var(--color-border);
+  border-radius: 16rpx;
+  background-color: var(--color-card);
+  padding: 16rpx 28rpx;
+}
+.quest-pill--active {
+  border-color: var(--gold);
+  background-color: var(--gold-light);
 }
 
 /* ---------- 移动端适配 ---------- */

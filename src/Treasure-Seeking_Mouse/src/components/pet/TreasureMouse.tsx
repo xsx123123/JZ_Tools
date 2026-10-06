@@ -1,7 +1,10 @@
 // 寻宝鼠「阿寻」：积木风桌宠。多造型切换 + 挖宝小剧场（土堆/尘土/宝石入袋）+
 // 连击转圈、爱心飘浮、闲置散步张望、宝箱累计计数、里程碑成就庆祝，可拖拽、右键静默。
 import { useCallback, useEffect, useRef, useState } from "react";
-import { readPetPos, writePetPos, readPetQuiet, writePetQuiet, bumpPokeCount, readTreasureCount, addTreasure, ACHIEVEMENTS, claimAchievement, earnedAchievements, type Achievement, type PetPos } from "@/services/petStore";
+import { Settings } from "lucide-react";
+import { readPetPos, writePetPos, readPetQuiet, writePetQuiet, readPetSize, readPetAlways, readPetIdleAlive, bumpPokeCount, readTreasureCount, addTreasure, ACHIEVEMENTS, claimAchievement, earnedAchievements, type Achievement, type PetPos } from "@/services/petStore";
+import { onPetSettingsChanged, onPetRecall, onPetQuiet, onPetResetPos, onPetTyping, emitPetSettingsChanged } from "@/lib/petBus";
+import { PetSettingsPanel } from "@/components/pet/PetSettingsPanel";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useI18n } from "@/i18n/provider";
 import { petLines, type MessageKey } from "@/i18n";
@@ -40,20 +43,13 @@ function pick<T>(arr: T[]): T {
   return arr[Math.floor(Math.random() * arr.length)];
 }
 
-const SIZE = 144; // 宠物宽（px，桌面端）
-const SIZE_MOBILE = 96; // 移动端缩小：原尺寸在手机上占近半屏宽，遮挡对话内容
 const MOBILE_MAX_W = 768; // 与 useIsMobile / Tailwind md: 断点一致
+const MOBILE_SIZE_CAP = 120; // 移动端即使选大档也封顶，避免遮挡对话
 const MARGIN = 12;
 
-/** 当前设备下的宠物宽度 */
-function petSize(): number {
-  return window.innerWidth < MOBILE_MAX_W ? SIZE_MOBILE : SIZE;
-}
-
-function clampPos(p: PetPos): PetPos {
+function clampPos(p: PetPos, size: number): PetPos {
   const w = window.innerWidth;
   const h = window.innerHeight;
-  const size = petSize();
   return {
     x: Math.min(Math.max(MARGIN, p.x), w - size - MARGIN),
     y: Math.min(Math.max(MARGIN, p.y), h - size - 120),
@@ -75,16 +71,21 @@ interface Burst {
 }
 let burstId = 0;
 
-export function TreasureMouse({ event }: { event: PetEvent | null }): React.ReactElement {
+export function TreasureMouse({ event }: { event: PetEvent | null }): React.ReactElement | null {
   const { t, lang } = useI18n();
   const L = petLines(lang);
   const isMobile = useIsMobile();
-  const size = isMobile ? SIZE_MOBILE : SIZE; // 移动端缩小，避免遮挡近半屏宽
+  const [sizePref, setSizePref] = useState<number>(() => readPetSize()); // 体型宽 px（72–240，步进 12）
+  const [always, setAlways] = useState<boolean>(() => readPetAlways()); // 一直存在：关掉则闲置自动藏起来
+  const [idleAlive, setIdleAlive] = useState<boolean>(() => readPetIdleAlive()); // 闲置时自己活动（冒泡/溜达/入睡）
+  const [hidden, setHidden] = useState(false);
+  const [panelOpen, setPanelOpen] = useState(false); // 悬浮齿轮设置面板
+  const size = isMobile ? Math.min(sizePref, MOBILE_SIZE_CAP) : sizePref; // 实际渲染宽度
   const [quiet, setQuiet] = useState<boolean>(() => readPetQuiet());
   const [pos, setPos] = useState<PetPos>(() => {
     const saved = readPetPos();
-    if (saved) return clampPos(saved);
-    return { x: window.innerWidth - petSize() - 24, y: 120 };
+    if (saved) return clampPos(saved, size);
+    return { x: window.innerWidth - size - 24, y: 120 };
   });
   const [state, setState] = useState<PetState>("idle");
   const [bubble, setBubble] = useState<string | null>(null);
@@ -97,6 +98,8 @@ export function TreasureMouse({ event }: { event: PetEvent | null }): React.Reac
   const [bursts, setBursts] = useState<Burst[]>([]);
   const [dark, setDark] = useState<boolean>(() => document.documentElement.classList.contains("dark"));
   const dragRef = useRef<{ startX: number; startY: number; origX: number; origY: number; moved: boolean } | null>(null);
+  const [typing, setTyping] = useState(false); // 用户正在输入框键入：立绘挂「竖起耳朵」跃动 class
+  const bodyRef = useRef<HTMLSpanElement>(null); // 立绘包裹层：hover 回弹动画挂在它身上
   const longPressRef = useRef<ReturnType<typeof setTimeout> | null>(null); // 触摸端长按静默计时器
   const stateTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const idleTimer = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -106,6 +109,54 @@ export function TreasureMouse({ event }: { event: PetEvent | null }): React.Reac
   const lastAct = useRef(Date.now()); // 最近一次互动（事件/戳/拖拽），闲置超时后入睡
   const busyRef = useRef(false); // 有剧情在演时，闲置行为让路
   busyRef.current = state !== "idle";
+  const alwaysRef = useRef(always);
+  alwaysRef.current = always;
+  const idleAliveRef = useRef(idleAlive);
+  idleAliveRef.current = idleAlive;
+
+  // 页面层设置入口（顶栏按钮 / 共享面板）⇆ 桌宠：改设置即时生效、找回退出静默与隐藏
+  useEffect(() => {
+    const offSettings = onPetSettingsChanged(() => {
+      lastAct.current = Date.now(); // 用户在调设置，别睡着了/藏起来
+      setSizePref(readPetSize());
+      setAlways(readPetAlways());
+      setIdleAlive(readPetIdleAlive());
+      if (readPetAlways()) setHidden(false);
+    });
+    const offRecall = onPetRecall(() => {
+      lastAct.current = Date.now();
+      if (stateTimer.current) clearTimeout(stateTimer.current);
+      writePetQuiet(false);
+      setQuiet(false);
+      setHidden(false);
+      setState("idle");
+      setBubble(null);
+    });
+    const offQuiet = onPetQuiet(() => {
+      writePetQuiet(true);
+      setQuiet(true);
+      setPanelOpen(false);
+      setState("idle");
+      setBubble(null);
+    });
+    const offResetPos = onPetResetPos(() => {
+      const p = clampPos({ x: window.innerWidth - size - 24, y: 120 }, size);
+      setPos(p);
+      writePetPos(p);
+      lastAct.current = Date.now();
+    });
+    return () => {
+      offSettings();
+      offRecall();
+      offQuiet();
+      offResetPos();
+    };
+  }, [size]);
+
+  // 有剧情开演时收起设置面板
+  useEffect(() => {
+    if (state !== "idle" && panelOpen) setPanelOpen(false);
+  }, [state, panelOpen]);
 
   // 夜探矿洞主题：跟随 <html> 的 .dark 类
   useEffect(() => {
@@ -113,6 +164,43 @@ export function TreasureMouse({ event }: { event: PetEvent | null }): React.Reac
     mo.observe(document.documentElement, { attributes: true, attributeFilter: ["class"] });
     return () => mo.disconnect();
   }, []);
+
+  // 输入联动：用户在输入框键入时竖起耳朵，清空即恢复
+  useEffect(() => onPetTyping(setTyping), []);
+
+  // 气泡轮播：闲置时每 12s 从语录库平滑淡入下一句；点击气泡手动切换。
+  // 只在 idle 且无剧情气泡时接管，避免打断挖宝/出错等实时台词
+  const idleLineIdx = useRef(0);
+  useEffect(() => {
+    if (quiet || !idleAlive) return;
+    const timer = setInterval(() => {
+      setState((s) => {
+        if (s !== "idle") return s;
+        setBubble((b) => {
+          if (b !== null) return b; // 当前有台词（可能是剧情/手点）就先让它演完
+          idleLineIdx.current = (idleLineIdx.current + 1) % L.idle.length;
+          const next = L.idle[idleLineIdx.current];
+          setTimeout(() => setBubble((cur) => (cur === next ? null : cur)), 10_000);
+          return next;
+        });
+        return s;
+      });
+    }, 12_000);
+    return () => clearInterval(timer);
+  }, [quiet, idleAlive, lang, L.idle]);
+
+  /** 手动点气泡：立刻换一句（从语录库顺序取下一句，不重复当前句） */
+  function cycleBubble(): void {
+    if (state !== "idle") return; // 剧情台词不打扰
+    lastAct.current = Date.now();
+    idleLineIdx.current = (idleLineIdx.current + 1) % L.idle.length;
+    setBubble(L.idle[idleLineIdx.current]);
+    if (stateTimer.current) clearTimeout(stateTimer.current);
+    stateTimer.current = setTimeout(() => {
+      setState("idle");
+      setBubble(null);
+    }, 10_000);
+  }
 
   /** 临时状态：ms 后回 idle */
   const transient = useCallback((s: PetState, line: string | null, ms: number, onEnd?: () => void) => {
@@ -199,6 +287,7 @@ export function TreasureMouse({ event }: { event: PetEvent | null }): React.Reac
     if (event.seq <= lastSeq.current) return;
     lastSeq.current = event.seq;
     lastAct.current = Date.now();
+    setHidden(false); // 「一直存在」关闭时，有互动就回来
     if (state === "sleep") { // 有动静就醒
       setState("idle");
       setBubble(null);
@@ -248,11 +337,16 @@ export function TreasureMouse({ event }: { event: PetEvent | null }): React.Reac
     }
   }, [event, quiet, transient, state, checkMilestones, lang]);
 
-  // 闲置剧场：入睡 / 冒泡 / 散步 / 张望 / 探头
+  // 闲置剧场：入睡 / 冒泡 / 散步 / 张望 / 探头（「闲置时自己活动」关闭时整体停演，安静待命）
   useEffect(() => {
-    if (quiet) return;
+    if (quiet || !idleAlive) return;
     idleTimer.current = setInterval(() => {
       if (state === "sleep") return; // 睡着时保持安静，等互动唤醒
+      // 未开「一直存在」：闲置 15s 后藏起来（互动/流式事件会叫它回来）
+      if (!alwaysRef.current && !busyRef.current && Date.now() - lastAct.current > 15_000) {
+        setHidden(true);
+        return;
+      }
       // 45s 无互动 → 趴在土堆上睡着
       if (!busyRef.current && Date.now() - lastAct.current > 45_000) {
         setState("sleep");
@@ -280,7 +374,7 @@ export function TreasureMouse({ event }: { event: PetEvent | null }): React.Reac
             writePetPos(pos);
             return;
           }
-          setPos(clampPos({ x: base + dir * Math.sin(t * Math.PI) * 46, y: pos.y }));
+          setPos(clampPos({ x: base + dir * Math.sin(t * Math.PI) * 46, y: pos.y }, size));
         }, 50);
       } else if (r < 0.54) {
         transient("look", null, 3200);
@@ -292,7 +386,7 @@ export function TreasureMouse({ event }: { event: PetEvent | null }): React.Reac
       if (idleTimer.current) clearInterval(idleTimer.current);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [quiet, pos.x, pos.y, transient, lang, state]);
+  }, [quiet, idleAlive, pos.x, pos.y, transient, lang, state]);
 
   useEffect(() => () => {
     if (stateTimer.current) clearTimeout(stateTimer.current);
@@ -306,6 +400,7 @@ export function TreasureMouse({ event }: { event: PetEvent | null }): React.Reac
       setState("idle");
       setBubble(null);
     }
+    emitPetSettingsChanged(); // 通知设置面板刷新「从桌面收起」开关等状态
   }
 
   function handlePoke(): void {
@@ -375,7 +470,7 @@ export function TreasureMouse({ event }: { event: PetEvent | null }): React.Reac
       cancelLongPress(); // 已在拖动，不再触发长按静默
     }
     if (d.moved) {
-      setPos(clampPos({ x: d.origX + dx, y: d.origY - dy })); // y 是距底部距离
+      setPos(clampPos({ x: d.origX + dx, y: d.origY - dy }, size)); // y 是距底部距离
     }
   };
   const onPointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
@@ -391,6 +486,8 @@ export function TreasureMouse({ event }: { event: PetEvent | null }): React.Reac
     if (d.moved) writePetPos(pos);
     else handlePoke();
   };
+
+  if (hidden) return null; // 「一直存在」关闭时的闲置隐藏，经顶栏/设置面板「找回阿寻」恢复
 
   if (quiet) {
     return (
@@ -434,15 +531,34 @@ export function TreasureMouse({ event }: { event: PetEvent | null }): React.Reac
     <div
       role="img"
       aria-label={t("pet.alt")}
-      className="fixed z-30 select-none touch-none"
+      className="group fixed z-30 select-none touch-none"
       style={{ left: pos.x, bottom: pos.y, width: size }}
     >
-      {/* 气泡 */}
+      {/* 悬浮设置齿轮（hover 显现），点开为与顶栏同款的设置面板 */}
+      <button
+        type="button"
+        onClick={() => setPanelOpen((o) => !o)}
+        title={t("pet.settings.gear")}
+        aria-label={t("pet.settings.gear")}
+        className={`absolute -right-1.5 -top-1.5 z-10 flex h-6 w-6 items-center justify-center rounded-full border border-border bg-card text-muted-foreground shadow-soft transition-opacity hover:text-helix ${panelOpen ? "opacity-100" : "opacity-0 group-hover:opacity-100"}`}
+      >
+        <Settings size={13} />
+      </button>
+      {panelOpen ? (
+        <div className="absolute -top-2 right-0 z-20 -translate-y-full">
+          <PetSettingsPanel onClose={() => setPanelOpen(false)} />
+        </div>
+      ) : null}
+      {/* 气泡（点击手动切换语录） */}
       {bubble ? (
-        <div className="pet-bubble absolute -top-2 left-1/2 -translate-x-1/2 -translate-y-full whitespace-nowrap rounded-xl border border-border bg-card px-2.5 py-1 text-[11.5px] text-foreground shadow-soft">
+        <button
+          type="button"
+          onClick={cycleBubble}
+          className="pet-bubble absolute -top-2 left-1/2 -translate-x-1/2 -translate-y-full whitespace-nowrap rounded-xl border border-border bg-card px-2.5 py-1 text-[11.5px] text-foreground shadow-soft transition-colors hover:border-pet-amber/60"
+        >
           {bubble}
           <span className="absolute -bottom-1 left-1/2 h-2 w-2 -translate-x-1/2 rotate-45 border-b border-r border-border bg-card" />
-        </div>
+        </button>
       ) : null}
 
       {/* 飘浮爱心/星星 */}
@@ -469,20 +585,30 @@ export function TreasureMouse({ event }: { event: PetEvent | null }): React.Reac
         </div>
       ) : null}
 
-      {/* 主体（可拖/可点） */}
+      {/* 主体（可拖/可点；hover 回弹缩放；用户键入时竖起耳朵跃动） */}
       <div
         className={`relative cursor-grab active:cursor-grabbing ${animCls}`}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
+        onMouseEnter={() => {
+          if (state === "idle" && !isMobile) {
+            const el = bodyRef.current;
+            el?.classList.remove("pet-hover-bounce");
+            void el?.offsetWidth; // 重新触发动画
+            el?.classList.add("pet-hover-bounce");
+          }
+        }}
         onContextMenu={(e) => {
           e.preventDefault();
           toggleQuiet(true);
         }}
       >
-        {/* 脚下土堆（挖宝/出货时出现） */}
-        {state === "digging" || state === "reveal" || state === "stow" ? <span className="pet-mound pet-mound-pop" /> : null}
-        <img src={imgSrc} alt="" draggable={false} className="pointer-events-none relative block w-full drop-shadow-[0_6px_10px_rgb(0_0_0/0.12)]" />
+        <span ref={bodyRef} className={`block ${typing && state === "idle" ? "pet-ears-perk" : ""}`}>
+          {/* 脚下土堆（挖宝/出货时出现） */}
+          {state === "digging" || state === "reveal" || state === "stow" ? <span className="pet-mound pet-mound-pop" /> : null}
+          <img src={imgSrc} alt="" draggable={false} className="pointer-events-none relative block w-full drop-shadow-[0_6px_10px_rgb(0_0_0/0.12)]" />
+        </span>
         {/* 挖宝尘土 */}
         {state === "digging" ? (
           <>
@@ -495,8 +621,8 @@ export function TreasureMouse({ event }: { event: PetEvent | null }): React.Reac
         {(state === "reveal" || state === "stow") && gemCount !== null ? (
           <span className={`absolute -right-1 -top-3 flex h-9 w-9 items-center justify-center rounded-full bg-pet-gold-soft ring-2 ring-pet-amber/50 ${state === "stow" ? "pet-gem-stow" : "pet-gem"}`}>
             <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden>
-              <path d="M6 3h12l4 6-10 12L2 9z" fill="oklch(0.6 0.118 184.704)" stroke="oklch(0.45 0.1 185)" strokeWidth="1" strokeLinejoin="round" />
-              <path d="M2 9h20M9 3l-3 6 6 12M15 3l3 6-6 12" fill="none" stroke="oklch(0.98 0.02 185)" strokeWidth="0.9" />
+              <path d="M6 3h12l4 6-10 12L2 9z" fill="#D97706" stroke="#B45309" strokeWidth="1" strokeLinejoin="round" />
+              <path d="M2 9h20M9 3l-3 6 6 12M15 3l3 6-6 12" fill="none" stroke="#FEF3C7" strokeWidth="0.9" />
             </svg>
             {gemCount > 1 ? (
               <span className="absolute -right-1 -bottom-1 rounded-full bg-pet-amber-deep px-1 font-mono text-[9px] text-white">×{gemCount}</span>

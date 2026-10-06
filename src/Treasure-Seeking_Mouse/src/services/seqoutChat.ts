@@ -7,7 +7,7 @@ import { readLang, translate } from "@/i18n";
 // 未设置时走 Meoo 平台 Edge Function（须带 OneDay-App-Id 头）
 const CHAT_API: string = (import.meta.env.VITE_CHAT_API || "").trim();
 
-function chatEndpoint(): string {
+export function chatEndpoint(): string {
   return CHAT_API || `${supabaseUrl}/functions/v1/seqout-chat`;
 }
 
@@ -61,7 +61,7 @@ export interface UsageStats {
   toolCalls: number;
   toolErrors: number;
   actors: number;
-  tools: { name: string; label: string; count: number; errors: number }[];
+  tools: { name: string; label: string; count: number; errors: number; empties: number }[];
   since: string;
   updatedAt: string;
 }

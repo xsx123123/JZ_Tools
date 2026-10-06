@@ -8,7 +8,6 @@ export const en = {
 
   // ---- 顶栏 ----
   "header.newChat": "New chat",
-  "header.guestBadge": "guest mode",
   "header.expandSessions": "Expand session list",
   "header.collapseSessions": "Collapse session list",
   "header.openSessions": "Open session list",
@@ -40,17 +39,22 @@ export const en = {
   "sidebar.listTitle": "Sessions",
   "sidebar.guestNote":
     "Guest records are saved in this browser only: up to {n} chats, kept for {d} days{loginSuffix}",
-  "sidebar.guestNoteLogin": "; sign in to keep them forever",
+  "sidebar.guestNoteLogin": "; sign in to keep history forever and sync the leaderboard",
 
-  // ---- 空态 ----
+  // ---- Empty state ----
+  "empty.headline": "GEO Treasure Mouse · your lab-mate for bio-discovery",
+  "empty.subHeadline":
+    "“No labyrinths, just treasure. Name a topic and Muse dons its miner hat and digs!”",
   "empty.intro":
-    "Tell Muse which lode to dig. Its nose is sharp, it dives into GEO, SRA, ENA and GSA, sniffs out high-impact datasets, chews through cryptic accessions, and drops a bundle of samples right at your feet.",
+    "Muse's little nose is razor-sharp! It dives into GEO, SRA, ENA and GSA, sniffs out high-impact datasets, chews through cryptic accessions, and drops a bundle of sample treasures right at your feet.",
+  "empty.groupFit": "For: {caption}",
 
-  // ---- 输入区 ----
+  // ---- Composer ----
   "composer.placeholder":
-    "Tell Muse where to dig, e.g. single-cell RNA-seq datasets of mouse heart development… (Enter to send)",
+    "Tell Muse what to dig, e.g. “help me find human brain RNA-seq related to Alzheimer's”… (Enter to dig)",
   "composer.stop": "Stop generating",
-  "composer.send": "Send",
+  "composer.send": "Dig for treasure",
+  "composer.sendAria": "Dig for treasure",
   "composer.disclaimer":
     "Muse's finds come from public omics databases; verify via NCBI / NGDC.",
 
@@ -122,15 +126,23 @@ export const en = {
   "pet.readNoReply": "…squeak… (seen, not replying)",
   "pet.settings.gear": "Pet settings",
   "pet.settings.title": "Muse settings",
+  "pet.settings.close": "Close",
   "pet.settings.size": "Size",
-  "pet.settings.sizeS": "S",
-  "pet.settings.sizeM": "M",
-  "pet.settings.sizeL": "L",
+  "pet.settings.sizeDesc": "Adjust Muse's size on screen",
+  "pet.settings.shrink": "Shrink",
+  "pet.settings.grow": "Grow",
+  "pet.settings.quiet": "Hide from desktop",
+  "pet.settings.quietDesc": "Only a small recall entry stays in the corner; bring Muse back anytime",
+  "pet.settings.idle": "Wander when idle",
+  "pet.settings.idleDesc": "When off, Muse waits quietly — no bubbles, strolls or naps",
   "pet.settings.always": "Always around",
   "pet.settings.alwaysDesc": "When off, Muse hides after being idle",
-  "pet.settings.quiet": "Silence Muse",
+  "pet.settings.reset": "Reset position",
+  "pet.settings.resetDesc": "Put Muse back at the default bottom-right spot",
+  "pet.settings.resetBtn": "Reset",
   "pet.settings.recall": "Bring Muse back",
   "pet.settings.treasure": "{n} treasures stashed",
+  "pet.settings.note": "These preferences live in this browser only — change them anytime here.",
   "pet.achievements.10": "First-Gen Digger",
   "pet.achievements.50": "Lode Veteran",
   "pet.achievements.100": "Omics Gold King",
@@ -193,6 +205,7 @@ export const en = {
   "stats.perTool": "Per-tool usage",
   "stats.perToolSummary": "{types} types / {calls} calls",
   "stats.toolEmpty": "No tool calls yet, go ask Muse something",
+  "stats.toolBlank": "empty {n}",
   "stats.toolFailed": "failed {n}",
   "stats.since": "Stats since {since} · last updated {updated}",
 
@@ -203,6 +216,9 @@ export const en = {
   "auth.forgotTitle": "Reset password",
   "auth.loginSub": "Sign in to sync chat history across devices",
   "auth.registerSub": "Real email + password, email verification required",
+  "auth.localSub": "Self-hosted account: data stays on this server; sign in to keep chat history forever and sync the leaderboard",
+  "auth.nickname": "Nickname (shown on leaderboard)",
+  "auth.nicknamePlaceholder": "e.g. Little Miner",
   "auth.verifySub": "Code sent to {email}",
   "auth.forgotSub": "Enter your email and we'll send a reset link",
   "auth.email": "Email",
@@ -257,12 +273,15 @@ export const en = {
   "about.stackNote": "dual-theme design tokens (light academic + night-mine dark)",
   "about.footer":
     "Conversational omics data retrieval · Data from the seqout.org public API · Answers are AI-generated, verify against the original NCBI / NGDC pages",
+  "about.version": "GeoMuse_v0.1.1",
   "about.online": "Live demo",
   "about.onlineStale": "the deployed version may lag behind the latest repo code",
   "about.github": "GitHub repo",
   "about.docs": "Detailed dev docs",
   "about.thanks": "Acknowledgements",
   "about.why": "Why we built the treasure mouse",
+  "about.dbs": "Databases A-Xun can dig",
+  "about.dbsIntro": "It's called \"GEO Treasure Mouse\" only because GEO is the oldest lode — A-Xun digs far beyond GEO, punching through 7 databases in a single dig:",
   "about.why.1": "OmicsTreasure Hunter helps research newcomers leave behind the cold, labyrinthine bioinformatics databases of the past: through a personified \"prospecting for treasure\" interaction, it punches through the GEO / SRA / ENA / GSA data universe in one step.",
   "about.why.2": "For first-year graduate students, what drains the passion for science is usually not the experiments, it's the blind wandering through icy, hostile database mazes at the very start: can't find the right samples, can't decode the accessions, can't locate the literature. Step one becomes self-doubt and burnout. OmicsTreasure Hunter exists to rescue researchers from that dreary, oppressive first step of data hunting.",
   "about.why.3": "Here, research is no longer a lonely solo grind, and there is no cold wall of code between you and the data. Just chat about your project ideas the way you'd talk with a labmate, the desk pet \"A-Xun\" (阿寻) puts on its miner's helmet, dives into the data lodes, and gleefully digs out the golden datasets and key papers that best match your direction, delivering tidy sample cards right to your hands. Every search is a small adventure, less anxiety at the start of your research journey, more of the pure joy of exploration and steady companionship.",
