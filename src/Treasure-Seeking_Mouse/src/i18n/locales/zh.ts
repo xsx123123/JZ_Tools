@@ -278,7 +278,7 @@ export const zh = {
   "about.stack": "技术栈",
   "about.stackNote": "双主题 design token（亮色学术风 + 夜探矿洞暗色套）",
   "about.footer": "对话式组学数据检索 · 数据来自 seqout.org 公共 API · 回答由 AI 生成，请以 NCBI / NGDC 原始页面为准",
-  "about.version": "GeoMuse_v0.1.1",
+  "about.version": "GeoMuse_v0.1.2",
   "about.online": "在线体验",
   "about.onlineStale": "线上部署版本可能落后于仓库最新代码",
   "about.github": "GitHub 项目主页",

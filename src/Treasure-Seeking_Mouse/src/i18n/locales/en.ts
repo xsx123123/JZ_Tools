@@ -282,7 +282,7 @@ export const en = {
   "about.stackNote": "dual-theme design tokens (light academic + night-mine dark)",
   "about.footer":
     "Conversational omics data retrieval · Data from the seqout.org public API · Answers are AI-generated, verify against the original NCBI / NGDC pages",
-  "about.version": "GeoMuse_v0.1.1",
+  "about.version": "GeoMuse_v0.1.2",
   "about.online": "Live demo",
   "about.onlineStale": "the deployed version may lag behind the latest repo code",
   "about.github": "GitHub repo",
