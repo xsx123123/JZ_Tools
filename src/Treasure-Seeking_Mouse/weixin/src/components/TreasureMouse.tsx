@@ -2,7 +2,9 @@
 // 对应网页版 src/components/pet/TreasureMouse.tsx（470 行）。方案差异（详见 MIGRATION.md R3）：
 //   - 网页版依赖 pointer 拖拽 / 内联 SVG / DOM 动画 → 小程序不支持，
 //     改为 <Image> 静态图 + theme.css 已有 .pet-* CSS 关键帧（idle 浮动/挖掘/跳跃/转圈/庆祝）
-//   - 造型切换保留（base/dig/cheer 三图按状态换），土堆/尘土/爱心/星尘/横幅保留
+//   - 造型：多造型 webp 静态图按状态切换（挖土/夜探矿洞/失望/开宝箱/眨眼/转圈/加冕/探头/睡土堆；
+//     mouse-sniff 已拷入 assets 备 look 状态启用），
+//     <Image> + theme.css 已有 .pet-* CSS 关键帧（idle 浮动/挖掘/跳跃/转圈/庆祝/探头/入睡呼吸）
 //   - 拖拽与闲置散步省略（无 pointer 事件体系，价值/成本比低）；静音改成长按 600ms
 //   - 状态机/事件协议（makePetEvent 的 seq 去重、cards/done 重复计数防护、成就里程碑）与网页版一致
 import { useCallback, useEffect, useRef, useState } from 'react'
@@ -21,12 +23,19 @@ import {
 import { useI18n } from '@/i18n/provider'
 import { petLines, type MessageKey } from '@/i18n'
 import IMG_BASE from '@/assets/pet/mouse-base.webp'
-import IMG_DIG from '@/assets/pet/mouse-dig.webp'
-import IMG_CHEER from '@/assets/pet/mouse-cheer.webp'
+import IMG_SHOVEL from '@/assets/pet/mouse-shovel.webp'
+import IMG_NIGHT from '@/assets/pet/mouse-night.webp'
+import IMG_SAD from '@/assets/pet/mouse-sad.webp'
+import IMG_CHEST_OPEN from '@/assets/pet/mouse-chest-open.webp'
+import IMG_WINK from '@/assets/pet/mouse-wink.webp'
+import IMG_SPIN from '@/assets/pet/mouse-spin.webp'
+import IMG_CROWN from '@/assets/pet/mouse-crown.webp'
+import IMG_PEEK from '@/assets/pet/mouse-peek.webp'
+import IMG_SLEEP from '@/assets/pet/mouse-sleep.webp'
 import IMG_CHEST from '@/assets/pet/chest.webp'
 import './pet.css'
 
-type PetState = 'idle' | 'digging' | 'reveal' | 'miss' | 'poke' | 'spin' | 'celebrate'
+type PetState = 'idle' | 'digging' | 'reveal' | 'miss' | 'poke' | 'spin' | 'celebrate' | 'peek' | 'sleep'
 
 /** 外部流式事件 → 宠物动作（与网页版同款协议） */
 export type PetEvent =
@@ -52,7 +61,7 @@ interface Heart {
 }
 let heartId = 0
 
-export function TreasureMouse({ event }: { event: PetEvent | null }): React.ReactElement {
+export function TreasureMouse({ event, dark }: { event: PetEvent | null; dark?: boolean }): React.ReactElement {
   const { t, lang } = useI18n()
   const L = petLines(lang)
   const [quiet, setQuiet] = useState<boolean>(() => readPetQuiet())
@@ -68,6 +77,7 @@ export function TreasureMouse({ event }: { event: PetEvent | null }): React.Reac
   const stateTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const idleTimer = useRef<ReturnType<typeof setInterval> | null>(null)
   const lastSeq = useRef(0)
+  const lastAct = useRef(Date.now()) // 最近一次互动（事件/戳/触摸），闲置超时后入睡
   const pokeStreak = useRef<{ n: number; at: number }>({ n: 0, at: 0 })
   const countedRef = useRef(false)
   const longPressRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -134,6 +144,11 @@ export function TreasureMouse({ event }: { event: PetEvent | null }): React.Reac
     if (!event || quiet) return
     if (event.seq <= lastSeq.current) return
     lastSeq.current = event.seq
+    lastAct.current = Date.now()
+    if (state === 'sleep') { // 有动静就醒
+      setState('idle')
+      setBubble(null)
+    }
     switch (event.type) {
       case 'tool_start':
         setGemCount(null)
@@ -161,19 +176,31 @@ export function TreasureMouse({ event }: { event: PetEvent | null }): React.Reac
     }
   }, [event, quiet, transient, state, revealStow, L, t])
 
-  // 闲置剧场：偶尔冒一句台词（无 DOM 散步动画，简化为气泡）
+  // 闲置剧场：45s 无互动入睡 / 偶尔冒一句台词 / 探头张望（无 DOM 散步动画，简化为气泡与探头）
   useEffect(() => {
     if (quiet) return
     idleTimer.current = setInterval(() => {
-      if (state !== 'idle') return
-      setBubble(pick(L.idle))
-      setTimeout(() => setBubble((b) => (b && L.idle.includes(b) ? null : b)), 3200)
+      if (state === 'sleep') return // 睡着时保持安静，等互动唤醒
+      if (state !== 'idle') return // 有剧情在演，闲置行为让路
+      // 45s 无互动 → 趴在土堆上睡着
+      if (Date.now() - lastAct.current > 45_000) {
+        setState('sleep')
+        setBubble('Zzz…')
+        return
+      }
+      const r = Math.random()
+      if (r < 0.3) {
+        setBubble(pick(L.idle))
+        setTimeout(() => setBubble((b) => (b && L.idle.includes(b) ? null : b)), 3200)
+      } else if (r < 0.64) {
+        transient('peek', null, 2800) // 从地洞里探出脑袋张望
+      }
     }, 9000)
     return () => {
       if (idleTimer.current) clearInterval(idleTimer.current)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [quiet, state, lang])
+  }, [quiet, state, lang, transient])
 
   useEffect(
     () => () => {
@@ -193,10 +220,17 @@ export function TreasureMouse({ event }: { event: PetEvent | null }): React.Reac
   }
 
   function handlePoke(): void {
+    lastAct.current = Date.now()
     const now = Date.now()
     pokeStreak.current =
       now - pokeStreak.current.at < 1500 ? { n: pokeStreak.current.n + 1, at: now } : { n: 1, at: now }
     const n = bumpPokeCount()
+    if (state === 'sleep') {
+      // 睡梦中被戳醒：迷糊回应，不计连击
+      spawnHearts(1)
+      transient('poke', pick(L.wake), 1400)
+      return
+    }
     if (pokeStreak.current.n >= 3) {
       // 连击彩蛋：转圈 + 爱心雨 + 报宝藏库存
       pokeStreak.current = { n: 0, at: 0 }
@@ -211,6 +245,7 @@ export function TreasureMouse({ event }: { event: PetEvent | null }): React.Reac
   }
 
   function handleChestClick(): void {
+    lastAct.current = Date.now()
     const total = readTreasureCount()
     const line = total > 0 ? t('pet.chestStock', { n: total }) : L.treasureEmpty
     transient('poke', line, 1800)
@@ -218,6 +253,11 @@ export function TreasureMouse({ event }: { event: PetEvent | null }): React.Reac
 
   // 触摸端无右键：长按 600ms 静默（对齐网页版长按语义）
   function onTouchStart(): void {
+    lastAct.current = Date.now()
+    if (state === 'sleep') { // 触摸也叫醒
+      setState('idle')
+      setBubble(null)
+    }
     longPressRef.current = setTimeout(() => {
       longPressRef.current = null
       toggleQuiet(true)
@@ -249,12 +289,35 @@ export function TreasureMouse({ event }: { event: PetEvent | null }): React.Reac
             ? 'pet-poke'
             : state === 'spin'
               ? 'pet-spin'
-              : state === 'celebrate'
-                ? 'pet-celebrate'
-                : 'pet-idle'
+              : state === 'peek'
+                ? 'pet-look'
+                : state === 'celebrate'
+                  ? 'pet-celebrate'
+                  : state === 'sleep'
+                    ? 'pet-sleep'
+                    : 'pet-idle'
 
+  // 造型与状态一一对应：挖土(暗色换夜探矿洞)/开宝箱/空铲失望/眨眼/转圈卖萌/加冕/探头/睡土堆
   const imgSrc =
-    state === 'digging' ? IMG_DIG : state === 'reveal' || state === 'spin' || state === 'celebrate' ? IMG_CHEER : IMG_BASE
+    state === 'digging'
+      ? dark
+        ? IMG_NIGHT
+        : IMG_SHOVEL
+      : state === 'reveal'
+        ? IMG_CHEST_OPEN
+        : state === 'miss'
+          ? IMG_SAD
+          : state === 'poke'
+            ? IMG_WINK
+            : state === 'spin'
+              ? IMG_SPIN
+              : state === 'celebrate'
+                ? IMG_CROWN
+                : state === 'peek'
+                  ? IMG_PEEK
+                  : state === 'sleep'
+                    ? IMG_SLEEP
+                    : IMG_BASE
 
   return (
     <View className='pet'>

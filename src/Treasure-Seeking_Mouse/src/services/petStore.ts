@@ -5,6 +5,45 @@ const KEY_POKE = "seqout-pet-poke";
 const KEY_TREASURE = "seqout-pet-treasure";
 const KEY_THEME = "seqout-theme";
 const KEY_ACHIEVED = "seqout-pet-achievements";
+const KEY_SIZE = "seqout-pet-size";
+const KEY_ALWAYS = "seqout-pet-always";
+
+/** 桌宠尺寸档位（宽 px）：小 / 中 / 大 */
+export const PET_SIZES = [96, 144, 192] as const;
+
+export function readPetSize(): number {
+  try {
+    const n = Number(localStorage.getItem(KEY_SIZE) ?? "144");
+    return (PET_SIZES as readonly number[]).includes(n) ? n : 144;
+  } catch {
+    return 144;
+  }
+}
+
+export function writePetSize(n: number): void {
+  try {
+    localStorage.setItem(KEY_SIZE, String(n));
+  } catch {
+    /* ignore */
+  }
+}
+
+/** 是否一直存在：关闭后阿寻闲置时会自动藏起来（流式互动会再出现），可经设置找回 */
+export function readPetAlways(): boolean {
+  try {
+    return localStorage.getItem(KEY_ALWAYS) !== "0";
+  } catch {
+    return true;
+  }
+}
+
+export function writePetAlways(b: boolean): void {
+  try {
+    localStorage.setItem(KEY_ALWAYS, b ? "1" : "0");
+  } catch {
+    /* ignore */
+  }
+}
 
 export interface PetPos {
   x: number; // 距视口左缘 px

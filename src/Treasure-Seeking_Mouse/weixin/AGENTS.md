@@ -8,11 +8,11 @@
 
 - `README.md` — 可行性调研报告（平台约束 / 选型 / 资产映射 / 步骤 / 待确认清单）
 - `MIGRATION.md` — **迁移记录**：文件级映射、已做/未做清单、实测结果、踩坑（已落地 R1 + R2）
-- 代码：**已落地三轮**（Taro 4.3 + React 18），可 `npm run typecheck` / `npm run build:weapp`（dist 584KB）
+- 代码：**已落地六轮**（Taro 4.3 + React 18），可 `npm run typecheck` / `npm run build:weapp`
 - R2 已交付：dark 主题类绑定 + 顶栏切换、Markdown 渲染 + 编号内嵌链接（点击复制）、
   流式解析纯函数 `sseParse.ts` + `scripts/verify-stream.mjs`（10 case 全过）
 - R3 已交付：文献证据链卡片（evidenceBus 全链路）、会话侧栏、使用统计弹窗、
-  本机版排行榜抽屉（数据源差异见 MIGRATION.md R3）、简化桌宠（3 张 webp + CSS 帧动画）。
+  本机版排行榜抽屉（数据源差异见 MIGRATION.md R3）、桌宠（10 行为造型 webp + 入睡/探头状态 + CSS 帧动画，见 MIGRATION.md R6）。
   Web 版功能组件仅剩登录/云端同步未移植（待后端），`?theme=dark` 通道不需要（无 URL 概念）
 - ⚠️ **尚未在微信开发者工具/真机跑过**：流式收帧、覆盖层手势、桌宠动画仍是最关键的未验证项
   （流式解析已被 Node harness 覆盖，见 MIGRATION.md R2），动手扩展前先跑一次。

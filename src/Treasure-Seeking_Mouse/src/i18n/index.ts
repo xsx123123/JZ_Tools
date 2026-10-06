@@ -149,6 +149,7 @@ export interface PetLines {
   spin: string[];
   miss: string[];
   walk: string[];
+  wake: string[];
   treasureEmpty: string;
   treasureStash: (n: number) => string;
 }
@@ -161,6 +162,7 @@ const PET_LINES: Record<Lang, PetLines> = {
     spin: ["转圈圈！宝藏多多！", "被爱了吱吱吱", "嘿嘿，痒"],
     miss: ["唉，只有石头…", "这铲土是空的", "一定是姿势不对，再试一次!"],
     walk: ["去那边看看…", "闻着 RNA 的味儿就去了", "散步消食，顺便探矿"],
+    wake: ["呜哇…梦到一大箱 GSE", "zzZ…啊！醒了醒了", "再让我睡五分钟嘛…"],
     treasureEmpty: "宝藏还在路上，别急~",
     treasureStash: (n) => `本鼠已囤 ${n} 份宝藏，富甲一方！`,
   },
@@ -171,6 +173,7 @@ const PET_LINES: Record<Lang, PetLines> = {
     spin: ["Spinning! So much treasure!", "Loved it, squeak squeak", "Hehe, that tickles"],
     miss: ["Sigh, just rocks…", "This scoop was empty", "Wrong angle — one more try!"],
     walk: ["Let's check over there…", "Followed the scent of RNA", "A stroll and a little prospecting"],
+    wake: ["Whoa… dreamt of a chest full of GSEs", "zzZ… oh! I'm up, I'm up", "Five more minutes, please…"],
     treasureEmpty: "Treasure's on its way, hang tight~",
     treasureStash: (n) => `I've stashed ${n} treasures — rich beyond measure!`,
   },

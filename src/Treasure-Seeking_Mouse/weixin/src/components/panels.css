@@ -258,13 +258,12 @@
 .side__logo {
   width: 64rpx;
   height: 64rpx;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 34rpx;
+  display: block;
   background-color: var(--pet-gold-soft);
-  color: var(--pet-amber-deep);
   border-radius: 16rpx;
+  overflow: hidden;
+  /* 阿寻动画形象：静态帧 + theme.css 的 pet-bob 起伏（与网页版侧栏同一表现） */
+  animation: pet-bob 2.8s ease-in-out infinite;
 }
 
 .side__name {

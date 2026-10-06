@@ -3,10 +3,11 @@
 //   - 无登录入口（小程序暂无云端账号体系），底部展示游客存储策略提示
 //   - 重命名用 Taro Input（失焦/确认提交），删除走 showModal 二次确认
 import { useState } from 'react'
-import { View, Text, Input } from '@tarojs/components'
+import { View, Text, Input, Image } from '@tarojs/components'
 import Taro from '@tarojs/taro'
 import { useI18n } from '@/i18n/provider'
 import type { SessionRow } from '@/services/chatStore'
+import IMG_AVATAR from '@/assets/pet/mouse-wink.webp'
 import './panels.css'
 
 export function SessionSidebar({
@@ -54,7 +55,8 @@ export function SessionSidebar({
       <View className='mask' onClick={onClose} />
       <View className='drawer'>
         <View className='side__brand'>
-          <Text className='side__logo'>🐭</Text>
+          {/* 阿寻的动画形象（眨眼大头贴）：静态帧 + theme.css 的 pet-bob 起伏，与网页版侧栏一致 */}
+          <Image className='side__logo' src={IMG_AVATAR} mode='aspectFit' />
           <View className='side__brand-text'>
             <Text className='side__name'>{t('brand.name')}</Text>
             <Text className='side__tagline'>{t('brand.tagline')}</Text>

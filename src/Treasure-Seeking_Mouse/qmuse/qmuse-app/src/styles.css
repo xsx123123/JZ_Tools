@@ -566,6 +566,13 @@
 }
 .pet-look { animation: pet-peek 1.6s ease-in-out 2; }
 
+/* 熟睡：缓慢呼吸起伏 */
+@keyframes pet-breathe {
+  0%, 100% { transform: translateY(0) scale(1, 1); }
+  50% { transform: translateY(1.5px) scale(1.02, 0.98); }
+}
+.pet-sleep { animation: pet-breathe 3.2s ease-in-out infinite; }
+
 /* 爱心/星星飘起 */
 @keyframes heart-float {
   0% { opacity: 0; transform: translate(0, 0) scale(0.4); }
@@ -681,6 +688,6 @@
 
 @media (prefers-reduced-motion: reduce) {
   .pet-idle, .pet-digging, .pet-reveal, .pet-miss, .pet-dust, .pet-poke,
-  .pet-spin, .pet-walk, .pet-look, .pet-heart, .pet-chest-pop,
+  .pet-spin, .pet-walk, .pet-look, .pet-sleep, .pet-heart, .pet-chest-pop,
   .pet-burst, .pet-celebrate, .pet-halo, .pet-banner, .pet-badge-in { animation: none; }
 }

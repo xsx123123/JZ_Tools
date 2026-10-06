@@ -3,11 +3,19 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { readPetPos, writePetPos, readPetQuiet, writePetQuiet, bumpPokeCount, readTreasureCount, addTreasure, ACHIEVEMENTS, claimAchievement, earnedAchievements, type Achievement, type PetPos } from "@/services/petStore";
 import IMG_BASE from "@/assets/pet/mouse-base.png";
-import IMG_DIG from "@/assets/pet/mouse-dig.png";
-import IMG_CHEER from "@/assets/pet/mouse-cheer.png";
+import IMG_SHOVEL from "@/assets/pet/mouse-shovel.webp";
+import IMG_NIGHT from "@/assets/pet/mouse-night.webp";
+import IMG_SNIFF from "@/assets/pet/mouse-sniff.webp";
+import IMG_SAD from "@/assets/pet/mouse-sad.webp";
+import IMG_CHEST_OPEN from "@/assets/pet/mouse-chest-open.webp";
+import IMG_WINK from "@/assets/pet/mouse-wink.webp";
+import IMG_SPIN from "@/assets/pet/mouse-spin.webp";
+import IMG_CROWN from "@/assets/pet/mouse-crown.webp";
+import IMG_PEEK from "@/assets/pet/mouse-peek.webp";
+import IMG_SLEEP from "@/assets/pet/mouse-sleep.webp";
 import IMG_CHEST from "@/assets/pet/chest.png";
 
-type PetState = "idle" | "digging" | "reveal" | "stow" | "miss" | "poke" | "spin" | "walk" | "look" | "celebrate";
+type PetState = "idle" | "digging" | "reveal" | "stow" | "miss" | "poke" | "spin" | "walk" | "look" | "celebrate" | "peek" | "sleep";
 
 /** 外部流式事件 → 宠物动作 */
 export type PetEvent =
@@ -29,6 +37,7 @@ const POKE_LINES = ["吱!", "别戳啦~", "背包里掉出一张 GSM 卡片", "�
 const SPIN_LINES = ["转圈圈！宝藏多多！", "被爱了吱吱吱", "嘿嘿，痒"];
 const MISS_LINES = ["唉，只有石头…", "这铲土是空的", "一定是姿势不对，再试一次!"];
 const WALK_LINES = ["去那边看看…", "闻着 RNA 的味儿就去了", "散步消食，顺便探矿"];
+const WAKE_LINES = ["呜哇…梦到一大箱 GSE", "zzZ…啊！醒了醒了", "再让我睡五分钟嘛…"];
 const TREASURE_LINES: [() => string, (n: number) => string] = [
   () => "宝藏还在路上，别急~",
   (n: number) => `本鼠已囤 ${n} 份宝藏，富甲一方！`,
@@ -82,13 +91,22 @@ export function TreasureMouse({ event }: { event: PetEvent | null }): React.Reac
   const [earned, setEarned] = useState<Achievement[]>(() => earnedAchievements(readTreasureCount()));
   const [milestone, setMilestone] = useState<Achievement | null>(null);
   const [bursts, setBursts] = useState<Burst[]>([]);
+  const [dark, setDark] = useState<boolean>(() => document.documentElement.classList.contains("dark"));
   const dragRef = useRef<{ startX: number; startY: number; origX: number; origY: number; moved: boolean } | null>(null);
   const stateTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const idleTimer = useRef<ReturnType<typeof setInterval> | null>(null);
   const lastSeq = useRef(0);
   const pokeStreak = useRef<{ n: number; at: number }>({ n: 0, at: 0 });
+  const lastAct = useRef(Date.now()); // 最近一次互动（事件/戳/拖拽），闲置超时后入睡
   const busyRef = useRef(false); // 有剧情在演时，闲置行为让路
   busyRef.current = state !== "idle";
+
+  // 夜探矿洞主题：跟随 <html> 的 .dark 类
+  useEffect(() => {
+    const mo = new MutationObserver(() => setDark(document.documentElement.classList.contains("dark")));
+    mo.observe(document.documentElement, { attributes: true, attributeFilter: ["class"] });
+    return () => mo.disconnect();
+  }, []);
 
   /** 临时状态：ms 后回 idle */
   const transient = useCallback((s: PetState, line: string | null, ms: number, onEnd?: () => void) => {
@@ -174,6 +192,11 @@ export function TreasureMouse({ event }: { event: PetEvent | null }): React.Reac
     if (!event || quiet) return;
     if (event.seq <= lastSeq.current) return;
     lastSeq.current = event.seq;
+    lastAct.current = Date.now();
+    if (state === "sleep") { // 有动静就醒
+      setState("idle");
+      setBubble(null);
+    }
     switch (event.type) {
       case "tool_start":
         setGemCount(null);
@@ -202,10 +225,17 @@ export function TreasureMouse({ event }: { event: PetEvent | null }): React.Reac
     }
   }, [event, quiet, transient, state, checkMilestones]);
 
-  // 闲置剧场：冒泡 / 散步 / 张望
+  // 闲置剧场：入睡 / 冒泡 / 散步 / 张望 / 探头
   useEffect(() => {
     if (quiet) return;
     idleTimer.current = setInterval(() => {
+      if (state === "sleep") return; // 睡着时保持安静，等互动唤醒
+      // 45s 无互动 → 趴在土堆上睡着
+      if (!busyRef.current && Date.now() - lastAct.current > 45_000) {
+        setState("sleep");
+        setBubble("Zzz…");
+        return;
+      }
       if (busyRef.current) return;
       const r = Math.random();
       if (r < 0.3) {
@@ -231,13 +261,15 @@ export function TreasureMouse({ event }: { event: PetEvent | null }): React.Reac
         }, 50);
       } else if (r < 0.54) {
         transient("look", null, 3200);
+      } else if (r < 0.64) {
+        transient("peek", null, 2800); // 从地洞里探出脑袋张望
       }
     }, 9000);
     return () => {
       if (idleTimer.current) clearInterval(idleTimer.current);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [quiet, pos.x, pos.y, transient]);
+  }, [quiet, pos.x, pos.y, transient, state]);
 
   useEffect(() => () => {
     if (stateTimer.current) clearTimeout(stateTimer.current);
@@ -253,9 +285,16 @@ export function TreasureMouse({ event }: { event: PetEvent | null }): React.Reac
   }
 
   function handlePoke(): void {
+    lastAct.current = Date.now();
     const now = Date.now();
     pokeStreak.current = now - pokeStreak.current.at < 1500 ? { n: pokeStreak.current.n + 1, at: now } : { n: 1, at: now };
     const n = bumpPokeCount();
+    if (state === "sleep") {
+      // 睡梦中被戳醒：迷糊回应，不计连击
+      spawnHearts(1);
+      transient("poke", pick(WAKE_LINES), 1400);
+      return;
+    }
     if (pokeStreak.current.n >= 3) {
       // 连击彩蛋：转圈 + 爱心雨 + 报宝藏库存
       pokeStreak.current = { n: 0, at: 0 };
@@ -270,6 +309,7 @@ export function TreasureMouse({ event }: { event: PetEvent | null }): React.Reac
   }
 
   function handleChestClick(): void {
+    lastAct.current = Date.now();
     const total = readTreasureCount();
     const line = total > 0 ? `宝箱里已囤 ${total} 份宝藏，都是阿寻一铲一铲挖的！` : TREASURE_LINES[0]();
     transient("poke", line, 1800);
@@ -279,6 +319,11 @@ export function TreasureMouse({ event }: { event: PetEvent | null }): React.Reac
   const onPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
     e.currentTarget.setPointerCapture(e.pointerId);
     dragRef.current = { startX: e.clientX, startY: e.clientY, origX: pos.x, origY: pos.y, moved: false };
+    lastAct.current = Date.now();
+    if (state === "sleep") { // 拖动也叫醒
+      setState("idle");
+      setBubble(null);
+    }
   };
   const onPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
     const d = dragRef.current;
@@ -325,12 +370,21 @@ export function TreasureMouse({ event }: { event: PetEvent | null }): React.Reac
             : state === "poke" ? "pet-poke"
               : state === "spin" ? "pet-spin"
                 : state === "walk" ? "pet-walk"
-                  : state === "look" ? "pet-look"
-                    : state === "celebrate" ? "pet-celebrate" : "pet-idle";
+                  : state === "look" || state === "peek" ? "pet-look"
+                    : state === "celebrate" ? "pet-celebrate"
+                      : state === "sleep" ? "pet-sleep" : "pet-idle";
 
+  // 造型与状态一一对应：挖土(暗色换夜探矿洞)/开宝箱/空铲失望/转圈卖萌/加冕/眨眼/嗅探/探头/睡土堆
   const imgSrc =
-    state === "digging" || state === "walk" || state === "look" ? IMG_DIG
-      : state === "reveal" || state === "stow" || state === "spin" || state === "celebrate" ? IMG_CHEER : IMG_BASE;
+    state === "digging" || state === "walk" ? (dark ? IMG_NIGHT : IMG_SHOVEL)
+      : state === "reveal" || state === "stow" ? IMG_CHEST_OPEN
+        : state === "miss" ? IMG_SAD
+          : state === "poke" ? IMG_WINK
+            : state === "spin" ? IMG_SPIN
+              : state === "celebrate" ? IMG_CROWN
+                : state === "look" ? IMG_SNIFF
+                  : state === "peek" ? IMG_PEEK
+                    : state === "sleep" ? IMG_SLEEP : IMG_BASE;
 
   return (
     <div

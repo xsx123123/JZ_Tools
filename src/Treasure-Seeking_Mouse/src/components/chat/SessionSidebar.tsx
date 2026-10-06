@@ -2,8 +2,8 @@
 // 底部「视觉模式 + 界面语言」分段开关与用户行（登录态/游客态）
 import { useCallback, useState } from "react";
 import { LogIn, LogOut, MessageSquare, Moon, Pencil, Plus, Sun, Trash2, X } from "lucide-react";
-import { BrandMark } from "@/components/BrandMark";
 import { useIsTouch } from "@/hooks/use-touch";
+import mouseAvatar from "@/assets/pet/mouse-wink.webp";
 import { useI18n } from "@/i18n/provider";
 import { readTheme, writeTheme, applyTheme, type Theme } from "@/services/petStore";
 import type { SessionRow } from "@/services/chatStore";
@@ -58,7 +58,17 @@ export function SessionSidebar({
     <aside className="flex h-full w-full flex-col border-r border-border bg-panel">
       <div className="flex items-center gap-3 px-4 pb-3 pt-4">
         <span className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-pet-gold-soft shadow-sm ring-1 ring-pet-amber/30">
-          <BrandMark size={30} />
+          {/* 阿寻的动画形象（眨眼大头贴）：双层结构——内层承载 idle 起伏，
+              外层负责裁切与金色底托。scale/keyframe 都写 transform，
+              落同一元素会互相覆盖，故拆开。 */}
+          <span className="pet-idle flex h-full w-full items-center justify-center">
+            <img
+              src={mouseAvatar}
+              alt={t("pet.alt")}
+              draggable={false}
+              className="h-full w-full object-contain drop-shadow-sm"
+            />
+          </span>
         </span>
         <div className="min-w-0">
           <p className="font-display truncate text-[16px] font-semibold tracking-tight">{t("brand.name")}</p>

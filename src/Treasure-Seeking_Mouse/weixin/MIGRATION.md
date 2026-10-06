@@ -3,6 +3,50 @@
 > 记录每轮从主仓库到小程序版的同步。体例参照 `../qmuse/MIGRATION.md`：
 > 每条记 `R<n> — 日期 — 源 commit`。
 
+## R6 — 2026-10-06 桌宠 10 新造型 + 入睡/探头状态（源：主仓库 `src/components/pet/TreasureMouse.tsx` 多造型改造）
+
+### 本轮做了什么
+
+对齐 Web 版桌宠的新造型体系：造型从 base/dig/cheer 三图扩到 10 行为图，并新增
+「45s 无互动入睡（互动即醒）」与「闲置探头张望」两个状态。i18n 零新增字典键——
+`PetLines` 接口与台词表在 `src/i18n/index.ts`（非 locales 字典），新增 `wake` 一组
+（中英各 3 条）；locales 字典维持各 225 键。
+
+### 文件级结果
+
+| 文件 | 处理 |
+|---|---|
+| `src/assets/pet/` | ✅ 从主仓库拷入 10 张 webp（shovel/night/sniff/sad/chest-open/wink/spin/crown/peek/sleep，共 ~183KB）。`mouse-sniff` 因小程序版无 `look` 状态未被引用，webpack 不打包，仅留源文件备用 |
+| `src/components/TreasureMouse.tsx` | 🔧 改写：`PetState` 加 `peek`/`sleep`；`lastAct` ref（事件 effect / 戳 / 触摸开始 / 宝箱点击处更新）；事件 effect 开头更新 lastAct + sleep 先醒；闲置 interval 最前 sleep 早退、45s 入睡挂 "Zzz…"、概率分支尾加 `r<0.64 → transient('peek')`；戳睡眠中的宠物 = 爱心 + `L.wake` 台词不计连击；`imgSrc` 全量状态映射（digging→shovel、暗色→night、reveal→chest-open、miss→sad、poke→wink、spin→spin、celebrate→crown、peek→peek、sleep→sleep）；删 `IMG_DIG`/`IMG_CHEER` import |
+| `src/components/TreasureMouse.tsx` 签名 | 加可选 `dark?: boolean` prop——替代 Web 版 MutationObserver（小程序禁 DOM），由页面根 View 同款 theme state 传入 |
+| `src/pages/index/index.tsx` | 🔧 `<TreasureMouse event={petEvent} dark={theme === 'dark'} />` |
+| `src/styles/theme.css` | 加 `pet-breathe` keyframes + `.pet-sleep`（3.2s 呼吸），并入 reduced-motion 清零清单 |
+| `src/i18n/index.ts` | `PetLines` 接口 + 中英台词表各加 `wake: string[]`（与主仓库文案一致） |
+
+### 差异决策（相对 Web 版）
+
+- Web 版 12 状态含 `stow`/`walk`/`look`，小程序版维持 R3 的精简状态机（无 pointer 拖拽/散步），
+  仅加 `peek`/`sleep`；`stow` 收尾动画、`walk` 散步、`look` 嗅探继续省略
+  （`mouse-sniff.webp` 已拷入 assets，启用 `look` 时直接用）。
+- dark 跟随：Web 版 MutationObserver 挂 `<html>.dark`；小程序版按 R2 既定模式由页面 theme state
+  经 prop 传入，行为等价。
+
+### 验证结果（本轮实测）
+
+| 项 | 结果 |
+|---|---|
+| `npm run typecheck` | ✅ 通过 |
+| `npm run build:weapp` | ✅ Compiled successfully，dist **760KB**（+164KB，10 张 webp；距 2MB 主包上限余量充足） |
+| 产物资源 | ✅ `dist/assets/pet/` 含全部 9 张被引用图；`dist/pages/index/index.js` 引用名逐一核对无误 |
+| `node scripts/verify-stream.mjs` | ✅ 仍 11 case 全过 |
+| `grep oklch(/color-mix(` | ✅ 0 |
+| i18n 字典 | ✅ locales zh/en 各 225 键（本轮零新增）；`PetLines.wake` 中英各 3 条已同步 |
+
+### 踩坑记录（本轮新增）
+
+- ⚠️ Taro/webpack 对**未被引用的图片 import 不打包**（assets 目录里 sniff 缺失属预期），
+  未使用的 import 会被 tree-shake——拷了图但没进 dist 先查是否真的有状态引用它。
+
 ## R5 — 2026-10-05 IdLink 新用户发现性提示（源：主仓库 lib/linkHint.ts + IdLink.tsx 同款）
 
 ### 本轮做了什么

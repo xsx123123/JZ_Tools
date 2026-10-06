@@ -403,7 +403,7 @@ export default function Index() {
       <Text className='composer__note'>{t('composer.disclaimer')}</Text>
 
       {/* 寻宝鼠桌宠（z-30，低于覆盖层遮罩 z-40） */}
-      <TreasureMouse event={petEvent} />
+      <TreasureMouse event={petEvent} dark={theme === 'dark'} />
 
       {/* 覆盖层 */}
       {sidebarOpen ? (
