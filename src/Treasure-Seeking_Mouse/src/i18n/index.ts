@@ -210,7 +210,7 @@ const EXAMPLE_GROUPS: Record<Lang, ExampleGroup[]> = {
   zh: [
     {
       label: "探矿定位",
-      caption: "按课题方向找 GEO / SRA 收录的矿脉",
+      caption: "只有一个课题设想时",
       show: 3,
       items: [
         "帮我搜索小鼠肝再生相关的 GEO 数据集",
@@ -229,7 +229,7 @@ const EXAMPLE_GROUPS: Record<Lang, ExampleGroup[]> = {
     },
     {
       label: "验宝鉴宝",
-      caption: "GSE / GSM / PRJ 编号反查来龙去脉",
+      caption: "手里只有一串编号时",
       show: 2,
       items: [
         "GSE299340 是什么研究？有哪些样本？",
@@ -242,7 +242,7 @@ const EXAMPLE_GROUPS: Record<Lang, ExampleGroup[]> = {
     },
     {
       label: "清点矿藏",
-      caption: "样本量、平台与分组概览",
+      caption: "摸底样本量与平台分布",
       show: 1,
       items: [
         "统计 GSE136831 里有多少个样本",
@@ -257,7 +257,7 @@ const EXAMPLE_GROUPS: Record<Lang, ExampleGroup[]> = {
   en: [
     {
       label: "Locate the lode",
-      caption: "Find GEO / SRA deposits by research topic",
+      caption: "you only have a research idea",
       show: 3,
       items: [
         "Search GEO datasets related to mouse liver regeneration",
@@ -276,7 +276,7 @@ const EXAMPLE_GROUPS: Record<Lang, ExampleGroup[]> = {
     },
     {
       label: "Assay the find",
-      caption: "Trace GSE / GSM / PRJ accessions back to their source",
+      caption: "you only have a string of accessions",
       show: 2,
       items: [
         "What study is GSE299340? What samples does it have?",
@@ -289,7 +289,7 @@ const EXAMPLE_GROUPS: Record<Lang, ExampleGroup[]> = {
     },
     {
       label: "Count the cache",
-      caption: "Sample counts, platforms and group overview",
+      caption: "surveying sample sizes & platforms",
       show: 1,
       items: [
         "How many samples are in GSE136831?",

@@ -54,19 +54,28 @@
 
 ## 4. 页面区块规范
 
-### 4.1 空态 Hero（`EmptyState.tsx`）
+### 4.1 空态 Hero（`EmptyState.tsx`，布局基准 `docs/2026-10-06_21.23.22.png`）
 
-- 圆润卡片容器，居中，最大宽度 780px；内嵌阿寻形象 + 主/副标语。
-- **主标语**：`GEO 寻宝鼠 · 你的同门生信探险搭子`——「GEO寻宝」用矿工绿、「鼠/矿脉元素」用琥珀金（`text-helix` / `text-pet-amber-deep` 点染，不整体染色）。
-- **副标语**：`"不查迷宫，只挖宝藏。随口说出课题，阿寻戴上矿工帽这就下铲！"`（`text-muted-foreground`）。
-- 介绍文案放 `--secondary` 浅米底框，圆角 `--radius`。
+- 圆润卡片容器（`.hero-card`），居中，最大宽度 **860px**；整体 **左右排布**，不是居中对齐。
+- **第一行（横排）**：左侧阿寻头像方块（`h-20 w-20`、`rounded-[24px]`、`bg-pet-gold-soft` + `gold-glow` + `ring-1 ring-pet-amber/30`，图 `mouse-base.webp`）；右侧文字块左对齐——主标语在上、副标语在下。
+- **主标语**：`GEO 寻宝鼠 · 你的同门生信探险搭子`——「GEO寻宝」用矿工绿、「鼠」用琥珀金（`text-miner-green` / `text-gold` 点染，不整体染色），`font-display` 22-24px。
+- **副标语**：`"不查迷宫，只挖宝藏。随口说出课题，阿寻戴上矿工帽这就下铲！"`（`text-muted-foreground` 14px）。
+- **状态徽章**：卡片**右上角绝对定位**「休息中」胶囊（`absolute right-4 top-4`）——`rounded-full border-pet-amber/40 bg-pet-gold-soft text-pet-amber-deep` 11px（i18n 键 `empty.badgeIdle`）。
+- **介绍文案**：头像行下方**通栏** `--secondary` 浅米底框（`rounded-xl p-4`），**左对齐** 13.5px。
+- 移动端（<sm）头像与文字改纵向堆叠。
+- **彩蛋**：头像可点击，1.5s 内连点 3 次弹出「鼠鼠我呀」弹窗（`mouse-wink.webp` + `pet-reveal` 入场，平台 Dialog 规范，`easterEgg.*` i18n 键）；每次点击头像回弹（`pet-hover-bounce`，key 重触发）。与右下角桌宠的连戳转圈彩蛋相互独立。
 
 ### 4.2 探矿任务牌（示例提问）
 
-- 分组标题编号制：`01 探矿定位 ⛏️` / `02 验宝鉴宝 💎` / `03 清点矿藏 📜`，配「适合：…」场景胶囊（浅绿/浅金底小字）。
-- 每个示例问题是独立 pill 微卡片：白/浅米底、1px `border-border`、`px-3.5 py-2`、圆角 8px。
-- **hover 三联动**：`translateY(-2px)` 上浮 + 边框变琥珀金 + 背景微过渡 `--gold-light`，cursor pointer。
+- **分组标题三件套**（`flex flex-wrap items-center gap-2`）：
+  1. **编号牌**：`01` / `02` / `03` 边框小方牌（`rounded-md border border-border bg-card`，`font-mono` 11px 矿工绿）；
+  2. **组名 + emoji**：`探矿定位 ⛏️` / `验宝鉴宝 💎` / `清点矿藏 📜`（13px 加粗）；
+  3. **「适合：…」场景胶囊**：`rounded-full px-2 py-0.5` 11px，文案来自 `empty.groupFit` + `exampleGroups(lang).caption`（`src/i18n/index.ts`），**按组分色**：01 浅绿（`bg-miner-green-light text-miner-green-hover`）/ 02 浅金（`bg-gold-light text-gold-hover`）/ 03 中性（`bg-secondary text-muted-foreground`）。
+- **示例 chips**：`flex flex-wrap gap-2` 自然宽度横排（`w-fit`，不拉满整行），每条 chip 前置 **琥珀小方点**（`h-1.5 w-1.5 rounded-[2px] bg-gold`）。
+- 每个示例问题是独立 pill 微卡片（`.quest-pill`）：白底、1px `border-border`、`px-3.5 py-2`、圆角 8px。
+- **hover 三联动**：`translateY(-2px)` 上浮 + 边框变琥珀金 + 背景微过渡 `--gold-light`，cursor pointer；右侧浮现 ⛏ 提示。
 - 点击 = 填入输入框并直接发送（`onPick` → `handleSend`）。
+- 示例池每次进入空态**每组随机抽样**（Fisher-Yates，条数 = `show`），本次空态内保持稳定，切语言重新抽样。
 
 ### 4.3 对话区
 
@@ -149,7 +158,7 @@
 |---|---|
 | `src/styles.css` | 全部 token、keyframes、暗色覆盖的权威实现 |
 | `docs/style_prompt.md` | 视觉重构任务指令（本规范的源头） |
-| `src/components/chat/EmptyState.tsx` / `Composer.tsx` / `SessionSidebar.tsx` | Hero / 输入区 / 侧栏的落地参考 |
+| `src/components/chat/EmptyState.tsx` / `Composer.tsx` / `SessionSidebar.tsx` | 冷启动空态（布局基准 `docs/2026-10-06_21.23.22.png`）/ 输入区 / 侧栏的落地参考 |
 | `src/components/pet/TreasureMouse.tsx` / `PetSettingsPanel.tsx` | 桌宠状态机与设置面板参考 |
 | `src/lib/reveal-engine.ts` / `petBus.ts` / `hintBus.ts` | 动效门控与跨层通信契约 |
 | `src/i18n/locales/{zh,en}.ts` | 全部界面文案（术语口径以此为准） |

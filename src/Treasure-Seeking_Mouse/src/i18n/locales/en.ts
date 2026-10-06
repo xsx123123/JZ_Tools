@@ -49,6 +49,14 @@ export const en = {
   "empty.intro":
     "Muse's little nose is razor-sharp! It dives into GEO, SRA, ENA and GSA, sniffs out high-impact datasets, chews through cryptic accessions, and drops a bundle of sample treasures right at your feet.",
   "empty.groupFit": "For: {caption}",
+  "empty.badgeIdle": "Resting",
+
+  // ---- Empty-state easter egg ----
+  "easterEgg.hint": "Poke Muse",
+  "easterEgg.title": "Just a lil' mouse",
+  "easterEgg.body":
+    "Oops, you poked me out! This lil' mouse digs through GEO / SRA / ENA / GSA for you all day, then stacks up treasures in its burrow all night — come play with Muse often, okay? 🧀",
+  "easterEgg.close": "Got it — back to digging!",
 
   // ---- Composer ----
   "composer.placeholder":

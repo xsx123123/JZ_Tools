@@ -47,6 +47,14 @@ export const zh = {
   "empty.intro":
     "阿寻的小鼻子可灵了！一头扎进 GEO、SRA、ENA、GSA 数据库里刨拉半天，不仅能嗅出高分数据集、啃透繁杂编号，还能把打包好的样本宝藏一口气叼到你跟前。",
   "empty.groupFit": "适合：{caption}",
+  "empty.badgeIdle": "休息中",
+
+  // ---- 空态彩蛋 ----
+  "easterEgg.hint": "戳戳阿寻",
+  "easterEgg.title": "Just a lil' mouse",
+  "easterEgg.body":
+    "哎呀，被你戳出来啦！鼠鼠我呀，白天在 GEO / SRA / ENA / GSA 里帮你刨数据，夜里还要回洞把宝藏码整齐——记得常来找阿寻玩哦！🧀",
+  "easterEgg.close": "知道啦，去挖宝！",
 
   // ---- 输入区 ----
   "composer.placeholder":
