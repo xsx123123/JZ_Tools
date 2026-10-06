@@ -37,6 +37,7 @@
 
 - [English README](../README.md)
 - [详细开发文档](DETAILED_README.md)
+- [技术与工程设计白皮书](寻宝鼠_技术与工程设计白皮书_v1.docx)
 
 ## 快速开始
 
@@ -83,6 +84,7 @@ React 19 + TypeScript · Vite 7 · Tailwind CSS v4（双主题 design token）·
 | 位置 | 内容 |
 |------|------|
 | `docs/DETAILED_README.md` | **详细开发文档**：目录结构、核心架构与数据流、平台部署（Meoo）、手动部署、systemd、踩坑清单 |
+| `docs/寻宝鼠_技术与工程设计白皮书_v1.docx` | **技术与工程设计白皮书**：产品概述、创新性、工程实践、技术实现、应用价值与演进规划 |
 | `src/routes/about.tsx` | 应用内「关于」页（产品介绍） |
 | `deploy/` | Docker 部署（Dockerfile 双 target + compose + nginx + Makefile） |
 | `server/` | 自托管对话服务（Node 原生跑 Edge Function 的 handler，零依赖） |

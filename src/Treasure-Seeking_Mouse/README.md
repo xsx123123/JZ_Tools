@@ -37,6 +37,7 @@ Here, research is no longer a lonely solo grind, and there is no cold wall of co
 
 - [中文说明（简体中文版 README）](docs/README.zh-CN.md)
 - [Detailed development docs](docs/DETAILED_README.md)
+- [Technical and engineering white paper (Chinese)](docs/寻宝鼠_技术与工程设计白皮书_v1.docx)
 
 ## Quick start
 
@@ -83,6 +84,7 @@ React 19 + TypeScript · Vite 7 · Tailwind CSS v4 (dual-theme design tokens) ·
 | Location | Contents |
 |----------|----------|
 | `docs/DETAILED_README.md` | **Detailed development docs**: directory structure, core architecture and data flow, platform deployment (Meoo), manual deployment, systemd, pitfalls |
+| `docs/寻宝鼠_技术与工程设计白皮书_v1.docx` | **Technical and engineering white paper**: product overview, innovation, engineering practice, implementation, value and roadmap |
 | `src/routes/about.tsx` | In-app "About" page (product intro) |
 | `deploy/` | Docker deployment (dual-target Dockerfile + compose + nginx + Makefile) |
 | `server/` | Self-hosted chat service (runs the Edge Function handler natively on Node, zero dependencies) |

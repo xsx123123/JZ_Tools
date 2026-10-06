@@ -2,7 +2,7 @@
 
 > 本文件夹是给 AI agent / 新开发者准备的**深度参考**，目标：接到任务后 5 分钟内定位改哪里、怎么改、怎么验。
 > 运行时契约看仓库根 `AGENTS.md`（必读，含踩坑记录与回归测试红线）；本文件夹是它的"地图 + 菜谱"。
-> 产品层面介绍看 `docs/README.zh-CN.md` 与 `docs/DETAILED_README.md`。如果目标是启动一个相似平台，先读 `platform-kickstart.md`；它定义可复用边界、最小启动路径、当前项目的功能基线，并在 §9 附了一份可直接复制给 agent 的搭建提示词模板。
+> 产品层面介绍看 `docs/README.zh-CN.md`、`docs/DETAILED_README.md` 与 `寻宝鼠_技术与工程设计白皮书_v1.docx`。如果目标是启动一个相似平台，先读 `platform-kickstart.md`；它定义可复用边界、最小启动路径和当前项目的功能基线。
 
 ## 阅读顺序（按任务类型）
 
