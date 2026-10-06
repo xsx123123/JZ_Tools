@@ -7,9 +7,10 @@ export interface SuggestionItem {
   text: string;
 }
 
-/** 从模型回复中解析 :::followup 围栏（容错：允许列表/加粗前缀） */
+/** 从模型回复中解析 :::followup 围栏（容错：允许列表/加粗前缀；缺结尾围栏时收掉剩余全文） */
 export function extractFollowups(content: string): { main: string; items: string[] } {
-  const m = content.match(/:::followup\s*\n([\s\S]*?)\n\s*:::/);
+  // 严格形态优先（开头围栏 + 结尾围栏）；模型漏写结尾围栏时兜底：从开头围栏收到全文末尾
+  const m = content.match(/:::followup\s*\n([\s\S]*?)\n\s*:::/) ?? content.match(/:::followup\s*\n([\s\S]*)$/);
   if (!m) return { main: content, items: [] };
   const items = m[1]
     .split("\n")
