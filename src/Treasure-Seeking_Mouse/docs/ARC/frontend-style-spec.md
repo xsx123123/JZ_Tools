@@ -54,7 +54,7 @@
 
 ## 4. 页面区块规范
 
-### 4.1 空态 Hero（`EmptyState.tsx`，布局基准 `docs/2026-10-06_21.23.22.png`）
+### 4.1 空态 Hero（`EmptyState.tsx`）
 
 - 圆润卡片容器（`.hero-card`），居中，最大宽度 **860px**；整体 **左右排布**，不是居中对齐。
 - **第一行（横排）**：左侧阿寻头像方块（`h-20 w-20`、`rounded-[24px]`、`bg-pet-gold-soft` + `gold-glow` + `ring-1 ring-pet-amber/30`，图 `mouse-base.webp`）；右侧文字块左对齐——主标语在上、副标语在下。
@@ -158,7 +158,7 @@
 |---|---|
 | `src/styles.css` | 全部 token、keyframes、暗色覆盖的权威实现 |
 | `docs/style_prompt.md` | 视觉重构任务指令（本规范的源头） |
-| `src/components/chat/EmptyState.tsx` / `Composer.tsx` / `SessionSidebar.tsx` | 冷启动空态（布局基准 `docs/2026-10-06_21.23.22.png`）/ 输入区 / 侧栏的落地参考 |
+| `src/components/chat/EmptyState.tsx` / `Composer.tsx` / `SessionSidebar.tsx` | 冷启动空态 / 输入区 / 侧栏的落地参考 |
 | `src/components/pet/TreasureMouse.tsx` / `PetSettingsPanel.tsx` | 桌宠状态机与设置面板参考 |
 | `src/lib/reveal-engine.ts` / `petBus.ts` / `hintBus.ts` | 动效门控与跨层通信契约 |
 | `src/i18n/locales/{zh,en}.ts` | 全部界面文案（术语口径以此为准） |
