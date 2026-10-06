@@ -8,17 +8,18 @@
 #   make docker-logs     跟踪对话服务日志
 #   make docker-stop     停止容器
 #
-# 端口：默认 8080，在 server/.env 里设 WEB_PORT=8090 即可改用其它端口
+# 端口：默认 10087（server/.env 的 WEB_PORT 覆盖；按服务器实际可用端口配置）
+# 一键启动前会自动检测该端口是否被其他进程占用，占用即报错停止
 
 SHELL := /bin/bash
 
 COMPOSE   := docker compose -f deploy/docker-compose.yml
 ENV_FILE  := server/.env
-PORT      ?= 8080
+PORT      ?= 10087
 PYTHON    ?= python3
 CHECK_LLM := deploy/check-llm-key.py
 
-# 从 server/.env 读 WEB_PORT（缺省 8080）；导出为环境变量，覆盖 compose 插值里的默认值
+# 从 server/.env 读 WEB_PORT（缺省 10087）；导出为环境变量，覆盖 compose 插值里的默认值
 WEB_PORT := $(shell grep -E '^WEB_PORT=' $(ENV_FILE) 2>/dev/null | cut -d= -f2 | tr -d ' ')
 ifeq ($(WEB_PORT),)
 WEB_PORT := $(PORT)
@@ -26,7 +27,7 @@ endif
 export WEB_PORT
 
 .DEFAULT_GOAL := help
-.PHONY: help docker-start docker-stop docker-restart docker-logs docker-status docker-clean check-env check-llm
+.PHONY: help docker-start docker-stop docker-restart docker-logs docker-status docker-clean check-env check-llm check-port
 
 help: ## 显示所有可用命令
 	@echo "GEO寻宝鼠 · 可用命令："
@@ -51,7 +52,22 @@ else
 	@$(PYTHON) $(CHECK_LLM) --env-file $(ENV_FILE)
 endif
 
-docker-start: check-llm ## 预检 LLM 密钥 → 构建并启动容器（后台运行）
+check-port: check-env ## 预检 WEB_PORT 是否被其他进程占用（被占即报错停止；本项目容器自身占用除外）
+	@WP="$(WEB_PORT)"; \
+	if ss -tln 2>/dev/null | awk '{print $$4}' | grep -qE ":$${WP}$$"; then \
+	  PUB=$$($(COMPOSE) --env-file $(ENV_FILE) port web 80 2>/dev/null | cut -d: -f2); \
+	  if [ "$$PUB" = "$$WP" ]; then \
+	    echo "✓ 端口 $$WP 由本项目 web 容器占用（重启场景，继续）"; \
+	  else \
+	    echo "❌ 端口 $$WP 已被其他进程占用，启动已中止"; \
+	    echo "   → 释放该端口，或在 $(ENV_FILE) 里把 WEB_PORT 改为服务器上实际可用的端口"; \
+	    exit 1; \
+	  fi; \
+	else \
+	  echo "✓ 端口 $$WP 可用"; \
+	fi
+
+docker-start: check-llm check-port ## 预检 LLM 密钥 + 端口占用 → 构建并启动容器（后台运行）
 	@echo ""
 	$(COMPOSE) --env-file $(ENV_FILE) up -d --build
 	@echo ""

@@ -521,6 +521,10 @@ function ChatPage(): React.ReactElement {
       onRename={handleRename}
       onDelete={handleDelete}
       onLogin={() => setAuthOpen(true)}
+      onGuestTry={() => {
+        setDrawerOpen(false);
+        setCollapsed(true);
+      }}
       onLogout={handleLogout}
       storageNote={
         user

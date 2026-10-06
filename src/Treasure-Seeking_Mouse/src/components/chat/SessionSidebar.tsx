@@ -17,6 +17,7 @@ export function SessionSidebar({
   onRename,
   onDelete,
   onLogin,
+  onGuestTry,
   onLogout,
   storageNote,
 }: {
@@ -28,6 +29,8 @@ export function SessionSidebar({
   onRename: (id: string, title: string) => void;
   onDelete: (id: string) => void;
   onLogin?: () => void;
+  /** 「不登录，先试试」：收起侧栏/抽屉，直接以游客身份用（与 onLogin 并列的逃逸口） */
+  onGuestTry?: () => void;
   onLogout: () => void;
   storageNote?: string; // 游客存储策略提示（未登录时展示在侧栏底部）
 }): React.ReactElement {
@@ -189,13 +192,24 @@ export function SessionSidebar({
             </button>
           </div>
         ) : onLogin ? (
-          <button
-            type="button"
-            onClick={onLogin}
-            className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-border bg-card px-3 py-2 text-[12.5px] text-foreground transition-colors hover:border-helix/50 hover:text-helix"
-          >
-            <LogIn size={13} /> {t("sidebar.guestContinue")}
-          </button>
+          <div className="space-y-1.5">
+            <button
+              type="button"
+              onClick={onLogin}
+              className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-border bg-card px-3 py-2 text-[12.5px] text-foreground transition-colors hover:border-helix/50 hover:text-helix"
+            >
+              <LogIn size={13} /> {t("sidebar.loginCta")}
+            </button>
+            {onGuestTry ? (
+              <button
+                type="button"
+                onClick={onGuestTry}
+                className="story-link block w-full py-0.5 text-center text-[11.5px] text-muted-foreground transition-colors hover:text-foreground"
+              >
+                {t("sidebar.guestTry")}
+              </button>
+            ) : null}
+          </div>
         ) : null}
         {!userLabel && storageNote ? (
           <p className="border-t border-border/60 pt-2 text-[10.5px] leading-relaxed text-muted-foreground/70">{storageNote}</p>

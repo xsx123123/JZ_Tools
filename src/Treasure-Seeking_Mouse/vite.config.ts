@@ -49,7 +49,7 @@ export default defineConfig({
     // 浏览器只访问本端口（局域网设备也能完整对话），由 vite 转发到本地服务（仅 dev 生效）
     proxy: {
       "/chat-api": {
-        target: process.env.CHAT_API_PROXY_TARGET || "http://localhost:8788",
+        target: process.env.CHAT_API_PROXY_TARGET || "http://localhost:8787",
         changeOrigin: true,
         rewrite: (p) => p.replace(/^\/chat-api/, ""),
       },

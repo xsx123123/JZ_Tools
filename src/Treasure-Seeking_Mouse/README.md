@@ -47,7 +47,7 @@ cp server/.env.example server/.env   # fill in LLM_API_KEY (OpenAI / DeepSeek / 
 make docker-start                    # precheck key → build → start
 ```
 
-Open `http://localhost:8080/` (the port is controlled by `WEB_PORT` in `server/.env`) — you're set up once a message returns a streamed reply. Common commands: `make docker-stop` / `make docker-restart` / `make docker-logs` (`make` lists them all).
+Open `http://localhost:10087/` — the port defaults to 10087 and is controlled by `WEB_PORT` in `server/.env`; set it to any port actually available on your server (an occupied port makes `make docker-start` abort with an error). You're set up once a message returns a streamed reply. Common commands: `make docker-stop` / `make docker-restart` / `make docker-logs` (`make` lists them all).
 
 ### Local development
 

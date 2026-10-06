@@ -1,5 +1,8 @@
 # AGENTS.md
 
+## 深度参考手册（docs/ARC/）
+- 接到开发任务先读 **`docs/ARC/README.md`**：代码地图（任务→文件）、6 类常见任务菜谱（加工具/加文案/加桌宠状态/加设置项/加协议帧/改主题）、验证命令速查、硬红线。配套两份专题：`architecture-2026-10-06.md`（当前平台架构与数据面）、`frontend-style-spec.md`（设计令牌/组件/动效规范）。
+
 ## QMuse 平台版（迁移副本，已停止维护）
 - `qmuse/qmuse-app/` 是本应用的 **QMuse 平台迁移版**（数据后端 Supabase→QMuse 云服务、Edge Function→云函数、SSE→整包+前端模拟流式、应用内邮箱登录→平台账号）。**自 2026-10-06 起停止维护：新改动不再同步过去，回归测试与构建校验也只需跑主仓库**；目录保留作历史归档，勿删。
 - （存档）改 QMuse 版时遵守 `qmuse/qmuse-app/AGENTS.md` 与其内置 qmuse-cloud 技能契约；改完跑 `npm run check`、`npm run build` 与产物校验器（见 MIGRATION.md 第五节）。

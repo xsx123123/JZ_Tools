@@ -189,7 +189,7 @@ function AboutPage(): React.ReactElement {
 make docker-start                    # ${t("about.deploySteps")}`}
           </pre>
           <p className="mt-2 text-[11.5px] text-muted-foreground/80">
-            {t("about.deployOpen", { url: "http://localhost:8080/" })}
+            {t("about.deployOpen", { url: "http://localhost:10087/" })}
           </p>
         </section>
 

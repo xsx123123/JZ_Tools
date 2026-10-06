@@ -47,7 +47,7 @@ cp server/.env.example server/.env   # 填入 LLM_API_KEY（OpenAI / DeepSeek / 
 make docker-start                    # 预检密钥 → 构建 → 启动
 ```
 
-打开 `http://localhost:8080/`（端口由 `server/.env` 的 `WEB_PORT` 控制），发一条消息能看到流式回复即成功。常用命令：`make docker-stop` / `make docker-restart` / `make docker-logs`（`make` 查看全部）。
+打开 `http://localhost:10087/`（端口默认 10087，由 `server/.env` 的 `WEB_PORT` 控制；按服务器实际可用的端口配置，端口被占用时 `make docker-start` 会报错停止），发一条消息能看到流式回复即成功。常用命令：`make docker-stop` / `make docker-restart` / `make docker-logs`（`make` 查看全部）。
 
 ### 本地开发
 
