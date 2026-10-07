@@ -120,6 +120,7 @@ function AboutPage(): React.ReactElement {
             <Database size={16} className="text-pet-amber-deep" /> {t("about.dbs")}
           </h2>
           <p className="mt-2 text-[12.5px] leading-relaxed text-muted-foreground">{t("about.dbsIntro")}</p>
+          <p className="mt-2 text-[12.5px] leading-relaxed text-muted-foreground">{t("about.gsaPolicy")}</p>
           <div className="mt-3 flex flex-wrap gap-1.5">
             {DATABASES.map((db) => (
               <span

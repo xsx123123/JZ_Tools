@@ -16,7 +16,13 @@ const NCBI_BASE: Record<string, string> = {
   DRR: "https://trace.ncbi.nlm.nih.gov/Traces/sra/?run=",
 };
 
+const DAC_URL = "https://ngdc.cncb.ac.cn/gsa-human/";
+
 function buildLink(accession: string): string | null {
+  if (/^GWH[A-Z0-9]+$/i.test(accession)) return `https://ngdc.cncb.ac.cn/gwh/assembly/${accession.toUpperCase()}`;
+  if (/^PRJCA\d+$/i.test(accession)) return `https://ngdc.cncb.ac.cn/gwh/bioProject/${accession.toUpperCase()}`;
+  if (/^SAMC\d+$/i.test(accession)) return `https://ngdc.cncb.ac.cn/gwh/bioSample/${accession.toUpperCase()}`;
+  if (/^C_[A-Z]{2}\d+\.\d+$/i.test(accession)) return `https://ngdc.cncb.ac.cn/genbase/sequence/${accession.toUpperCase()}`;
   const m = accession.match(/^(GSE|GSM|GDS|SRP|SRR|SRX|PRJNA|DRR)\d+$/i);
   if (!m) return null;
   const base = NCBI_BASE[m[1].toUpperCase()];
@@ -57,6 +63,9 @@ export function DatasetCardView({ card, hostMessageId }: { card: CardData; hostM
   const { t } = useI18n();
   const link = buildLink(card.accession);
   const prefix = prefixOf(card.accession);
+  const controlled = /^HRA\d+$/i.test(card.accession) || card.meta?.controlled === "true";
+  const gsaPublic = card.meta?.source?.toLowerCase() === "gsa" && !controlled;
+  const mirrorUrl = card.meta?.mirror_url || card.meta?.download_url;
   // 📖 点击反馈：短暂高亮 + 卡片描边脉冲（文献卡片在消息层渲染时的视觉锚点）
   const [litClicked, setLitClicked] = useState(false);
   const clickTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -83,6 +92,8 @@ export function DatasetCardView({ card, hostMessageId }: { card: CardData; hostM
               {prefix}
             </span>
           ) : null}
+          {gsaPublic ? <span className="shrink-0 rounded bg-helix-soft px-1 py-px text-[9px] font-medium text-helix ring-1 ring-helix/20">{t("card.gsaMirror")}</span> : null}
+          {controlled ? <a href={DAC_URL} target="_blank" rel="noreferrer noopener" className="shrink-0 rounded bg-pet-amber/15 px-1 py-px text-[9px] font-medium text-pet-amber ring-1 ring-pet-amber/30">{t("card.controlled")}</a> : null}
           <a
             href={link ?? undefined}
             target="_blank"
@@ -130,6 +141,9 @@ export function DatasetCardView({ card, hostMessageId }: { card: CardData; hostM
             </span>
           ))}
         </div>
+      ) : null}
+      {mirrorUrl && gsaPublic ? (
+        <a href={mirrorUrl} target="_blank" rel="noreferrer noopener" className="mt-1.5 inline-flex text-[10.5px] text-helix story-link">{t("card.openGsaMirror")}</a>
       ) : null}
     </div>
   );

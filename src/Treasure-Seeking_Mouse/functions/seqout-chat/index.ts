@@ -1,6 +1,6 @@
 // seqout-chat: 对话式 GEO 组学数据检索 Edge Function
 // 1) LLM (Meoo AI, OpenAI 兼容 + tools) 决定调用哪个 seqout 工具
-// 2) 函数内直接 GET https://seqout.org/api/... 执行工具（复刻 seqout-mcp 的 26 个只读能力）
+// 2) 函数内直接 GET seqout.org 与 NGDC 官方 API 执行 31 个只读工具
 // 3) 流式返回 SSE：delta 为文本增量；event: tool / event: cards 供前端展示执行过程与结果卡片
 //
 // 提示词维护：SYSTEM_PROMPT 双语文本外置在 prompts/system-{zh,en}.md（唯一可编辑来源），
@@ -18,6 +18,7 @@ export { SYSTEM_PROMPT, SYSTEM_PROMPT_EN };
 //   NCBI_EMAIL       可选：NCBI 要求的联系方式（tool=go_xunbaoshu）
 const LLM_BASE_URL = envGet('LLM_BASE_URL') || 'https://api.meoo.host/meoo-ai/compatible-mode/v1';
 const SEQOUT_BASE_URL = envGet('SEQOUT_BASE_URL') || 'https://seqout.org/api';
+const NGDC_BASE_URL = envGet('NGDC_BASE_URL') || 'https://ngdc.cncb.ac.cn';
 const DEFAULT_MODEL = envGet('LLM_MODEL') || 'qwen3.6-plus';
 const FUNCTION_NAME = 'seqout-chat';
 
@@ -171,7 +172,7 @@ function touchStats(): void {
   usageStats.updatedAt = new Date().toISOString();
 }
 
-// ---------- seqout 工具定义（与 seqout-mcp 26 个工具一一对应） ----------
+// ---------- 工具定义（26 个 seqout 工具 + 5 个 NGDC 工具） ----------
 
 function strEnum(values: string[]) {
   return { type: 'string', enum: values };
@@ -204,7 +205,13 @@ const TOOL_DEFS = [
   tool('seqout_get_platform_totals', '获取平台实验总数；传 platform 时查询对应过滤选项。', { platform: strOpt('平台名称，可空') }, []),
   tool('seqout_beacon_info', '获取 Beacon 身份和元数据。', {}, []),
   tool('seqout_beacon_runs', 'Beacon 默认运行记录查询（服务端默认分页，不支持 limit/skip）。', {}, []),
+  tool('ngdc_get_gwh_assembly', '查询 NGDC Genome Warehouse 组装元数据、关联项目样本和国内下载直链。仅接受 GWH 编号。', { accession: reqStr('GWH 组装编号，如 GWHAAAA00000000') }, ['accession']),
+  tool('ngdc_get_gwh_project', '查询 NGDC Genome Warehouse 项目详情。仅接受 PRJCA 编号。', { accession: reqStr('GWH BioProject 编号，如 PRJCA000437') }, ['accession']),
+  tool('ngdc_get_gwh_sample', '查询 NGDC Genome Warehouse 样本属性。仅接受 SAMC 编号。', { accession: reqStr('GWH BioSample 编号，如 SAMC000001') }, ['accession']),
+  tool('ngdc_get_genbase_sequence', '查询 NGDC GenBase 序列，返回截断预览和完整国内直链，避免把大文件灌入上下文。', { accession: reqStr('GenBase 编号，如 C_AA004835.1'), format: { type: 'string', enum: ['fasta', 'gbf'], description: '返回格式，默认 fasta' } }, ['accession']),
+  tool('ngdc_get_gsa_mirror', '通过 seqout 检索 SRA/GEO 编号对应的 GSA 国内镜像。找不到时如实返回无镜像。', { accession: reqStr('SRP、SRR、PRJNA 或 GSE 编号') }, ['accession']),
 ];
+export const NGDC_TOOL_NAMES = ['ngdc_get_gwh_assembly', 'ngdc_get_gwh_project', 'ngdc_get_gwh_sample', 'ngdc_get_genbase_sequence', 'ngdc_get_gsa_mirror'] as const;
 
 function tool(name: string, description: string, properties: Record<string, unknown>, required: string[]) {
   return { type: 'function', function: { name, description, parameters: { type: 'object', properties, required } } };
@@ -240,7 +247,7 @@ export function describeSeqoutError(status: number, body: string): string {
 }
 
 async function seqoutGet(path: string, params?: Record<string, string>): Promise<Json> {
-  const url = new URL(SEQOUT_BASE_URL + path);
+  const url = new URL(/^https?:\/\//i.test(path) ? path : SEQOUT_BASE_URL + path);
   if (params) for (const [k, v] of Object.entries(params)) url.searchParams.set(k, v);
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 25000);
@@ -252,6 +259,66 @@ async function seqoutGet(path: string, params?: Record<string, string>): Promise
   } finally {
     clearTimeout(timer);
   }
+}
+
+async function ngdcGet(urlOrPath: string, accept = 'application/json,text/plain'): Promise<{ value: Json | string; url: string }> {
+  const url = /^https?:\/\//i.test(urlOrPath) ? urlOrPath : `${NGDC_BASE_URL}${urlOrPath}`;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 30000);
+  try {
+    const resp = await fetch(url, { signal: controller.signal, headers: { Accept: accept } });
+    const text = await resp.text();
+    if (!resp.ok) {
+      if (resp.status === 404) throw new Error(`NGDC 未找到该编号或数据尚未释放（HTTP 404）：${text.slice(0, 160)}`);
+      throw new Error(`NGDC HTTP ${resp.status}: ${text.slice(0, 300)}`);
+    }
+    if (accept.includes('application/json')) {
+      try { return { value: JSON.parse(text) as Json, url }; } catch { throw new Error(`NGDC 返回了非 JSON 响应：${text.slice(0, 200)}`); }
+    }
+    return { value: text, url };
+  } finally { clearTimeout(timer); }
+}
+
+const GWH_ASSEMBLY_PATTERN = /^GWH[A-Z0-9]+$/i;
+const PRJCA_PATTERN = /^PRJCA\d+$/i;
+const SAMC_PATTERN = /^SAMC\d+$/i;
+const GENBASE_PATTERN = /^C_[A-Z]{2}\d+\.\d+$/i;
+const MIRROR_ACCESSION_PATTERN = /^(SRP|SRR|PRJNA|GSE)\d+$/i;
+
+function validateNgdcAccession(value: string, pattern: RegExp, label: string): string {
+  const acc = value.trim().toUpperCase();
+  if (!pattern.test(acc)) throw new Error(`${label}格式不正确：${acc}`);
+  return acc;
+}
+
+export function genbasePreview(text: string, format: 'fasta' | 'gbf', url: string): Record<string, Json> {
+  const preview = text.slice(0, 2000);
+  const header = format === 'fasta' ? (text.split(/\r?\n/, 1)[0] || '') : '';
+  const sequence = format === 'fasta' ? text.replace(/^>[^\r\n]*(?:\r?\n|$)/, '').replace(/\s+/g, '') : '';
+  return { format, preview, header, estimated_length: sequence ? sequence.length : text.length, download_url: url };
+}
+
+function collectMirrorValues(value: unknown, out: { cra?: string; crr: string[]; urls: string[] }): void {
+  if (typeof value === 'string') {
+    const cra = /\bCRA\d+\b/i.exec(value)?.[0]?.toUpperCase();
+    if (cra && !out.cra) out.cra = cra;
+    for (const m of value.matchAll(/\bCRR\d+\b/gi)) if (!out.crr.includes(m[0].toUpperCase())) out.crr.push(m[0].toUpperCase());
+    for (const m of value.matchAll(/https?:\/\/download\.cncb\.ac\.cn\/[^\s"']+/gi)) if (!out.urls.includes(m[0])) out.urls.push(m[0]);
+  } else if (Array.isArray(value)) {
+    for (const item of value.slice(0, 200)) collectMirrorValues(item, out);
+  } else if (value && typeof value === 'object') {
+    for (const item of Object.values(value as Record<string, unknown>)) collectMirrorValues(item, out);
+  }
+}
+
+async function ngdcGsaMirror(accession: string): Promise<Json> {
+  const acc = validateNgdcAccession(accession, MIRROR_ACCESSION_PATTERN, 'GSA 镜像查询编号');
+  const result = await seqoutGet('/search', { q: acc });
+  const found = { cra: undefined as string | undefined, crr: [] as string[], urls: [] as string[] };
+  collectMirrorValues(result, found);
+  if (!found.cra && found.crr.length === 0 && found.urls.length === 0) return { mirrored: false, sra_accession: acc, note: '该数据暂无可确认的 GSA 国内镜像。' };
+  const mirrorUrls = found.urls;
+  return { mirrored: mirrorUrls.length > 0, sra_accession: acc, gsa_cra: found.cra ?? null, gsa_crr: found.crr, mirror_urls: mirrorUrls, gsa_browse_url: found.cra ? `https://ngdc.cncb.ac.cn/gsa/browse/${found.cra}` : null };
 }
 
 /** TSV 类端点专用（runs/download 返回 text/tab-separated-values；metadata/download 返回 text/csv） */
@@ -493,6 +560,29 @@ async function executeTool(name: string, args: Record<string, Json | undefined>)
     case 'seqout_get_platform_totals': { const p = q(args, 'platform'); return wrap(await seqoutGet(p ? '/stats/platform-filters' : '/stats/platform-totals', p ? { platform: p } : undefined)); }
     case 'seqout_beacon_info': return wrap(await seqoutGet('/beacon/info'));
     case 'seqout_beacon_runs': return wrap(await seqoutGet('/beacon/runs'));
+    case 'ngdc_get_gwh_assembly': {
+      const acc = validateNgdcAccession(String(args.accession), GWH_ASSEMBLY_PATTERN, 'GWH 组装编号');
+      const { value, url } = await ngdcGet(`/gwh/api/public/assembly/${encodeURIComponent(acc)}`);
+      return wrap({ accession: acc, source: 'NGDC GWH', endpoint: url, ...(value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, Json> : { result: value }) });
+    }
+    case 'ngdc_get_gwh_project': {
+      const acc = validateNgdcAccession(String(args.accession), PRJCA_PATTERN, 'PRJCA 项目编号');
+      const { value, url } = await ngdcGet(`/gwh/api/public/bioProject/${encodeURIComponent(acc)}`);
+      return wrap({ accession: acc, source: 'NGDC GWH', endpoint: url, ...(value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, Json> : { result: value }) });
+    }
+    case 'ngdc_get_gwh_sample': {
+      const acc = validateNgdcAccession(String(args.accession), SAMC_PATTERN, 'SAMC 样本编号');
+      const { value, url } = await ngdcGet(`/gwh/api/public/bioSample/${encodeURIComponent(acc)}`);
+      return wrap({ accession: acc, source: 'NGDC GWH', endpoint: url, ...(value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, Json> : { result: value }) });
+    }
+    case 'ngdc_get_genbase_sequence': {
+      const acc = validateNgdcAccession(String(args.accession), GENBASE_PATTERN, 'GenBase 编号');
+      const format = q(args, 'format') === 'gbf' ? 'gbf' : 'fasta';
+      const path = `/genbase/api/file/${format}?acc=${encodeURIComponent(acc)}`;
+      const { value, url } = await ngdcGet(path, 'text/plain,application/octet-stream');
+      return wrap(genbasePreview(String(value), format, url));
+    }
+    case 'ngdc_get_gsa_mirror': return wrap(await ngdcGsaMirror(String(args.accession)));
     default: throw new Error(`未知工具：${name}`);
   }
 }
@@ -821,6 +911,19 @@ function extractCards(name: string, payload: Json): Json[] {
   try {
     const data = (payload as { data?: unknown }).data;
     if (!data || typeof data !== 'object') return [];
+    if (name === 'ngdc_get_gsa_mirror') return [];
+    if (name.startsWith('ngdc_')) {
+      const obj = data as Record<string, Json>;
+      const accession = typeof obj.accession === 'string' ? obj.accession : '';
+      const title = typeof obj.title === 'string' ? obj.title : typeof obj.name === 'string' ? obj.name : name.replace(/^ngdc_/, 'NGDC ');
+      const summary = typeof obj.description === 'string' ? obj.description.slice(0, 600) : typeof obj.summary === 'string' ? obj.summary.slice(0, 600) : '';
+      if (accession || title) {
+        const meta: Record<string, string> = { source: 'ngdc' };
+        if (/^HRA\d+$/i.test(accession) || obj.controlled === true) meta.controlled = 'true';
+        if (typeof obj.download_url === 'string') meta.download_url = obj.download_url;
+        return [{ tool: name, accession, title, summary, meta }];
+      }
+    }
     const list = Array.isArray(data) ? data : (data as { results?: unknown }).results;
     if (!Array.isArray(list)) return [];
     const cards: Json[] = [];
@@ -836,7 +939,7 @@ function extractCards(name: string, payload: Json): Json[] {
       if (!accession && !title) continue;
       const summary = typeof it.summary === 'string' ? it.summary.slice(0, 600) : typeof it.description === 'string' ? it.description.slice(0, 600) : '';
       const meta: Record<string, string> = {};
-      for (const key of ['organism', 'species', 'common_name', 'overall_design', 'library_strategy', 'instrument', 'platform', 'total', 'status'] as const) {
+      for (const key of ['organism', 'species', 'common_name', 'overall_design', 'library_strategy', 'instrument', 'platform', 'total', 'status', 'source', 'controlled'] as const) {
         const v = it[key];
         if (typeof v === 'string' || typeof v === 'number') meta[key] = String(v);
       }
@@ -1157,6 +1260,11 @@ function labelOf(name: string): string {
     seqout_get_platform_totals: '查询平台总量',
     seqout_beacon_info: '查询 Beacon 信息',
     seqout_beacon_runs: '查询 Beacon 运行',
+    ngdc_get_gwh_assembly: '查询 NGDC GWH 组装',
+    ngdc_get_gwh_project: '查询 NGDC GWH 项目',
+    ngdc_get_gwh_sample: '查询 NGDC GWH 样本',
+    ngdc_get_genbase_sequence: '查询 NGDC GenBase 序列',
+    ngdc_get_gsa_mirror: '查询 GSA 国内镜像',
   };
   return map[name] || name;
 }

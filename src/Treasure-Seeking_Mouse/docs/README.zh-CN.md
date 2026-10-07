@@ -12,10 +12,10 @@
     <a href="https://github.com/xsx123123/JZ_Tools/blob/main/LICENSE"><img src="https://img.shields.io/badge/License-MIT-yellow?style=flat-square" alt="MIT License" /></a>
   </p>
   <p>🚀 <a href="https://render.qmuse.pub/p/muse/2842191818002612/index.html"><strong>在线体验</strong>：https://render.qmuse.pub/p/muse/2842191818002612/index.html</a>（线上部署版本可能落后于仓库最新代码）</p>
-  <p>把 <a href="https://github.com/xsx123123/JZ_Tools/tree/main/src/seqout-mcp">seqout-mcp</a> 的 26 个组学数据检索工具封装成「聊天式挖宝」——自然语言提问，大模型自动检索 GEO / SRA / ENA / GSA，数据卡片 + 文献证据链呈现，附桌宠养成玩法。</p>
+  <p>把 <a href="https://github.com/xsx123123/JZ_Tools/tree/main/src/seqout-mcp">seqout-mcp</a> 的 31 个组学数据检索工具封装成「聊天式挖宝」——自然语言提问，大模型自动检索 GEO / SRA / ENA / GSA / NGDC，数据卡片 + 文献证据链呈现，附桌宠养成玩法。</p>
 </div>
 
-> **备注**：本项目对话后端封装的 [seqout-mcp](https://github.com/xsx123123/JZ_Tools/tree/main/src/seqout-mcp) 是一个通过 [seqout.org](https://seqout.org) 查询公共组学数据的 MCP Server，提供 26 个只读工具，覆盖 GEO、SRA、ENA、GSA 数据集搜索、项目详情、样本信息、编号反查、统计和下载链接。它使用 stdio 传输：MCP 客户端负责启动进程并通过标准输入/输出通信；普通日志只写入 stderr，不会污染 MCP 协议数据。本应用将这套工具能力以 OpenAI function schema 声明式移植进对话服务，无需在本地运行 Python MCP 进程。
+> **备注**：本项目对话后端封装的 [seqout-mcp](https://github.com/xsx123123/JZ_Tools/tree/main/src/seqout-mcp) 是一个通过 [seqout.org](https://seqout.org) 与 NGDC 官方 API 查询公共组学数据的 MCP Server，提供 31 个只读工具，覆盖 GEO、SRA、ENA、GSA、NGDC 数据集搜索、项目详情、样本信息、编号反查、统计和下载链接。它使用 stdio 传输：MCP 客户端负责启动进程并通过标准输入/输出通信；普通日志只写入 stderr，不会污染 MCP 协议数据。本应用将这套工具能力以 OpenAI function schema 声明式移植进对话服务，无需在本地运行 Python MCP 进程。
 
 ![封面 · 夜探矿洞](寻宝鼠.png)
 
@@ -68,7 +68,7 @@ GEO · SRA · ArrayExpress · ENA · GSA · DRA · GEA
 
 ## 功能一览
 
-- **对话式检索**：自然语言提问 → LLM tool-calling 自动选择 seqout 工具（26 个只读工具，GEO/SRA/ENA/GSA）→ 流式回答 + 数据卡片 + 「下一铲建议」
+- **对话式检索**：自然语言提问 → LLM tool-calling 自动选择 seqout 与 NGDC 工具（31 个只读工具，GEO/SRA/ENA/GSA/NGDC）→ 流式回答 + 数据卡片 + 「下一铲建议」
 - **正文内嵌链接**：GSE/GSM/GO/PMID 编号自动变成可点链接，hover 浮层预取论文元数据，一键查看文献证据链（PubMed 摘要 + DOI / OA 全文）
 - **排行榜**：登录用户榜 + 访客榜，本周 / 累计双维度，自定义昵称
 - **使用统计**：顶栏 📊 面板展示累计对话、Token 消耗、使用人数、每个工具的调用次数（服务端聚合，容器内持久化）

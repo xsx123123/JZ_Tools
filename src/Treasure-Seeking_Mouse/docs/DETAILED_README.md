@@ -5,7 +5,7 @@
 
 > 🚀 **在线体验**：<https://render.qmuse.pub/p/muse/2842191818002612/index.html>（线上部署版本可能落后于仓库最新代码）
 
-一个把 [seqout-mcp](https://github.com/xsx123123/JZ_Tools/tree/main/src/seqout-mcp) 的 26 个只读组学数据检索工具封装成「聊天式挖宝」体验的单页 Web 应用：用户用自然语言提问，后端大模型自动选择并调用 seqout API，结果以数据卡片 + 可折叠建议卡呈现；页面右下角常驻一只「寻宝鼠」桌宠，随检索进度挖宝、攒宝藏、解锁成就。支持移动端自适应，可完全脱离平台自托管（任意 OpenAI 兼容模型 + Docker 一键部署，见 §七/§八）。
+一个把 [seqout-mcp](https://github.com/xsx123123/JZ_Tools/tree/main/src/seqout-mcp) 的 31 个只读组学数据检索工具封装成「聊天式挖宝」体验的单页 Web 应用：用户用自然语言提问，后端大模型自动选择并调用 seqout 与 NGDC API，结果以数据卡片 + 可折叠建议卡呈现；页面右下角常驻一只「寻宝鼠」桌宠，随检索进度挖宝、攒宝藏、解锁成就。支持移动端自适应，可完全脱离平台自托管（任意 OpenAI 兼容模型 + Docker 一键部署，见 §七/§八）。
 
 ![封面 · 夜探矿洞](docs/寻宝鼠.png)
 
@@ -106,7 +106,7 @@
         值取自 src/supabase/client.ts 的 projectUrlId；
        自托管模式：VITE_CHAT_API 直连本地/自建服务，见 §七）
       → Edge Function functions/seqout-chat/index.ts（自托管时由 server/local.mjs 本地托管）
-          1. 调 LLM 网关（OpenAI 兼容 /chat/completions，带 26 个 tool schema）
+          1. 调 LLM 网关（OpenAI 兼容 /chat/completions，带 31 个 tool schema）
           2. 模型发起 tool_calls → 函数内直接 GET https://seqout.org/api/...（最多 40 轮循环）
           3. 结果回填给模型继续推理；search 响应超大时先截断再送 LLM
         ← 以 SSE 下行自定义协议推给前端

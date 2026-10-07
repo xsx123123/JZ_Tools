@@ -81,6 +81,9 @@ export const zh = {
   "card.openNcbi": "在 NCBI 打开",
   "card.literature": "查看关联文献（证据链）",
   "card.literatureAria": "查看关联文献",
+  "card.gsaMirror": "国内镜像",
+  "card.controlled": "受控数据",
+  "card.openGsaMirror": "打开 GSA 国内直链",
 
   // ---- 下载加速卡片 ----
   "boost.title": "下载加速 · Polariseq",
@@ -269,7 +272,7 @@ export const zh = {
   "about.highlights": "核心亮点",
   "about.mcpTitle": "对话后端：seqout-mcp",
   "about.mcpNote":
-    "本项目对话后端封装的 {mcp} 是一个通过 {seqout} 查询公共组学数据的 MCP Server，提供 26 个只读工具，覆盖 GEO、SRA、ENA、GSA 数据集搜索、项目详情、样本信息、编号反查、统计和下载链接。它使用 stdio 传输：MCP 客户端负责启动进程并通过标准输入/输出通信；普通日志只写入 stderr，不会污染 MCP 协议数据。本应用将这套工具能力以 OpenAI function schema 声明式移植进对话服务，无需在本地运行 Python MCP 进程。",
+    "本项目对话后端封装的 {mcp} 是一个通过 {seqout} 查询公共组学数据的 MCP Server，提供 31 个只读工具，覆盖 GEO、SRA、ENA、GSA、NGDC 数据集搜索、项目详情、样本信息、编号反查、统计和下载链接。它使用 stdio 传输：MCP 客户端负责启动进程并通过标准输入/输出通信；普通日志只写入 stderr，不会污染 MCP 协议数据。本应用将这套工具能力以 OpenAI function schema 声明式移植进对话服务，无需在本地运行 Python MCP 进程。",
   "about.deploy": "一键自托管",
   "about.deployDesc":
     "完全脱离云平台：任意 OpenAI 兼容模型（OpenAI / DeepSeek / 硅基流动 / 本地 vLLM）+ Docker 即可运行，配置只有一份 {env}，不配数据库则自动降级纯游客模式。",
@@ -288,13 +291,14 @@ export const zh = {
   "about.why": "立意 · 为什么做这只寻宝鼠",
   "about.dbs": "阿寻能挖的数据库",
   "about.dbsIntro": "叫「GEO 寻宝鼠」只是因为 GEO 是最老的那条矿脉——阿寻其实不只能搜 GEO，一次下铲同时穿透 7 个数据库：",
+  "about.gsaPolicy": "GSA 公开数据可通过国家基因组科学数据中心的国内直链获取；GSA-Human 受控数据需要 PI 经 BIGSSO 登录并向 DAC 申请，本平台不提供受控数据下载。",
   "about.why.1": "GEO 寻宝鼠（OmicsTreasure Hunter）让新手科研小白告别老旧繁琐的生信数据库迷宫，用拟人化“探矿挖宝”交互，一键穿透 GEO / SRA / ENA / GSA 全网数据宝藏。",
   "about.why.2": "对刚进组的研究生来说，科研最磨灭热情的，往往不是做实验，而是起步时在冰冷、反人类的数据库迷宫里抓瞎，找不对样本、看不懂编号、搜不到文献，第一步就陷入自我怀疑与精神内耗。「GEO 寻宝鼠」想要做的，是把高校科研人从枯燥压抑的第一步数据搜索中彻底解救出来。",
   "about.why.3": "在这里，科研不再是孤独的单打独斗，也没有冰冷复杂的代码门槛。只要像和同门聊天一样，随口说出你的课题构想，桌宠“阿寻”就会戴上矿工帽一头扎进数据矿脉深处，兴冲冲地帮你刨出与研究方向最贴合的黄金数据与关键文献，将规整的样本卡片稳稳叼到你面前。每一次检索都是一次充满惊喜的挖宝，让科研起步少一点焦虑迷茫，多一份探索的纯粹乐趣与踏实陪伴。",
   "about.authors": "本应用基于 {qmuse} 构建与部署，并在 DeepSeek-V4、Kimi-K3、GLM-5.3 等 AI 模型的协助下开发完成。",
 
   "about.h.1.title": "对话式检索",
-  "about.h.1.desc": "自然语言提问 → 大模型自动调用 26 个 seqout 只读工具（GEO / SRA / ENA / GSA）→ 流式回答 + 数据卡片 +「下一铲建议」。",
+  "about.h.1.desc": "自然语言提问 → 大模型自动调用 31 个 seqout 与 NGDC 只读工具（GEO / SRA / ENA / GSA / NGDC）→ 流式回答 + 数据卡片 +「下一铲建议」。",
   "about.h.2.title": "正文内嵌链接",
   "about.h.2.desc": "正文里的 GSE/GSM/GO/PMID 编号自动变成可点链接，hover 预取论文元数据，一键查看文献证据链（PubMed 摘要 + DOI / OA 全文）。",
   "about.h.3.title": "排行榜",
