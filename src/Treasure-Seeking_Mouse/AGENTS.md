@@ -56,6 +56,18 @@
   3. 候选 `PRJ` 优先、`SRP` 兜底，并逐个 `hasRuns` 验证；全为 0 时如实返回、不抛异常、不回退到任意 SRP。
   4. 404 要区分"镜像库未同步"与"项目无数据"。
 
+## 文献检索测试（literature_search 多源架构）
+- **测试位置**：`functions/seqout-chat/tests/literature.test.ts`；架构说明见 `docs/ARC/literature-multisource-architecture.md`。
+- **命令**：`npm test`（离线，18 个用例秒级）；`SEQOUT_LIVE=1 node --test functions/seqout-chat/tests/literature.test.ts`（联网逐源验收，对齐架构文档 §5；共享出口 IP 触发 429 时对应来源自动 skip，不算失败）。
+- **触发条件**：任何改动 `functions/seqout-chat/index.ts` 的文献检索层（来源适配器 / `mergeSettledLiterature` / `preprintCollectionToSearchResults` / `LITERATURE_SOURCES` / `extractCards` 的 literature 分支）后必须跑测试，全绿才可提交/部署。
+- **守住的不变量**：
+  1. `LITERATURE_SOURCES` 固定 9 源（pubmed / europe_pmc / crossref / openalex / semantic_scholar / core / arxiv / biorxiv / medrxiv），工具 schema 的 source enum 与 `source=all` 调度共用同一份常量，禁止各处手写副本。
+  2. `mergeSettledLiterature` 去重优先级：DOI（小写）→ PMID → 小写标题；失败来源进 `warnings`（带来源前缀）、不拖垮整次搜索；`results` 截断到 `clampLimit(args.limit)`（默认 10、封顶 20），`total` 报告去重后总数（截断前）。
+  3. CORE 无 `CORE_API_KEY` 时单源查询必须抛「CORE_API_KEY 未配置」清晰错误（source=all 时降级为 warning）。
+  4. bioRxiv / medRxiv 是「最近 100 条 + 服务端关键词过滤」，缺 DOI 或标题的记录丢弃；要历史全库检索需另做日期窗口分页。
+  5. fetch 头必须是 ASCII（ByteString）：曾用中文 `User-Agent: GEO寻宝鼠/1.0` 导致 Node/undici 直接抛 TypeError，Crossref 源整体不可用（curl 能过是因为它在发送前不校验）。现用 `ResearchTreasureMouse/1.0`。
+- **2026-10-07 实测**：离线 29/29 全绿；LIVE 下 pubmed / europe_pmc / crossref / arxiv / biorxiv / medrxiv + source=all 合并通过，openalex / semantic_scholar 因出口 IP 429 跳过（重试耗尽后抛错、在 all 模式下正确落入 warnings，符合架构设计）。
+
 ## 踩坑记录
 - ❌ **`.bg-grid::before` 整面蒙板把普通内容洗成幽灵（2026-10-06 定位并修复）**：视觉重设计为调淡点阵底纹，加了 `inset:0` + `background:var(--background)` + `opacity:0.955` 的 pointer-events-none 蒙板。它能被 hit-test 忽略（elementFromPoint 完全正常），但绘制层压在所有**不建堆叠上下文**的子内容之上——侧栏图标、普通文本全部被罩成 95.5% 背景色（连强制 `#FF0000` 描边都只剩淡粉 ghosts）。有 backdrop-filter/transform 的元素（顶栏、卡片）不受影响，所以极难排查。**修法：底纹要淡就直接把透明度画进底纹本身**（`rgb(120 113 108 / 0.045)` 画点），禁用整面蒙板手法。教训：排查"颜色不对"先做像素级取证（元素截图+灰度 min/max），别信 computed style。
 - ⚠️ **GEO-only 项目的「无数据」被 seqout 表达成 404（2026-10-06 定位并修复）**：`/project/{PRJ}/metadata/download` 对无实验项目返回 404 "No experiments found"，`/runs/download` 则返回 200 空表头——同一事实两种表达。曾导致 `get_metadata_csv` 全灭并被统计为工具失败。修法：两个下载类工具把这类 404/空表统一转为 `emptyStudyResult`（success + `data.empty: true` + 中文 note），统计单列 `empties`（「空矿」）与真错误分开；`resolve_prj` 前置 `/^PRJ[A-Z]+\d+$/` 校验，挡住 seqout 的 422 原始英文报文。QMuse 版无统计子系统，empties 为其 no-op 平价副本。

@@ -62,7 +62,8 @@ export const zh = {
   "composer.stop": "停止生成",
   "composer.send": "下铲挖宝",
   "composer.sendAria": "下铲挖宝",
-  "composer.disclaimer": "阿寻挖的宝藏检索自全球公共组学数据库，具体信息请以 NCBI / NGDC 原始条目为准",
+  "composer.disclaimer":
+    "检索自公共组学与文献库，以原始条目为准",
 
   // ---- 消息 ----
   "msg.thinking": "正在思考…",
@@ -274,7 +275,7 @@ export const zh = {
   "about.highlights": "核心亮点",
   "about.mcpTitle": "对话后端：seqout-mcp",
   "about.mcpNote":
-    "本项目对话后端封装的 {mcp} 是一个通过 {seqout} 查询公共组学数据的 MCP Server，提供 31 个只读工具，覆盖 GEO、SRA、ENA、GSA、NGDC 数据集搜索、项目详情、样本信息、编号反查、统计和下载链接。它使用 stdio 传输：MCP 客户端负责启动进程并通过标准输入/输出通信；普通日志只写入 stderr，不会污染 MCP 协议数据。本应用将这套工具能力以 OpenAI function schema 声明式移植进对话服务，无需在本地运行 Python MCP 进程。",
+    "本项目对话后端封装的 {mcp} 是一个通过 {seqout} 查询公共组学数据的 MCP Server，提供 31 个只读工具，覆盖 GEO、SRA、ENA、GSA、NGDC 数据集搜索、项目详情、样本信息、编号反查、统计和下载链接；文献检索同时接入 PubMed、Europe PMC、Crossref、OpenAlex、Semantic Scholar、CORE、arXiv、bioRxiv、medRxiv。它使用 stdio 传输：MCP 客户端负责启动进程并通过标准输入/输出通信；普通日志只写入 stderr，不会污染 MCP 协议数据。本应用将这套工具能力以 OpenAI function schema 声明式移植进对话服务，无需在本地运行 Python MCP 进程。",
   "about.deploy": "一键自托管",
   "about.deployDesc":
     "完全脱离云平台：任意 OpenAI 兼容模型（OpenAI / DeepSeek / 硅基流动 / 本地 vLLM）+ Docker 即可运行，配置只有一份 {env}，不配数据库则自动降级纯游客模式。",
@@ -283,7 +284,7 @@ export const zh = {
   "about.deployOpen": "打开 {url}（端口由 WEB_PORT 控制），发一条消息看到流式回复即部署成功。",
   "about.stack": "技术栈",
   "about.stackNote": "双主题 design token（亮色学术风 + 夜探矿洞暗色套）",
-  "about.footer": "对话式组学数据检索 · 数据来自 seqout.org 公共 API · 回答由 AI 生成，请以 NCBI / NGDC 原始页面为准",
+  "about.footer": "对话式组学数据与公共文献检索 · 数据来自 seqout.org 公共 API · 回答由 AI 生成，请以 NCBI / NGDC 原始页面为准",
   "about.version": "ResearchTreasureMouse_v0.1.2",
   "about.online": "在线体验",
   "about.onlineStale": "线上部署版本可能落后于仓库最新代码",
@@ -292,17 +293,18 @@ export const zh = {
   "about.thanks": "致谢",
   "about.why": "立意 · 为什么做这只寻宝鼠",
   "about.dbs": "阿寻能挖的数据库",
-  "about.dbsIntro": "叫「科研寻宝鼠」是因为科研检索像是在矿脉里寻宝——阿寻其实不只能搜 GEO，一次下铲同时穿透组学数据库与公共文献库：",
+  "about.dbsIntro": "叫「科研寻宝鼠」是因为科研检索像是在矿脉里寻宝。阿寻一次下铲可以穿透组学数据库，并沿着编号和主题追到相关文献。",
+  "about.literatureSources": "文献检索来源",
   "about.gsaPolicy": "GSA 公开数据可通过国家基因组科学数据中心的国内直链获取；GSA-Human 受控数据需要 PI 经 BIGSSO 登录并向 DAC 申请，本平台不提供受控数据下载。",
-  "about.why.1": "科研寻宝鼠（Research Treasure Mouse）让新手科研小白告别老旧繁琐的生信数据库迷宫，用拟人化“探矿挖宝”交互，一键穿透 GEO / SRA / ENA / GSA 等组学数据库，并检索 PubMed、Europe PMC 等文献资源。",
+  "about.why.1": "科研寻宝鼠（Research Treasure Mouse）让新手科研小白告别老旧繁琐的生信数据库迷宫，用拟人化“探矿挖宝”交互，一键检索 GEO / SRA / ENA / GSA / NGDC 等组学数据库，并联动 PubMed、Europe PMC、Crossref、OpenAlex、Semantic Scholar、CORE、arXiv、bioRxiv、medRxiv 文献资源。",
   "about.why.2": "对刚进组的研究生来说，科研最磨灭热情的，往往不是做实验，而是起步时在冰冷、反人类的数据库迷宫里抓瞎，找不对样本、看不懂编号、搜不到文献，第一步就陷入自我怀疑与精神内耗。「科研寻宝鼠」想要做的，是把高校科研人从枯燥压抑的第一步数据搜索中彻底解救出来。",
   "about.why.3": "在这里，科研不再是孤独的单打独斗，也没有冰冷复杂的代码门槛。只要像和同门聊天一样，随口说出你的课题构想，桌宠“阿寻”就会戴上矿工帽一头扎进数据矿脉深处，兴冲冲地帮你刨出与研究方向最贴合的黄金数据与关键文献，将规整的样本卡片稳稳叼到你面前。每一次检索都是一次充满惊喜的挖宝，让科研起步少一点焦虑迷茫，多一份探索的纯粹乐趣与踏实陪伴。",
   "about.authors": "本应用基于 {qmuse} 构建与部署，并在 DeepSeek-V4、Kimi-K3、GLM-5.3 等 AI 模型的协助下开发完成。",
 
   "about.h.1.title": "对话式检索",
-  "about.h.1.desc": "自然语言提问 → 大模型自动调用 31 个 seqout 与 NGDC 只读工具（GEO / SRA / ENA / GSA / NGDC）→ 流式回答 + 数据卡片 +「下一铲建议」。",
+  "about.h.1.desc": "自然语言提问 → 大模型自动调用组学、NGDC 与五源文献工具 → 流式回答 + 数据集或论文卡片 +「下一铲建议」。",
   "about.h.2.title": "正文内嵌链接",
-  "about.h.2.desc": "正文里的 GSE/GSM/GO/PMID 编号自动变成可点链接，hover 预取论文元数据，一键查看文献证据链（PubMed 摘要 + DOI / OA 全文）。",
+  "about.h.2.desc": "正文里的 GSE/GSM/GO/PMID 编号自动变成可点链接，hover 预取论文元数据，一键查看文献证据链和 DOI / OA 全文。",
   "about.h.3.title": "排行榜",
   "about.h.3.desc": "登录用户榜 + 访客榜，本周 / 累计双维度，支持自定义昵称，前 3 名奖牌展示。",
   "about.h.4.title": "使用统计",

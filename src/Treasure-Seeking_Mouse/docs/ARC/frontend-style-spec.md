@@ -88,7 +88,7 @@
 - Placeholder 引导语：`随口告诉阿寻你想挖什么，比如："帮我找找阿尔茨海默病相关的人脑 RNA-seq"…（Enter 下铲）`。
 - 发送按钮 = 矿工绿「⛏️ 下铲挖宝」实底（hover `--miner-green-hover`）；停止态切换为中断样式。
 - **输入联动**：输入框有字符时经 `petBus.emitPetTyping(true)` 通知桌宠挂「竖起耳朵」跃动 class（`pet-ears-perk`），清空即恢复。
-- 底部免责小字（`text-muted-foreground` 11-12px）：`阿寻挖的宝藏检索自全球公共组学数据库，具体信息请以 NCBI / NGDC 原始条目为准`。
+- 底部免责小字（`text-muted-foreground` 11-12px）：`检索自公共组学与文献库，以原始条目为准`。
 
 ### 4.5 侧栏与顶栏
 

@@ -11,6 +11,7 @@
 | 启动一个相似平台/评估是否可复用 | `platform-kickstart.md` | `package.json`、`server/.env.example`、`server/`、`src/` |
 | 任何任务开始前 | 本 README §1 代码地图 + 根 AGENTS.md | — |
 | 改对话/工具/统计后端 | `architecture-2026-10-06.md` §二 §三 §七 | `functions/seqout-chat/index.ts` |
+| 改多源文献检索/验证 API | `literature-multisource-architecture.md` | `functions/seqout-chat/index.ts`、`server/.env.example` |
 | 改任何 UI/文案/主题 | `frontend-style-spec.md` 全文 | `src/styles.css` + 对应组件 |
 | 改桌宠行为/造型/设置 | `frontend-style-spec.md` §5 + 架构文档 §五 | `src/components/pet/*` |
 | 评估当前架构与启动可行性 | `platform-kickstart.md`（准备清单、功能基线与验收表） | — |

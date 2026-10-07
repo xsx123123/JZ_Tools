@@ -49,8 +49,9 @@ const STACK_TAIL: Record<"zh" | "en", string[]> = {
   en: ["Supabase-compatible backend (optional)", "Any OpenAI-compatible LLM gateway", "Docker Compose (dual container)"],
 };
 
-/** 阿寻一次下铲同时穿透的数据库（与 README「阿寻能挖的数据库」一节一致） */
-const DATABASES = ["GEO", "SRA", "ArrayExpress", "ENA", "GSA", "DRA", "GEA"];
+/** 组学数据源与文献索引分开展示，避免把两类来源混为一谈。 */
+const DATABASES = ["GEO", "SRA", "ENA", "GSA", "NGDC"];
+const LITERATURE_SOURCES = ["PubMed", "Europe PMC", "Crossref", "OpenAlex", "Semantic Scholar", "CORE", "arXiv", "bioRxiv", "medRxiv"];
 
 const linkBtn =
   "flex items-center gap-1.5 rounded-lg border border-border bg-card px-3 py-1.5 text-[12.5px] text-muted-foreground shadow-sm transition-colors hover:border-helix/50 hover:text-helix";
@@ -128,6 +129,17 @@ function AboutPage(): React.ReactElement {
                 className="rounded-full border border-helix/25 bg-helix-soft/50 px-2.5 py-1 font-mono text-[11.5px] text-helix"
               >
                 {db}
+              </span>
+            ))}
+          </div>
+          <p className="mt-4 text-[12.5px] font-medium text-foreground/80">{t("about.literatureSources")}</p>
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            {LITERATURE_SOURCES.map((source) => (
+              <span
+                key={source}
+                className="rounded-full border border-pet-amber-deep/25 bg-pet-amber-soft/50 px-2.5 py-1 font-mono text-[11.5px] text-pet-amber-deep"
+              >
+                {source}
               </span>
             ))}
           </div>

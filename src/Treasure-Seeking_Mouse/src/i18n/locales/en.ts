@@ -65,7 +65,7 @@ export const en = {
   "composer.send": "Dig for treasure",
   "composer.sendAria": "Dig for treasure",
   "composer.disclaimer":
-    "Muse's finds come from public omics databases; verify via NCBI / NGDC.",
+    "Retrieved from public omics & literature databases; verify via NCBI / NGDC.",
 
   // ---- 消息 ----
   "msg.thinking": "Thinking…",
@@ -277,7 +277,7 @@ export const en = {
   "about.highlights": "Highlights",
   "about.mcpTitle": "Chat backend: seqout-mcp",
   "about.mcpNote":
-    "The chat backend wraps {mcp}, an MCP Server that queries public omics data via {seqout}. It exposes 31 read-only tools covering GEO, SRA, ENA, GSA and NGDC dataset search, project details, sample info, accession lookup, statistics and download links. It uses stdio transport: the MCP client launches the process and talks over stdin/stdout; regular logs go to stderr only, never polluting the MCP protocol stream. This app ports those tool capabilities declaratively into the chat service as OpenAI function schemas, no local Python MCP process required.",
+    "The chat backend wraps {mcp}, an MCP Server that queries public omics data via {seqout}. It exposes 31 read-only tools covering GEO, SRA, ENA, GSA and NGDC dataset search, project details, sample info, accession lookup, statistics and download links; literature search also covers PubMed, Europe PMC, Crossref, OpenAlex, Semantic Scholar, CORE, arXiv, bioRxiv and medRxiv. It uses stdio transport: the MCP client launches the process and talks over stdin/stdout; regular logs go to stderr only, never polluting the MCP protocol stream. This app ports those tool capabilities declaratively into the chat service as OpenAI function schemas, no local Python MCP process required.",
   "about.deploy": "One-click self-host",
   "about.deployDesc":
     "Fully platform-free: any OpenAI-compatible model (OpenAI / DeepSeek / SiliconFlow / local vLLM) + Docker. Config lives in a single {env} file; without a database it degrades to guest-only mode.",
@@ -287,7 +287,7 @@ export const en = {
   "about.stack": "Tech stack",
   "about.stackNote": "dual-theme design tokens (light academic + night-mine dark)",
   "about.footer":
-    "Conversational omics data retrieval · Data from the seqout.org public API · Answers are AI-generated, verify against the original NCBI / NGDC pages",
+    "Conversational omics & literature retrieval · Data from the seqout.org public API · Answers are AI-generated, verify against the original NCBI / NGDC pages",
   "about.version": "ResearchTreasureMouse_v0.1.2",
   "about.online": "Live demo",
   "about.onlineStale": "the deployed version may lag behind the latest repo code",
@@ -296,17 +296,18 @@ export const en = {
   "about.thanks": "Acknowledgements",
   "about.why": "Why we built the treasure mouse",
   "about.dbs": "Databases A-Xun can dig",
-  "about.dbsIntro": "It's called \"Research Treasure Mouse\" because research retrieval is a treasure hunt — A-Xun digs far beyond GEO, reaching omics databases and public literature indexes in a single dig:",
+  "about.dbsIntro": "It's called \"Research Treasure Mouse\" because research retrieval is a treasure hunt. A-Xun reaches omics databases and follows accessions and topics into related papers:",
+  "about.literatureSources": "Literature sources",
   "about.gsaPolicy": "Public GSA data can use domestic direct links from the National Genomics Data Center. GSA-Human controlled data requires a PI to sign in through BIGSSO and apply to the DAC; this platform does not provide controlled-data downloads.",
-  "about.why.1": "OmicsTreasure Hunter helps research newcomers leave behind the cold, labyrinthine bioinformatics databases of the past: through a personified \"prospecting for treasure\" interaction, it punches through the GEO / SRA / ENA / GSA data universe in one step.",
+  "about.why.1": "Research Treasure Mouse helps newcomers leave behind cold, labyrinthine bioinformatics databases through a personified \"prospecting for treasure\" interaction. It searches GEO / SRA / ENA / GSA / NGDC and links results to PubMed, Europe PMC, Crossref, OpenAlex, Semantic Scholar, CORE, arXiv, bioRxiv and medRxiv.",
   "about.why.2": "For first-year graduate students, what drains the passion for science is usually not the experiments, it's the blind wandering through icy, hostile database mazes at the very start: can't find the right samples, can't decode the accessions, can't locate the literature. Step one becomes self-doubt and burnout. OmicsTreasure Hunter exists to rescue researchers from that dreary, oppressive first step of data hunting.",
   "about.why.3": "Here, research is no longer a lonely solo grind, and there is no cold wall of code between you and the data. Just chat about your project ideas the way you'd talk with a labmate, the desk pet \"A-Xun\" (阿寻) puts on its miner's helmet, dives into the data lodes, and gleefully digs out the golden datasets and key papers that best match your direction, delivering tidy sample cards right to your hands. Every search is a small adventure, less anxiety at the start of your research journey, more of the pure joy of exploration and steady companionship.",
   "about.authors": "Built and deployed on {qmuse}, developed with assistance from AI models including DeepSeek-V4, Kimi-K3 and GLM-5.3.",
 
   "about.h.1.title": "Conversational retrieval",
-  "about.h.1.desc": "Ask in natural language → the LLM calls 31 seqout and NGDC read-only tools (GEO / SRA / ENA / GSA / NGDC) → streamed answer + data cards + “next dig” suggestions.",
+  "about.h.1.desc": "Ask in natural language → the LLM calls omics, NGDC and five-source literature tools → streamed answer + dataset or paper cards + “next dig” suggestions.",
   "about.h.2.title": "Inline linked accessions",
-  "about.h.2.desc": "GSE/GSM/GO/PMID accessions in the text become clickable links; hover prefetches paper metadata, one click opens the literature evidence chain (PubMed abstract + DOI / OA full text).",
+  "about.h.2.desc": "GSE/GSM/GO/PMID accessions become clickable links; hover prefetches paper metadata, and one click opens the evidence chain with DOI and open-access links.",
   "about.h.3.title": "Leaderboard",
   "about.h.3.desc": "Signed-in users board + guest board, weekly / all-time views, custom nicknames, medals for the top 3.",
   "about.h.4.title": "Usage stats",

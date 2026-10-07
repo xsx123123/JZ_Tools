@@ -49,7 +49,7 @@ export const zh = {
     "随口告诉阿寻你想挖什么，比如：“帮我找找阿尔茨海默病相关的人脑 RNA-seq”…",
   "composer.stop": "停止生成",
   "composer.send": "⛏ 下铲挖宝",
-  "composer.disclaimer": "阿寻挖的宝藏检索自全球公共组学数据库，具体信息请以 NCBI / NGDC 原始条目为准",
+  "composer.disclaimer": "检索自公共组学与文献库，以原始条目为准",
 
   // ---- 消息 ----
   "msg.thinking": "正在思考…",
@@ -258,7 +258,7 @@ export const zh = {
   "about.deployOpen": "打开 {url}（端口由 WEB_PORT 控制），发一条消息看到流式回复即部署成功。",
   "about.stack": "技术栈",
   "about.stackNote": "双主题 design token（亮色学术风 + 夜探矿洞暗色套）",
-  "about.footer": "对话式组学数据检索 · 数据来自 seqout.org 公共 API · 回答由 AI 生成，请以 NCBI / NGDC 原始页面为准",
+  "about.footer": "对话式组学数据与公共文献检索 · 数据来自 seqout.org 公共 API · 回答由 AI 生成，请以 NCBI / NGDC 原始页面为准",
   "about.online": "在线体验",
   "about.onlineStale": "线上部署版本可能落后于仓库最新代码",
   "about.github": "GitHub 项目主页",

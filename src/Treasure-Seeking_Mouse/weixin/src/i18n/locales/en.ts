@@ -52,7 +52,7 @@ export const en = {
   "composer.stop": "Stop generating",
   "composer.send": "⛏ Dig",
   "composer.disclaimer":
-    "Muse's treasures are retrieved from global public omics databases — check the original NCBI / NGDC entries for details",
+    "Retrieved from public omics & literature databases; verify via NCBI / NGDC.",
 
   // ---- 消息 ----
   "msg.thinking": "Thinking…",
@@ -263,7 +263,7 @@ export const en = {
   "about.stack": "Tech stack",
   "about.stackNote": "dual-theme design tokens (light academic + night-mine dark)",
   "about.footer":
-    "Conversational omics data retrieval · Data from the seqout.org public API · Answers are AI-generated — verify against the original NCBI / NGDC pages",
+    "Conversational omics & literature retrieval · Data from the seqout.org public API · Answers are AI-generated — verify against the original NCBI / NGDC pages",
   "about.online": "Live demo",
   "about.onlineStale": "the deployed version may lag behind the latest repo code",
   "about.github": "GitHub repo",
