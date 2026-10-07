@@ -1,6 +1,6 @@
 <div align="center">
-  <img src="src/assets/pet/mouse-base.webp" width="140" alt="GeoMuse" />
-  <h1>GeoMuse · Conversational Omics Data Explorer</h1>
+  <img src="src/assets/pet/mouse-base.webp" width="140" alt="Research Treasure Mouse" />
+  <h1>Research Treasure Mouse · Conversational Omics and Literature Explorer</h1>
   <p>
     <strong>English</strong> | <a href="docs/README.zh-CN.md">简体中文</a>
   </p>
@@ -15,7 +15,7 @@
   <p>Wraps the 31 omics data-retrieval tools of <a href="https://github.com/xsx123123/JZ_Tools/tree/main/src/seqout-mcp">seqout-mcp</a> into a "chat-style treasure hunt" — ask in natural language, and the LLM automatically searches GEO / SRA / ENA / GSA / NGDC, presenting results as data cards plus a literature evidence chain, with a virtual pet to raise on the side.</p>
 </div>
 
-> **Note**: The chat backend wraps [seqout-mcp](https://github.com/xsx123123/JZ_Tools/tree/main/src/seqout-mcp), an MCP Server that queries public omics data through [seqout.org](https://seqout.org) and official NGDC APIs. It exposes 31 read-only tools covering GEO, SRA, ENA, GSA and NGDC dataset search, project details, sample info, accession lookup, statistics and download links. It uses stdio transport: the MCP client launches the process and communicates over stdin/stdout; ordinary logs go to stderr only and never pollute the MCP protocol stream. This app ports those tool capabilities declaratively into the chat service as OpenAI function schemas — no local Python MCP process required.
+> **Note**: The chat backend wraps [seqout-mcp](https://github.com/xsx123123/JZ_Tools/tree/main/src/seqout-mcp), an MCP Server that queries public omics data through [seqout.org](https://seqout.org) and official NGDC APIs. It exposes 31 omics read-only tools covering GEO, SRA, ENA, GSA and NGDC dataset search, project details, sample info, accession lookup, statistics and download links, plus a dedicated PubMed / Europe PMC literature-search tool. It uses stdio transport: the MCP client launches the process and communicates over stdin/stdout; ordinary logs go to stderr only and never pollute the MCP protocol stream. This app ports those tool capabilities declaratively into the chat service as OpenAI function schemas — no local Python MCP process required.
 
 ![Cover · Night in the mine](docs/寻宝鼠.png)
 
@@ -68,7 +68,7 @@ GEO · SRA · ArrayExpress · ENA · GSA · DRA · GEA
 
 ## Features
 
-- **Conversational retrieval**: ask in natural language → LLM tool-calling automatically picks seqout and NGDC tools (31 read-only tools, GEO/SRA/ENA/GSA/NGDC) → streamed answer + data cards + "next dig" suggestions
+- **Conversational retrieval**: ask in natural language → LLM tool-calling automatically picks seqout, NGDC or literature tools (31 omics tools plus PubMed / Europe PMC search) → streamed answer + dataset or paper cards + "next dig" suggestions
 - **Inline linked accessions**: GSE/GSM/GO/PMID accessions automatically become clickable links; a hover popover prefetches paper metadata, and one click opens the literature evidence chain (PubMed abstract + DOI / OA full text)
 - **Leaderboard**: signed-in users board + guest board, weekly / all-time views, custom nicknames
 - **Usage stats**: a 📊 panel in the top bar showing total chats, token usage, user count and per-tool call counts (aggregated server-side, persisted inside the container)

@@ -1,6 +1,6 @@
 // seqout-chat: 对话式 GEO 组学数据检索 Edge Function
 // 1) LLM (Meoo AI, OpenAI 兼容 + tools) 决定调用哪个 seqout 工具
-// 2) 函数内直接 GET seqout.org 与 NGDC 官方 API 执行 31 个只读工具
+// 2) 函数内直接 GET seqout.org、NGDC、PubMed、Europe PMC、Crossref、OpenAlex、Semantic Scholar 执行检索工具
 // 3) 流式返回 SSE：delta 为文本增量；event: tool / event: cards 供前端展示执行过程与结果卡片
 //
 // 提示词维护：SYSTEM_PROMPT 双语文本外置在 prompts/system-{zh,en}.md（唯一可编辑来源），
@@ -16,6 +16,9 @@ export { SYSTEM_PROMPT, SYSTEM_PROMPT_EN };
 //   SEQOUT_BASE_URL  可选：seqout 数据 API 地址
 //   NCBI_API_KEY     可选：NCBI E-utilities key（无 key 限 3 次/秒，有 key 10 次/秒）
 //   NCBI_EMAIL       可选：NCBI 要求的联系方式（tool=go_xunbaoshu）
+//   CROSSREF_MAILTO  可选：Crossref polite pool 联系邮箱
+//   OPENALEX_MAILTO / OPENALEX_API_KEY 可选：OpenAlex 联系邮箱 / key
+//   SEMANTIC_SCHOLAR_API_KEY 可选：Semantic Scholar API key
 const LLM_BASE_URL = envGet('LLM_BASE_URL') || 'https://api.meoo.host/meoo-ai/compatible-mode/v1';
 const SEQOUT_BASE_URL = envGet('SEQOUT_BASE_URL') || 'https://seqout.org/api';
 const NGDC_BASE_URL = envGet('NGDC_BASE_URL') || 'https://ngdc.cncb.ac.cn';
@@ -172,7 +175,7 @@ function touchStats(): void {
   usageStats.updatedAt = new Date().toISOString();
 }
 
-// ---------- 工具定义（26 个 seqout 工具 + 5 个 NGDC 工具） ----------
+// ---------- 工具定义（26 个 seqout 工具 + 5 个 NGDC 工具 + 文献搜索） ----------
 
 function strEnum(values: string[]) {
   return { type: 'string', enum: values };
@@ -205,6 +208,16 @@ const TOOL_DEFS = [
   tool('seqout_get_platform_totals', '获取平台实验总数；传 platform 时查询对应过滤选项。', { platform: strOpt('平台名称，可空') }, []),
   tool('seqout_beacon_info', '获取 Beacon 身份和元数据。', {}, []),
   tool('seqout_beacon_runs', 'Beacon 默认运行记录查询（服务端默认分页，不支持 limit/skip）。', {}, []),
+  tool('literature_search', '搜索 PubMed、Europe PMC、Crossref、OpenAlex、Semantic Scholar 文献。适合按疾病、基因、物种、技术或研究方向查找多篇论文；不要用于查询单个 PMID 的证据链。source=all 时并行查询全部来源。', {
+    query: reqStr('文献检索词，可使用自然语言或 PubMed 查询式'),
+    source: { type: 'string', enum: ['all', 'pubmed', 'europe_pmc', 'crossref', 'openalex', 'semantic_scholar'], description: '数据源，默认 all；all 会并行查询全部来源' },
+    year_from: intOpt('起始年份，可选'),
+    year_to: intOpt('结束年份，可选'),
+    author: strOpt('作者过滤，可选'),
+    open_access_only: { type: 'boolean', description: '是否只返回开放获取论文，可选' },
+    limit: intOpt('返回数量，默认10，最大20'),
+    cursor: strOpt('Europe PMC 翻页游标，可选'),
+  }, ['query']),
   tool('ngdc_get_gwh_assembly', '查询 NGDC Genome Warehouse 组装元数据、关联项目样本和国内下载直链。仅接受 GWH 编号。', { accession: reqStr('GWH 组装编号，如 GWHAAAA00000000') }, ['accession']),
   tool('ngdc_get_gwh_project', '查询 NGDC Genome Warehouse 项目详情。仅接受 PRJCA 编号。', { accession: reqStr('GWH BioProject 编号，如 PRJCA000437') }, ['accession']),
   tool('ngdc_get_gwh_sample', '查询 NGDC Genome Warehouse 样本属性。仅接受 SAMC 编号。', { accession: reqStr('GWH BioSample 编号，如 SAMC000001') }, ['accession']),
@@ -560,6 +573,14 @@ async function executeTool(name: string, args: Record<string, Json | undefined>)
     case 'seqout_get_platform_totals': { const p = q(args, 'platform'); return wrap(await seqoutGet(p ? '/stats/platform-filters' : '/stats/platform-totals', p ? { platform: p } : undefined)); }
     case 'seqout_beacon_info': return wrap(await seqoutGet('/beacon/info'));
     case 'seqout_beacon_runs': return wrap(await seqoutGet('/beacon/runs'));
+    case 'literature_search': {
+      const query = String(args.query ?? '').trim();
+      if (!query) throw new Error('文献检索词不能为空');
+      const source = q(args, 'source') ?? 'all';
+      if (!['all', 'pubmed', 'europe_pmc', 'crossref', 'openalex', 'semantic_scholar'].includes(source)) throw new Error(`文献来源不支持：${source}`);
+      const payload = source === 'all' ? await searchAllLiterature(args) : await searchLiteratureSource(source, args);
+      return wrap(payload);
+    }
     case 'ngdc_get_gwh_assembly': {
       const acc = validateNgdcAccession(String(args.accession), GWH_ASSEMBLY_PATTERN, 'GWH 组装编号');
       const { value, url } = await ngdcGet(`/gwh/api/public/assembly/${encodeURIComponent(acc)}`);
@@ -611,6 +632,7 @@ function isBusinessEmpty(payload: Json): boolean {
 
 const EUTILS = 'https://eutils.ncbi.nlm.nih.gov/entrez/eutils';
 const EPMC = 'https://www.ebi.ac.uk/europepmc/webservices/rest/search';
+export const LITERATURE_TOOL_NAME = 'literature_search';
 /** 缓存 key 带检索策略版本号：检索词规则升级后旧缓存自然失效 */
 const LIT_STRATEGY_VERSION = 'v1';
 
@@ -621,6 +643,245 @@ interface LiteratureCard {
   outline?: OutlineSection[];
   urls?: { pubmed?: string; doi?: string; full_text?: string };
   suggested_queries?: string[];
+}
+
+interface LiteratureSearchResult {
+  source: 'pubmed' | 'europe_pmc' | 'crossref' | 'openalex' | 'semantic_scholar';
+  id: string;
+  title: string;
+  authors?: string[];
+  journal?: string;
+  year?: string;
+  abstract?: string;
+  pmid?: string;
+  doi?: string;
+  isOpenAccess?: boolean;
+  urls: { pubmed?: string; europe_pmc?: string; doi?: string; full_text?: string; google_scholar_search?: string; crossref?: string; openalex?: string; semantic_scholar?: string };
+}
+
+function clampLimit(value: Json | undefined, fallback = 10): number {
+  const n = Number(value ?? fallback);
+  return Number.isFinite(n) ? Math.min(20, Math.max(1, Math.floor(n))) : fallback;
+}
+
+function yearValue(value: Json | undefined): string | undefined {
+  const n = Number(value);
+  return Number.isFinite(n) && n >= 1800 && n <= 2200 ? String(Math.floor(n)) : undefined;
+}
+
+function scholarSearchUrl(query: string): string {
+  return `https://scholar.google.com/scholar?q=${encodeURIComponent(query)}`;
+}
+
+function parseEpmcAuthors(value: Json | undefined): string[] | undefined {
+  if (!Array.isArray(value)) return undefined;
+  const names = value.map((a) => {
+    if (!a || typeof a !== 'object' || Array.isArray(a)) return '';
+    const obj = a as Record<string, Json>;
+    return typeof obj.fullName === 'string' ? obj.fullName : [obj.firstName, obj.lastName].filter((v): v is string => typeof v === 'string').join(' ');
+  }).filter(Boolean).slice(0, 8);
+  return names.length ? names : undefined;
+}
+
+export function epmcResultToSearchResult(item: Record<string, Json>): LiteratureSearchResult | null {
+  const title = typeof item.title === 'string' ? item.title.trim() : '';
+  if (!title) return null;
+  const pmid = typeof item.pmid === 'string' ? item.pmid : undefined;
+  const doi = typeof item.doi === 'string' ? item.doi : undefined;
+  const id = pmid || doi || String(item.id || title);
+  const fullTextUrls = (item.fullTextUrlList && typeof item.fullTextUrlList === 'object' && !Array.isArray(item.fullTextUrlList))
+    ? (item.fullTextUrlList as Record<string, Json>).fullTextUrl : undefined;
+  const fullText = Array.isArray(fullTextUrls)
+    ? fullTextUrls.find((u) => u && typeof u === 'object' && !Array.isArray(u) && (((u as Record<string, Json>).documentStyle === 'pdf') || ((u as Record<string, Json>).availability === 'Open access')))
+    : undefined;
+  const fullTextUrl = fullText && typeof fullText === 'object' && !Array.isArray(fullText) && typeof (fullText as Record<string, Json>).url === 'string'
+    ? String((fullText as Record<string, Json>).url) : undefined;
+  const query = pmid ? `PMID ${pmid}` : doi ? `DOI ${doi}` : title;
+  return {
+    source: 'europe_pmc', id, title,
+    authors: parseEpmcAuthors(item.authorList && typeof item.authorList === 'object' && !Array.isArray(item.authorList) ? (item.authorList as Record<string, Json>).author : undefined),
+    journal: typeof item.journalTitle === 'string' ? item.journalTitle : undefined,
+    year: yearValue(item.pubYear),
+    abstract: typeof item.abstractText === 'string' ? item.abstractText.slice(0, 5000) : undefined,
+    pmid, doi,
+    isOpenAccess: item.isOpenAccess === 'Y' || item.inEPMC === 'Y' || Boolean(fullTextUrl),
+    urls: {
+      pubmed: pmid ? `https://pubmed.ncbi.nlm.nih.gov/${pmid}/` : undefined,
+      europe_pmc: pmid
+        ? `https://europepmc.org/article/MED/${encodeURIComponent(pmid)}`
+        : `https://europepmc.org/search?query=${encodeURIComponent(`EXT_ID:${id}`)}`,
+      doi: doi ? `https://doi.org/${doi}` : undefined,
+      full_text: fullTextUrl,
+      google_scholar_search: scholarSearchUrl(query),
+    },
+  };
+}
+
+async function searchEuropePmc(args: Record<string, Json | undefined>): Promise<Json> {
+  const queryParts = [String(args.query ?? '').trim()];
+  const yearFrom = yearValue(args.year_from);
+  const yearTo = yearValue(args.year_to);
+  if (yearFrom || yearTo) queryParts.push(`FIRST_PDATE:[${yearFrom || '*'} TO ${yearTo || '*'}]`);
+  if (typeof args.author === 'string' && args.author.trim()) queryParts.push(`AUTHORNAME:"${args.author.trim().replace(/"/g, '')}"`);
+  if (args.open_access_only === true) queryParts.push('OPEN_ACCESS:Y');
+  const usp = new URLSearchParams({ query: queryParts.join(' AND '), format: 'json', resultType: 'core', pageSize: String(clampLimit(args.limit)), cursorMark: typeof args.cursor === 'string' && args.cursor ? args.cursor : '*' });
+  const json = await fetchWithRetry(`${EPMC}?${usp.toString()}`);
+  const root = json as { resultList?: { result?: Record<string, Json>[] }; hitCount?: number; nextCursorMark?: string };
+  const results = (root.resultList?.result ?? []).map(epmcResultToSearchResult).filter((r): r is LiteratureSearchResult => Boolean(r));
+  return { source: 'europe_pmc', query: queryParts.join(' AND '), total: root.hitCount ?? results.length, next_cursor: root.nextCursorMark, results };
+}
+
+async function searchPubmed(args: Record<string, Json | undefined>): Promise<Json> {
+  const queryParts = [String(args.query ?? '').trim()];
+  const yearFrom = yearValue(args.year_from);
+  const yearTo = yearValue(args.year_to);
+  if (yearFrom || yearTo) queryParts.push(`${yearFrom || '1800'}:${yearTo || '3000'}[pdat]`);
+  if (typeof args.author === 'string' && args.author.trim()) queryParts.push(`${args.author.trim().replace(/[^\w .'-]/g, '')}[Author]`);
+  if (args.open_access_only === true) queryParts.push('open access[filter]');
+  const ids = await esearch(queryParts.join(' AND '), clampLimit(args.limit));
+  const summaries = await esummary(ids);
+  const results: LiteratureSearchResult[] = ids.map((pmid) => {
+    const item = summaries[pmid] ?? {};
+    const title = item.title || `PMID ${pmid}`;
+    const doi = item.doi;
+    return {
+      source: 'pubmed', id: pmid, title, journal: item.journal,
+      year: (item.pubdate || '').slice(0, 4) || undefined, pmid, doi,
+      urls: {
+        pubmed: `https://pubmed.ncbi.nlm.nih.gov/${pmid}/`,
+        doi: doi ? `https://doi.org/${doi}` : undefined,
+        google_scholar_search: scholarSearchUrl(title),
+      },
+    };
+  });
+  return { source: 'pubmed', query: queryParts.join(' AND '), total: results.length, results };
+}
+
+type LiteratureSource = LiteratureSearchResult['source'];
+
+function searchQuery(args: Record<string, Json | undefined>): string {
+  return String(args.query ?? '').trim();
+}
+
+function sourceUrl(source: LiteratureSource, id: string): string | undefined {
+  if (source === 'crossref') return `https://api.crossref.org/works/${encodeURIComponent(id)}`;
+  if (source === 'openalex') return `https://openalex.org/${encodeURIComponent(id.replace(/^https?:\/\/openalex\.org\//, ''))}`;
+  if (source === 'semantic_scholar') return `https://www.semanticscholar.org/paper/${encodeURIComponent(id)}`;
+  return undefined;
+}
+
+function parseAuthors(value: Json | undefined): string[] | undefined {
+  if (!Array.isArray(value)) return undefined;
+  const names = value.map((a) => {
+    if (!a || typeof a !== 'object' || Array.isArray(a)) return '';
+    const obj = a as Record<string, Json>;
+    if (typeof obj.name === 'string') return obj.name;
+    if (typeof obj.given === 'string' || typeof obj.family === 'string') return [obj.given, obj.family].filter((v): v is string => typeof v === 'string').join(' ');
+    const author = obj.author;
+    if (author && typeof author === 'object' && !Array.isArray(author) && typeof (author as Record<string, Json>).display_name === 'string') return String((author as Record<string, Json>).display_name);
+    return '';
+  }).filter(Boolean).slice(0, 8);
+  return names.length ? names : undefined;
+}
+
+function crossrefResultToSearchResult(item: Record<string, Json>): LiteratureSearchResult | null {
+  const title = Array.isArray(item.title) && typeof item.title[0] === 'string' ? item.title[0].trim() : '';
+  if (!title) return null;
+  const doi = typeof item.DOI === 'string' ? item.DOI : undefined;
+  const id = doi || String(item.URL || title);
+  const date = item.published && typeof item.published === 'object' && !Array.isArray(item.published) ? (item.published as Record<string, Json>)['date-parts'] : undefined;
+  const year = Array.isArray(date) && Array.isArray(date[0]) && typeof date[0][0] === 'number' ? String(date[0][0]) : undefined;
+  const urls = { doi: doi ? `https://doi.org/${doi}` : undefined, full_text: typeof item.URL === 'string' ? item.URL : undefined, google_scholar_search: scholarSearchUrl(title) };
+  return { source: 'crossref', id, title, authors: parseAuthors(item.author), journal: Array.isArray(item['container-title']) && typeof item['container-title'][0] === 'string' ? item['container-title'][0] : undefined, year, abstract: typeof item.abstract === 'string' ? item.abstract.replace(/<[^>]+>/g, '').slice(0, 5000) : undefined, doi, urls };
+}
+
+async function searchCrossref(args: Record<string, Json | undefined>): Promise<Json> {
+  const limit = clampLimit(args.limit);
+  const usp = new URLSearchParams({ 'query.bibliographic': searchQuery(args), rows: String(limit), select: 'DOI,title,author,container-title,published,URL,abstract' });
+  const yearFrom = yearValue(args.year_from); const yearTo = yearValue(args.year_to);
+  if (yearFrom || yearTo) usp.set('filter', `${yearFrom ? `from-pub-date:${yearFrom}-01-01` : ''}${yearTo ? `${yearFrom ? ',' : ''}until-pub-date:${yearTo}-12-31` : ''}`);
+  if (typeof args.author === 'string' && args.author.trim()) usp.set('query.author', args.author.trim());
+  const mailto = envGet('CROSSREF_MAILTO'); if (mailto) usp.set('mailto', mailto);
+  const json = await fetchWithRetry(`https://api.crossref.org/works?${usp.toString()}`, 8000, 2, { 'User-Agent': `GEO寻宝鼠/1.0${mailto ? ` (mailto:${mailto})` : ''}` });
+  const message = json && typeof json === 'object' && !Array.isArray(json) ? (json as Record<string, Json>).message : undefined;
+  const items = message && typeof message === 'object' && !Array.isArray(message) ? (message as Record<string, Json>).items : undefined;
+  const results = Array.isArray(items) ? items.map((x) => x && typeof x === 'object' && !Array.isArray(x) ? crossrefResultToSearchResult(x as Record<string, Json>) : null).filter((x): x is LiteratureSearchResult => Boolean(x)) : [];
+  return { source: 'crossref', query: searchQuery(args), total: results.length, results };
+}
+
+function openAlexResultToSearchResult(item: Record<string, Json>): LiteratureSearchResult | null {
+  const title = typeof item.title === 'string' ? item.title.trim() : '';
+  if (!title) return null;
+  const ids = item.ids && typeof item.ids === 'object' && !Array.isArray(item.ids) ? item.ids as Record<string, Json> : {};
+  const doi = typeof ids.doi === 'string' ? ids.doi.replace(/^https?:\/\/doi\.org\//, '') : undefined;
+  const id = typeof item.id === 'string' ? item.id : doi || title;
+  const primary = item.primary_location && typeof item.primary_location === 'object' && !Array.isArray(item.primary_location) ? item.primary_location as Record<string, Json> : {};
+  const journal = primary.source && typeof primary.source === 'object' && !Array.isArray(primary.source) && typeof (primary.source as Record<string, Json>).display_name === 'string' ? String((primary.source as Record<string, Json>).display_name) : undefined;
+  const oa = item.best_oa_location && typeof item.best_oa_location === 'object' && !Array.isArray(item.best_oa_location) ? item.best_oa_location as Record<string, Json> : {};
+  const fullText = typeof oa.pdf_url === 'string' ? oa.pdf_url : typeof oa.landing_page_url === 'string' ? oa.landing_page_url : undefined;
+  return { source: 'openalex', id, title, authors: parseAuthors(item.authorships), journal, year: yearValue(item.publication_year), abstract: typeof item.abstract_inverted_index === 'object' ? undefined : undefined, doi, isOpenAccess: item.open_access && typeof item.open_access === 'object' && !Array.isArray(item.open_access) ? (item.open_access as Record<string, Json>).is_oa === true : Boolean(fullText), urls: { doi: doi ? `https://doi.org/${doi}` : undefined, full_text: fullText, google_scholar_search: scholarSearchUrl(title), ...(sourceUrl('openalex', id) ? { openalex: sourceUrl('openalex', id) } : {}) } as LiteratureSearchResult['urls'] };
+}
+
+async function searchOpenAlex(args: Record<string, Json | undefined>): Promise<Json> {
+  const usp = new URLSearchParams({ search: searchQuery(args), 'per-page': String(clampLimit(args.limit)), cursor: typeof args.cursor === 'string' && args.cursor ? args.cursor : '*' });
+  const yearFrom = yearValue(args.year_from); const yearTo = yearValue(args.year_to);
+  if (yearFrom || yearTo) usp.set('filter', `from_publication_date:${yearFrom || '1900'}-01-01,to_publication_date:${yearTo || '2100'}-12-31`);
+  const mailto = envGet('OPENALEX_MAILTO'); if (mailto) usp.set('mailto', mailto);
+  const key = envGet('OPENALEX_API_KEY'); if (key) usp.set('api_key', key);
+  const json = await fetchWithRetry(`https://api.openalex.org/works?${usp.toString()}`, 8000, 2);
+  const root = json as { meta?: { count?: number; next_cursor?: string }; results?: Record<string, Json>[] };
+  const results = (root.results ?? []).map(openAlexResultToSearchResult).filter((x): x is LiteratureSearchResult => Boolean(x));
+  return { source: 'openalex', query: searchQuery(args), total: root.meta?.count ?? results.length, next_cursor: root.meta?.next_cursor, results };
+}
+
+function semanticScholarResultToSearchResult(item: Record<string, Json>): LiteratureSearchResult | null {
+  const title = typeof item.title === 'string' ? item.title.trim() : ''; const id = typeof item.paperId === 'string' ? item.paperId : title;
+  if (!title || !id) return null;
+  const ext = item.externalIds && typeof item.externalIds === 'object' && !Array.isArray(item.externalIds) ? item.externalIds as Record<string, Json> : {};
+  const doi = typeof ext.DOI === 'string' ? ext.DOI : undefined; const pmid = typeof ext.PubMed === 'string' ? ext.PubMed : undefined;
+  const journal = item.journal && typeof item.journal === 'object' && !Array.isArray(item.journal) && typeof (item.journal as Record<string, Json>).name === 'string' ? String((item.journal as Record<string, Json>).name) : undefined;
+  const oa = item.openAccessPdf && typeof item.openAccessPdf === 'object' && !Array.isArray(item.openAccessPdf) ? item.openAccessPdf as Record<string, Json> : {};
+  const fullText = typeof oa.url === 'string' ? oa.url : undefined;
+  return { source: 'semantic_scholar', id, title, authors: parseAuthors(item.authors), journal, year: yearValue(item.year), abstract: typeof item.abstract === 'string' ? item.abstract.slice(0, 5000) : undefined, pmid, doi, isOpenAccess: Boolean(fullText), urls: { pubmed: pmid ? `https://pubmed.ncbi.nlm.nih.gov/${pmid}/` : undefined, doi: doi ? `https://doi.org/${doi}` : undefined, full_text: fullText, google_scholar_search: scholarSearchUrl(title), semantic_scholar: `https://www.semanticscholar.org/paper/${encodeURIComponent(id)}` } as LiteratureSearchResult['urls'] };
+}
+
+async function searchSemanticScholar(args: Record<string, Json | undefined>): Promise<Json> {
+  const usp = new URLSearchParams({ query: searchQuery(args), limit: String(clampLimit(args.limit)), fields: 'title,authors,year,abstract,journal,externalIds,openAccessPdf' });
+  const yearFrom = yearValue(args.year_from); const yearTo = yearValue(args.year_to); if (yearFrom) usp.set('year', `${yearFrom}-${yearTo || yearFrom}`);
+  const headers: Record<string, string> = {}; const key = envGet('SEMANTIC_SCHOLAR_API_KEY'); if (key) headers['x-api-key'] = key;
+  const json = await fetchWithRetry(`https://api.semanticscholar.org/graph/v1/paper/search?${usp.toString()}`, 8000, 2, headers);
+  const root = json as { total?: number; data?: Record<string, Json>[]; next?: string };
+  const results = (root.data ?? []).map(semanticScholarResultToSearchResult).filter((x): x is LiteratureSearchResult => Boolean(x));
+  return { source: 'semantic_scholar', query: searchQuery(args), total: root.total ?? results.length, results };
+}
+
+async function searchLiteratureSource(source: LiteratureSource, args: Record<string, Json | undefined>): Promise<Json> {
+  if (source === 'pubmed') return searchPubmed(args);
+  if (source === 'europe_pmc') return searchEuropePmc(args);
+  if (source === 'crossref') return searchCrossref(args);
+  if (source === 'openalex') return searchOpenAlex(args);
+  return searchSemanticScholar(args);
+}
+
+async function searchAllLiterature(args: Record<string, Json | undefined>): Promise<Json> {
+  const sources: LiteratureSource[] = ['pubmed', 'europe_pmc', 'crossref', 'openalex', 'semantic_scholar'];
+  const settled = await Promise.allSettled(sources.map((source) => searchLiteratureSource(source, args)));
+  const results: LiteratureSearchResult[] = [];
+  const seen = new Set<string>();
+  const failures: string[] = [];
+  for (let i = 0; i < settled.length; i++) {
+    const item = settled[i];
+    if (item.status === 'rejected') { failures.push(`${sources[i]}: ${item.reason instanceof Error ? item.reason.message : String(item.reason)}`); continue; }
+    const list = item.value && typeof item.value === 'object' && !Array.isArray(item.value) ? (item.value as Record<string, Json>).results : undefined;
+    if (!Array.isArray(list)) continue;
+    for (const result of list) {
+      if (!result || typeof result !== 'object' || Array.isArray(result)) continue;
+      const paper = result as LiteratureSearchResult;
+      const key = (paper.doi ? `doi:${paper.doi.toLowerCase()}` : paper.pmid ? `pmid:${paper.pmid}` : `title:${paper.title.toLowerCase()}`);
+      if (!seen.has(key)) { seen.add(key); results.push(paper); }
+    }
+  }
+  return { source: 'all', query: searchQuery(args), total: results.length, results: results.slice(0, clampLimit(args)), ...(failures.length ? { warnings: failures } : {}) };
 }
 
 // --- 进程内缓存（Edge 实例级；TTL 正缓存 30 天 / 负缓存 7 天，量级小直接 Map） ---
@@ -657,7 +918,7 @@ function acquireNcbi(): boolean {
 }
 
 // --- HTTP helper：429/5xx 退避 1s/2s/4s，三次后抛出 ---
-async function fetchWithRetry(url: string, timeoutMs = 6000, retries = 3): Promise<Json> {
+async function fetchWithRetry(url: string, timeoutMs = 6000, retries = 3, headers: Record<string, string> = {}): Promise<Json> {
   let delay = 1000;
   for (let attempt = 0; attempt <= retries; attempt++) {
     if (attempt > 0) {
@@ -667,7 +928,7 @@ async function fetchWithRetry(url: string, timeoutMs = 6000, retries = 3): Promi
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeoutMs);
     try {
-      const resp = await fetch(url, { signal: controller.signal, headers: { Accept: 'application/json' } });
+      const resp = await fetch(url, { signal: controller.signal, headers: { Accept: 'application/json', ...headers } });
       if (resp.ok) return JSON.parse(await resp.text()) as Json;
       if (resp.status === 429 || resp.status >= 500) continue; // 重试
       throw new Error(`HTTP ${resp.status}`);
@@ -912,6 +1173,31 @@ function extractCards(name: string, payload: Json): Json[] {
     const data = (payload as { data?: unknown }).data;
     if (!data || typeof data !== 'object') return [];
     if (name === 'ngdc_get_gsa_mirror') return [];
+    if (name === 'literature_search') {
+      const obj = data as Record<string, Json>;
+      const list = Array.isArray(obj.results) ? obj.results : [];
+      return list.slice(0, 20).flatMap((item) => {
+        if (!item || typeof item !== 'object' || Array.isArray(item)) return [];
+        const it = item as Record<string, Json>;
+        const id = typeof it.id === 'string' ? it.id : '';
+        const title = typeof it.title === 'string' ? it.title : '';
+        if (!id || !title) return [];
+        const meta: Record<string, string> = { source: 'literature', literature_source: typeof it.source === 'string' ? it.source : 'europe_pmc' };
+        for (const key of ['pmid', 'doi', 'journal', 'year', 'authors', 'isOpenAccess'] as const) {
+          const value = it[key];
+          if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') meta[key] = String(value);
+          else if (key === 'authors' && Array.isArray(value)) meta[key] = value.filter((v): v is string => typeof v === 'string').join(', ');
+        }
+        const urls = it.urls;
+        if (urls && typeof urls === 'object' && !Array.isArray(urls)) {
+          for (const key of ['pubmed', 'europe_pmc', 'doi', 'full_text', 'google_scholar_search', 'crossref', 'openalex', 'semantic_scholar'] as const) {
+            const value = (urls as Record<string, Json>)[key];
+            if (typeof value === 'string') meta[`url_${key}`] = value;
+          }
+        }
+        return [{ tool: name, accession: id, title, summary: typeof it.abstract === 'string' ? it.abstract.slice(0, 900) : '', meta }];
+      });
+    }
     if (name.startsWith('ngdc_')) {
       const obj = data as Record<string, Json>;
       const accession = typeof obj.accession === 'string' ? obj.accession : '';
@@ -1260,6 +1546,7 @@ function labelOf(name: string): string {
     seqout_get_platform_totals: '查询平台总量',
     seqout_beacon_info: '查询 Beacon 信息',
     seqout_beacon_runs: '查询 Beacon 运行',
+    literature_search: '搜索多源文献（PubMed / Europe PMC / Crossref / OpenAlex / Semantic Scholar）',
     ngdc_get_gwh_assembly: '查询 NGDC GWH 组装',
     ngdc_get_gwh_project: '查询 NGDC GWH 项目',
     ngdc_get_gwh_sample: '查询 NGDC GWH 样本',

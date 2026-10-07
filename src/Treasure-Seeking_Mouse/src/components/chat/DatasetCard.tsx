@@ -1,6 +1,6 @@
 // GEO/SRA 数据集结果卡片：编号类型徽章 + 标题 + 元信息 + 外链 + T2 文献入口
 import { useEffect, useRef, useState } from "react";
-import { BookOpen, ExternalLink } from "lucide-react";
+import { BookOpen, ExternalLink, FileText } from "lucide-react";
 import type { DatasetCard as CardData } from "@/services/seqoutChat";
 import { requestEvidence } from "@/lib/evidenceBus";
 import { useI18n } from "@/i18n/provider";
@@ -61,6 +61,7 @@ function onLiterature(accession: string, hostMessageId?: string): void {
 
 export function DatasetCardView({ card, hostMessageId }: { card: CardData; hostMessageId?: string }): React.ReactElement {
   const { t } = useI18n();
+  if (card.meta?.source === "literature") return <LiteratureResultCard card={card} />;
   const link = buildLink(card.accession);
   const prefix = prefixOf(card.accession);
   const controlled = /^HRA\d+$/i.test(card.accession) || card.meta?.controlled === "true";
@@ -146,6 +147,46 @@ export function DatasetCardView({ card, hostMessageId }: { card: CardData; hostM
         <a href={mirrorUrl} target="_blank" rel="noreferrer noopener" className="mt-1.5 inline-flex text-[10.5px] text-helix story-link">{t("card.openGsaMirror")}</a>
       ) : null}
     </div>
+  );
+}
+
+function LiteratureResultCard({ card }: { card: CardData }): React.ReactElement {
+  const { t } = useI18n();
+  const meta = card.meta ?? {};
+  const authors = meta.authors;
+  const abstract = card.summary?.trim();
+  const link = (key: string): string | undefined => meta[`url_${key}`] || undefined;
+  return (
+    <article className="hover-lift card-in relative overflow-hidden rounded-lg border border-helix/25 bg-card p-3 shadow-sm">
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <div className="mb-1 flex flex-wrap items-center gap-1.5">
+            <span className="shrink-0 rounded bg-helix-soft px-1.5 py-px font-mono text-[9px] font-semibold uppercase text-helix ring-1 ring-helix/20">
+              {meta.literature_source === "pubmed" ? "PubMed" : "Europe PMC"}
+            </span>
+            {meta.isOpenAccess === "true" ? <span className="shrink-0 rounded bg-helix-soft px-1.5 py-px text-[9px] text-helix">OA</span> : null}
+            <span className="font-mono text-[10px] text-muted-foreground">{meta.pmid ? `PMID: ${meta.pmid}` : card.accession}</span>
+          </div>
+          <h3 className="line-clamp-3 text-[13px] font-semibold leading-snug text-foreground">{card.title}</h3>
+        </div>
+        {link("pubmed") ? (
+          <a href={link("pubmed")} target="_blank" rel="noreferrer noopener" className="shrink-0 text-muted-foreground hover:text-helix" title={t("lit.openPubmed")} aria-label={t("lit.openPubmed")}>
+            <ExternalLink size={13} />
+          </a>
+        ) : null}
+      </div>
+      <p className="mt-1 text-[10.5px] text-muted-foreground">
+        {[authors, meta.journal, meta.year].filter(Boolean).join(" · ")}
+      </p>
+      {abstract ? <p className="mt-2 line-clamp-4 text-[11.5px] leading-relaxed text-foreground/80">{abstract}</p> : null}
+      <div className="mt-2.5 flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-border/60 pt-2">
+        {link("pubmed") ? <a href={link("pubmed")} target="_blank" rel="noreferrer noopener" className="story-link inline-flex items-center gap-1 text-[10.5px] text-helix"><ExternalLink size={10} />{t("lit.pubmed")}</a> : null}
+        {link("europe_pmc") ? <a href={link("europe_pmc")} target="_blank" rel="noreferrer noopener" className="story-link inline-flex items-center gap-1 text-[10.5px] text-helix"><ExternalLink size={10} />Europe PMC</a> : null}
+        {link("doi") ? <a href={link("doi")} target="_blank" rel="noreferrer noopener" className="story-link inline-flex items-center gap-1 text-[10.5px] text-helix"><ExternalLink size={10} />{t("lit.doi")}</a> : null}
+        {link("full_text") ? <a href={link("full_text")} target="_blank" rel="noreferrer noopener" className="story-link inline-flex items-center gap-1 text-[10.5px] text-helix"><FileText size={10} />{t("lit.fullText")}</a> : null}
+        {link("google_scholar_search") ? <a href={link("google_scholar_search")} target="_blank" rel="noreferrer noopener" className="story-link inline-flex items-center gap-1 text-[10.5px] text-muted-foreground"><ExternalLink size={10} />{t("lit.googleScholar")}</a> : null}
+      </div>
+    </article>
   );
 }
 

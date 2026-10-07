@@ -771,7 +771,8 @@
   position: absolute;
   z-index: 4;
   left: 50%;
-  bottom: 18%;
+  /* Keep the attachment wheel below the gear's top-right hit area. */
+  bottom: 11%;
   width: 0;
   height: 0;
   pointer-events: none;

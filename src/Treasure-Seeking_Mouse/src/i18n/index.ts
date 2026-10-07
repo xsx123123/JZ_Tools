@@ -49,7 +49,7 @@ export function writeLang(l: Lang): void {
 export function applyLang(l: Lang): void {
   try {
     document.documentElement.lang = l === "zh" ? "zh-CN" : "en";
-    document.title = l === "zh" ? "GEO寻宝鼠" : "GeoMuse";
+    document.title = l === "zh" ? "科研寻宝鼠" : "Research Treasure Mouse";
   } catch {
     /* ignore */
   }
@@ -211,7 +211,7 @@ const EXAMPLE_GROUPS: Record<Lang, ExampleGroup[]> = {
     {
       label: "探矿定位",
       caption: "只有一个课题设想时",
-      show: 3,
+      show: 2,
       items: [
         "帮我搜索小鼠肝再生相关的 GEO 数据集",
         "查找人单细胞 RNA-seq 的肿瘤微环境研究",
@@ -225,6 +225,17 @@ const EXAMPLE_GROUPS: Record<Lang, ExampleGroup[]> = {
         "查一下拟南芥激素处理的微阵列数据",
         "帮我找乙肝病毒感染相关的肝细胞数据",
         "搜索酵母应激反应的高通量测序数据",
+      ],
+    },
+    {
+      label: "文献寻踪",
+      caption: "想先摸清研究进展时",
+      show: 2,
+      items: [
+        "搜索近五年阿尔茨海默病单细胞论文",
+        "找 PubMed 里肝癌免疫微环境的综述",
+        "查找 CRISPR 筛选在乳腺癌中的研究进展",
+        "找开放获取的斑马鱼胚胎发育论文",
       ],
     },
     {
@@ -258,7 +269,7 @@ const EXAMPLE_GROUPS: Record<Lang, ExampleGroup[]> = {
     {
       label: "Locate the lode",
       caption: "you only have a research idea",
-      show: 3,
+      show: 2,
       items: [
         "Search GEO datasets related to mouse liver regeneration",
         "Find human single-cell RNA-seq studies of the tumor microenvironment",
@@ -272,6 +283,17 @@ const EXAMPLE_GROUPS: Record<Lang, ExampleGroup[]> = {
         "Look up microarray data on hormone-treated Arabidopsis",
         "Find hepatocyte data related to hepatitis B virus infection",
         "Search high-throughput sequencing data on yeast stress response",
+      ],
+    },
+    {
+      label: "Trace the papers",
+      caption: "you want the research landscape first",
+      show: 2,
+      items: [
+        "Search recent single-cell papers on Alzheimer's disease",
+        "Find PubMed reviews on the liver cancer immune microenvironment",
+        "Search recent CRISPR screening studies in breast cancer",
+        "Find open-access papers on zebrafish embryonic development",
       ],
     },
     {

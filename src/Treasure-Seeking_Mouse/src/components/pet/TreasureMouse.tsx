@@ -653,7 +653,8 @@ export function TreasureMouse({ event }: { event: PetEvent | null }): React.Reac
             title={t("pet.badgeTitle", { name: t(`pet.achievements.${a.threshold}` as MessageKey), n: a.threshold })}
             className={`pet-orbit-item pet-orbit-badge ${milestone?.threshold === a.threshold ? "pet-badge-in" : ""}`}
             style={{
-              ["--orbit-angle" as string]: `${268 + i * 34}deg`,
+              // Keep achievement badges on the left side so they cannot cover the gear button.
+              ["--orbit-angle" as string]: `${250 + i * 30}deg`,
               background: a.bg,
               boxShadow: `0 0 8px ${a.ring}`,
               ["--tw-ring-color" as string]: a.ring,

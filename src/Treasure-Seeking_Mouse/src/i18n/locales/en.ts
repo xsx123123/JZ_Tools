@@ -2,8 +2,8 @@
 // 风格：学术轻量 + 寻宝鼠隐喻（dig / treasure / cache），与中文原文案语气对齐
 export const en = {
   // ---- 品牌 / 通用 ----
-  "brand.name": "GeoMuse",
-  "brand.full": "GeoMuse · Conversational Omics Data Explorer",
+  "brand.name": "Research Treasure Mouse",
+  "brand.full": "Research Treasure Mouse · Conversational Omics and Literature Explorer",
   "brand.tagline": "Muse digs up omics treasures for you",
 
   // ---- 顶栏 ----
@@ -15,7 +15,7 @@ export const en = {
   "header.leaderboardAria": "Open treasure leaderboard",
   "header.stats": "Usage stats",
   "header.statsAria": "Open usage stats",
-  "header.about": "About GeoMuse",
+  "header.about": "About Research Treasure Mouse",
   "header.aboutAria": "About",
   "header.themeDark": "Switch to daylight",
   "header.themeLight": "Night in the mine",
@@ -43,11 +43,11 @@ export const en = {
   "sidebar.guestNoteLogin": "; sign in to keep history forever and sync the leaderboard",
 
   // ---- Empty state ----
-  "empty.headline": "GEO Treasure Mouse · your lab-mate for bio-discovery",
+  "empty.headline": "Research Treasure Mouse · your lab-mate for omics and literature",
   "empty.subHeadline":
     "“No labyrinths, just treasure. Name a topic and Muse dons its miner hat and digs!”",
   "empty.intro":
-    "Muse's little nose is razor-sharp! It dives into GEO, SRA, ENA and GSA, sniffs out high-impact datasets, chews through cryptic accessions, and drops a bundle of sample treasures right at your feet.",
+    "Muse's little nose is razor-sharp! It dives into GEO, SRA, ENA, GSA, PubMed and Europe PMC, sniffs out high-impact datasets, chews through cryptic accessions, and brings back related papers, evidence and sample treasures.",
   "empty.groupFit": "For: {caption}",
   "empty.badgeIdle": "Resting",
 
@@ -60,7 +60,7 @@ export const en = {
 
   // ---- Composer ----
   "composer.placeholder":
-    "Tell Muse what to dig, e.g. “help me find human brain RNA-seq related to Alzheimer's”… (Enter to dig)",
+    "Tell Muse what to dig, e.g. “find recent Alzheimer's single-cell papers and human brain RNA-seq data”… (Enter to dig)",
   "composer.stop": "Stop generating",
   "composer.send": "Dig for treasure",
   "composer.sendAria": "Dig for treasure",
@@ -92,7 +92,7 @@ export const en = {
   "boost.title": "Download Boost · Polariseq",
   "boost.page": "Project page",
   "boost.desc":
-    "Polariseq is a Rust-based high-speed download tool by GeoMuse's author xsx123 (CLI + cross-platform desktop GUI), supporting NCBI SRA / EBI / GEO, AWS S3 global acceleration by default, multi-threading, resumable downloads and MD5 verification.",
+    "Polariseq is a Rust-based high-speed download tool by the Research Treasure Mouse author xsx123 (CLI + cross-platform desktop GUI), supporting NCBI SRA / EBI / GEO, AWS S3 global acceleration by default, multi-threading, resumable downloads and MD5 verification.",
   "boost.note": "For GEO data, replace -A with the record's BioProject ID (found under the SRA / BioProject links on the GEO page); deps install only runs once to set up sra-tools.",
   "boost.copy": "Copy",
   "boost.copied": "Copied",
@@ -108,6 +108,8 @@ export const en = {
   "lit.pubmed": "PubMed",
   "lit.doi": "DOI",
   "lit.fullText": "OA full text",
+  "lit.openPubmed": "Open in PubMed",
+  "lit.googleScholar": "Search Google Scholar",
 
   // ---- ID 浮层 ----
   "idlink.copyId": "Copy ID",
@@ -223,7 +225,7 @@ export const en = {
   "stats.since": "Stats since {since} · last updated {updated}",
 
   // ---- 认证 ----
-  "auth.loginTitle": "Sign in to GeoMuse",
+  "auth.loginTitle": "Sign in to Research Treasure Mouse",
   "auth.registerTitle": "Create account",
   "auth.verifyTitle": "Enter email code",
   "auth.forgotTitle": "Reset password",
@@ -286,7 +288,7 @@ export const en = {
   "about.stackNote": "dual-theme design tokens (light academic + night-mine dark)",
   "about.footer":
     "Conversational omics data retrieval · Data from the seqout.org public API · Answers are AI-generated, verify against the original NCBI / NGDC pages",
-  "about.version": "GeoMuse_v0.1.2",
+  "about.version": "ResearchTreasureMouse_v0.1.2",
   "about.online": "Live demo",
   "about.onlineStale": "the deployed version may lag behind the latest repo code",
   "about.github": "GitHub repo",
@@ -294,7 +296,7 @@ export const en = {
   "about.thanks": "Acknowledgements",
   "about.why": "Why we built the treasure mouse",
   "about.dbs": "Databases A-Xun can dig",
-  "about.dbsIntro": "It's called \"GEO Treasure Mouse\" only because GEO is the oldest lode — A-Xun digs far beyond GEO, punching through 7 databases in a single dig:",
+  "about.dbsIntro": "It's called \"Research Treasure Mouse\" because research retrieval is a treasure hunt — A-Xun digs far beyond GEO, reaching omics databases and public literature indexes in a single dig:",
   "about.gsaPolicy": "Public GSA data can use domestic direct links from the National Genomics Data Center. GSA-Human controlled data requires a PI to sign in through BIGSSO and apply to the DAC; this platform does not provide controlled-data downloads.",
   "about.why.1": "OmicsTreasure Hunter helps research newcomers leave behind the cold, labyrinthine bioinformatics databases of the past: through a personified \"prospecting for treasure\" interaction, it punches through the GEO / SRA / ENA / GSA data universe in one step.",
   "about.why.2": "For first-year graduate students, what drains the passion for science is usually not the experiments, it's the blind wandering through icy, hostile database mazes at the very start: can't find the right samples, can't decode the accessions, can't locate the literature. Step one becomes self-doubt and burnout. OmicsTreasure Hunter exists to rescue researchers from that dreary, oppressive first step of data hunting.",

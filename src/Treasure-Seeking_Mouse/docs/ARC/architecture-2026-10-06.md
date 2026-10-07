@@ -20,7 +20,8 @@ browser ──→ web(nginx:80) ──┬─ /           → 前端静态产物�
                                                    ├─ /leaderboard   双榜聚合（登录榜 + 访客榜）
                                                    └─ /stats/*       bump / merge / nickname
                                                                     ↓
-                                              seqout.org/api（26 个只读工具，纯 GET 无鉴权）
+                                              seqout.org/api（26 个组学只读工具，纯 GET 无鉴权）
+                                              PubMed / Europe PMC（文献证据链与主动搜索）
                                               LLM_BASE_URL（OpenAI 兼容：DeepSeek / vLLM / 任意网关）
 ```
 
@@ -30,7 +31,7 @@ browser ──→ web(nginx:80) ──┬─ /           → 前端静态产物�
 
 1. 前端 `src/services/seqoutChat.ts` POST SSE 到 `chatEndpoint()`，自定义下行协议逐行解析：`{"delta"}` / `{"event":"tool"}` / `{"event":"cards"}` / `{"event":"polariseq"}` / `{"event":"end"}` / `{"error"}` / `[DONE]`，10s `: ping` 心跳防代理缓冲。
 2. 服务端 `index.ts` 收到请求后进入 **tool-calling 循环**（最多 40 轮）：
-   - 26 个 seqout 工具以 OpenAI function schema 声明式内置（`TOOL_DEFS`），不在前端调用、不运行 Python MCP 进程；
+   - 26 个 seqout 工具与 `literature_search` 以 OpenAI function schema 声明式内置（`TOOL_DEFS`），不在前端调用、不运行 Python MCP 进程；
    - 流式聚合 `tool_calls`（按 `index` 累加分片）→ `executeTool()` 直打 seqout.org → 结果 `trimForLLM`（10 万字符封顶）作为 `role:"tool"` 回传；错误也包装成 `{success:false,error}` 喂回模型自愈；
    - 数据集卡片经 `extractCards` 走独立 `cards` 事件不瘦身；文献证据链走 NCBI E-utilities + Europe PMC 降级 + 进程内 TTL 缓存，与检索工具解耦。
 3. 护栏：历史截断 `slice(-16)`、seqout 请求 25s 超时、单工具 try/catch、40 轮触顶可读提示、客户端断连 `AbortController` 中止（`local.mjs` `res.on('close')`）。

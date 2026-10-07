@@ -1,8 +1,8 @@
 // 中文文案字典（键集合的权威来源：zh 的键即全部可用键）
 export const zh = {
   // ---- 品牌 / 通用 ----
-  "brand.name": "GEO寻宝鼠",
-  "brand.full": "GEO寻宝鼠 · 对话式组学数据检索助手",
+  "brand.name": "科研寻宝鼠",
+  "brand.full": "科研寻宝鼠 · 对话式组学与文献检索助手",
   "brand.tagline": "阿寻带你挖组学宝藏",
 
   // ---- 顶栏 ----
@@ -14,14 +14,14 @@ export const zh = {
   "header.leaderboardAria": "打开寻宝排行榜",
   "header.stats": "使用统计",
   "header.statsAria": "打开使用统计",
-  "header.about": "关于 GEO寻宝鼠",
+  "header.about": "关于 科研寻宝鼠",
   "header.aboutAria": "关于",
   "header.themeDark": "切回白昼",
   "header.themeLight": "夜探矿洞",
   "header.themeAria": "切换主题",
   "header.lang": "EN",
   "header.langAria": "切换到英文",
-  "header.brandShort": "GEO寻宝鼠",
+  "header.brandShort": "科研寻宝鼠",
 
   // ---- 会话栏 ----
   "sidebar.newChat": "新建对话",
@@ -42,10 +42,10 @@ export const zh = {
   "sidebar.guestNoteLogin": "；登录可永久保存并同步排行榜",
 
   // ---- 空态 ----
-  "empty.headline": "GEO 寻宝鼠 · 你的同门生信探险搭子",
+  "empty.headline": "科研寻宝鼠 · 你的同门生信与文献探险搭子",
   "empty.subHeadline": "“不查迷宫，只挖宝藏。随口说出课题，阿寻戴上矿工帽这就下铲！”",
   "empty.intro":
-    "阿寻的小鼻子可灵了！一头扎进 GEO、SRA、ENA、GSA 数据库里刨拉半天，不仅能嗅出高分数据集、啃透繁杂编号，还能把打包好的样本宝藏一口气叼到你跟前。",
+    "阿寻的小鼻子可灵了！一头扎进 GEO、SRA、ENA、GSA 数据库和 PubMed、Europe PMC 文献库里刨拉半天，不仅能嗅出高分数据集、啃透繁杂编号，还能捞出相关论文与证据链，把数据和文献宝藏一口气叼到你跟前。",
   "empty.groupFit": "适合：{caption}",
   "empty.badgeIdle": "休息中",
 
@@ -58,7 +58,7 @@ export const zh = {
 
   // ---- 输入区 ----
   "composer.placeholder":
-    "随口告诉阿寻你想挖什么，比如：“帮我找找阿尔茨海默病相关的人脑 RNA-seq”…（Enter 下铲）",
+    "随口告诉阿寻你想挖什么，比如：“找近五年阿尔茨海默病单细胞论文和人脑 RNA-seq 数据”…（Enter 下铲）",
   "composer.stop": "停止生成",
   "composer.send": "下铲挖宝",
   "composer.sendAria": "下铲挖宝",
@@ -106,6 +106,8 @@ export const zh = {
   "lit.pubmed": "PubMed",
   "lit.doi": "DOI 原文",
   "lit.fullText": "OA 全文",
+  "lit.openPubmed": "在 PubMed 打开",
+  "lit.googleScholar": "Google Scholar 搜索",
 
   // ---- ID 浮层 ----
   "idlink.copyId": "复制 ID",
@@ -220,7 +222,7 @@ export const zh = {
   "stats.since": "统计自 {since} 起 · 最后更新 {updated}",
 
   // ---- 认证 ----
-  "auth.loginTitle": "登录 GEO寻宝鼠",
+  "auth.loginTitle": "登录 科研寻宝鼠",
   "auth.registerTitle": "注册新账号",
   "auth.verifyTitle": "输入邮箱验证码",
   "auth.forgotTitle": "找回密码",
@@ -282,7 +284,7 @@ export const zh = {
   "about.stack": "技术栈",
   "about.stackNote": "双主题 design token（亮色学术风 + 夜探矿洞暗色套）",
   "about.footer": "对话式组学数据检索 · 数据来自 seqout.org 公共 API · 回答由 AI 生成，请以 NCBI / NGDC 原始页面为准",
-  "about.version": "GeoMuse_v0.1.2",
+  "about.version": "ResearchTreasureMouse_v0.1.2",
   "about.online": "在线体验",
   "about.onlineStale": "线上部署版本可能落后于仓库最新代码",
   "about.github": "GitHub 项目主页",
@@ -290,10 +292,10 @@ export const zh = {
   "about.thanks": "致谢",
   "about.why": "立意 · 为什么做这只寻宝鼠",
   "about.dbs": "阿寻能挖的数据库",
-  "about.dbsIntro": "叫「GEO 寻宝鼠」只是因为 GEO 是最老的那条矿脉——阿寻其实不只能搜 GEO，一次下铲同时穿透 7 个数据库：",
+  "about.dbsIntro": "叫「科研寻宝鼠」是因为科研检索像是在矿脉里寻宝——阿寻其实不只能搜 GEO，一次下铲同时穿透组学数据库与公共文献库：",
   "about.gsaPolicy": "GSA 公开数据可通过国家基因组科学数据中心的国内直链获取；GSA-Human 受控数据需要 PI 经 BIGSSO 登录并向 DAC 申请，本平台不提供受控数据下载。",
-  "about.why.1": "GEO 寻宝鼠（OmicsTreasure Hunter）让新手科研小白告别老旧繁琐的生信数据库迷宫，用拟人化“探矿挖宝”交互，一键穿透 GEO / SRA / ENA / GSA 全网数据宝藏。",
-  "about.why.2": "对刚进组的研究生来说，科研最磨灭热情的，往往不是做实验，而是起步时在冰冷、反人类的数据库迷宫里抓瞎，找不对样本、看不懂编号、搜不到文献，第一步就陷入自我怀疑与精神内耗。「GEO 寻宝鼠」想要做的，是把高校科研人从枯燥压抑的第一步数据搜索中彻底解救出来。",
+  "about.why.1": "科研寻宝鼠（Research Treasure Mouse）让新手科研小白告别老旧繁琐的生信数据库迷宫，用拟人化“探矿挖宝”交互，一键穿透 GEO / SRA / ENA / GSA 等组学数据库，并检索 PubMed、Europe PMC 等文献资源。",
+  "about.why.2": "对刚进组的研究生来说，科研最磨灭热情的，往往不是做实验，而是起步时在冰冷、反人类的数据库迷宫里抓瞎，找不对样本、看不懂编号、搜不到文献，第一步就陷入自我怀疑与精神内耗。「科研寻宝鼠」想要做的，是把高校科研人从枯燥压抑的第一步数据搜索中彻底解救出来。",
   "about.why.3": "在这里，科研不再是孤独的单打独斗，也没有冰冷复杂的代码门槛。只要像和同门聊天一样，随口说出你的课题构想，桌宠“阿寻”就会戴上矿工帽一头扎进数据矿脉深处，兴冲冲地帮你刨出与研究方向最贴合的黄金数据与关键文献，将规整的样本卡片稳稳叼到你面前。每一次检索都是一次充满惊喜的挖宝，让科研起步少一点焦虑迷茫，多一份探索的纯粹乐趣与踏实陪伴。",
   "about.authors": "本应用基于 {qmuse} 构建与部署，并在 DeepSeek-V4、Kimi-K3、GLM-5.3 等 AI 模型的协助下开发完成。",
 

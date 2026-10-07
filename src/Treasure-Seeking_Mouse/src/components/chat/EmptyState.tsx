@@ -23,12 +23,13 @@ function sample<T>(arr: T[], n: number): T[] {
   return pool.slice(0, take);
 }
 
-/** 分组序号对应的主题 emoji（与「探矿定位 / 验宝鉴宝 / 清点矿藏」一一对应） */
-const GROUP_EMOJI = ["⛏️", "💎", "📜"] as const;
+/** 分组序号对应的主题 emoji（研究定位 / 文献寻踪 / 验宝鉴宝 / 清点矿藏） */
+const GROUP_EMOJI = ["⛏️", "📚", "💎", "📜"] as const;
 
-/** 分组「适合」胶囊的配色：探矿定位=浅绿、验宝鉴宝=浅琥珀、清点矿藏=中性灰 */
+/** 分组「适合」胶囊的配色：研究定位=浅绿、文献寻踪=浅蓝、验宝鉴宝=浅琥珀、清点矿藏=中性灰 */
 const FIT_TINT = [
   "bg-miner-green-light text-miner-green-hover",
+  "bg-helix-soft text-helix",
   "bg-gold-light text-gold-hover",
   "bg-secondary text-muted-foreground",
 ] as const;
@@ -83,19 +84,7 @@ export function EmptyState({ onPick }: { onPick: (q: string) => void }): React.R
             </button>
             <div className="min-w-0">
               <h1 className="reveal font-display text-[22px] font-bold tracking-tight text-foreground sm:text-[24px]" data-reveal-delay="80">
-                {lang === "zh" ? (
-                  <>
-                    <span className="text-miner-green">GEO寻宝</span>
-                    <span className="text-gold">鼠</span>
-                    <span className="text-foreground"> · 你的同门生信探险搭子</span>
-                  </>
-                ) : (
-                  <>
-                    <span className="text-miner-green">GEO Treasure</span>
-                    <span className="text-gold"> Mouse</span>
-                    <span className="text-foreground"> · your lab-mate for bio-discovery</span>
-                  </>
-                )}
+                {t("empty.headline")}
               </h1>
               <p className="reveal mt-2 text-[14px] leading-relaxed text-muted-foreground" data-reveal-delay="140">
                 {t("empty.subHeadline")}
