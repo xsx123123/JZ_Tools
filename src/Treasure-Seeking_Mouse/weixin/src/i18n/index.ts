@@ -236,7 +236,7 @@ const EXAMPLE_GROUPS: Record<Lang, ExampleGroup[]> = {
       show: 2,
       items: [
         "GSE299340 是什么研究？有哪些样本？",
-        "GSM8765432 这个样本属于哪个项目？",
+        "GSM3272966 这个样本属于哪个项目？",
         "PRJNA732811 对应哪个研究？",
         "GSE151530 的实验设计是什么样的？",
         "帮我反查 GSM4581240 属于哪个数据集",
@@ -283,7 +283,7 @@ const EXAMPLE_GROUPS: Record<Lang, ExampleGroup[]> = {
       show: 2,
       items: [
         "What study is GSE299340? What samples does it have?",
-        "Which project does sample GSM8765432 belong to?",
+        "Which project does sample GSM3272966 belong to?",
         "Which study does PRJNA732811 correspond to?",
         "What does the experimental design of GSE151530 look like?",
         "Trace which dataset GSM4581240 belongs to",

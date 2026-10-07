@@ -771,12 +771,14 @@
   position: absolute;
   z-index: 4;
   left: 50%;
-  /* Keep the attachment wheel below the gear's top-right hit area. */
-  bottom: 11%;
+  /* Wheel center at belly height: attachments hug the mouse's left side, below the
+     head and above the caption line. */
+  bottom: 26%;
   width: 0;
   height: 0;
   pointer-events: none;
-  --orbit-radius: clamp(42px, calc(var(--pet-size) * 0.43), 78px);
+  /* Just past the mouse's half-width so items touch its outline without covering it. */
+  --orbit-radius: clamp(48px, calc(var(--pet-size) * 0.5), 80px);
 }
 .pet-orbit-ring {
   position: absolute;

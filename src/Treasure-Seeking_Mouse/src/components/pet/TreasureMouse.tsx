@@ -640,7 +640,7 @@ export function TreasureMouse({ event }: { event: PetEvent | null }): React.Reac
           title={t("pet.chestHover", { n: treasure })}
           aria-label={t("pet.chestHover", { n: treasure })}
           className="pet-orbit-item pet-orbit-chest"
-          style={{ ["--orbit-angle" as string]: "235deg" }}
+          style={{ ["--orbit-angle" as string]: "255deg" }}
         >
           <img key={chestPopKey} src={IMG_CHEST} alt={t("pet.chest")} draggable={false} className={`pointer-events-none block h-full w-full drop-shadow-[0_3px_5px_rgb(0_0_0/0.15)] ${chestPopKey > 0 ? "pet-chest-pop" : ""}`} />
           {treasure > 0 ? (
@@ -653,8 +653,9 @@ export function TreasureMouse({ event }: { event: PetEvent | null }): React.Reac
             title={t("pet.badgeTitle", { name: t(`pet.achievements.${a.threshold}` as MessageKey), n: a.threshold })}
             className={`pet-orbit-item pet-orbit-badge ${milestone?.threshold === a.threshold ? "pet-badge-in" : ""}`}
             style={{
-              // Keep achievement badges on the left side so they cannot cover the gear button.
-              ["--orbit-angle" as string]: `${250 + i * 30}deg`,
+              // Fan on the mouse's left at body height (254°-290°, 18° apart): beside the
+              // body, cannot reach the face above or the caption/gear.
+              ["--orbit-angle" as string]: `${254 + i * 18}deg`,
               background: a.bg,
               boxShadow: `0 0 8px ${a.ring}`,
               ["--tw-ring-color" as string]: a.ring,
