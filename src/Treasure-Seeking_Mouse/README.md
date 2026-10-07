@@ -3,6 +3,7 @@
   <h1>Research Treasure Mouse</h1>
   <p>Conversational omics data and literature search for research workflows</p>
   <p><strong>English</strong> | <a href="docs/README.zh-CN.md">简体中文</a></p>
+  <p>🚀 <a href="https://render.qmuse.pub/p/muse/2842191818002612"><strong>Try the online demo</strong></a>: https://render.qmuse.pub/p/muse/2842191818002612</p>
   <p>
     <img src="https://img.shields.io/badge/React-19-61dafb?logo=react&logoColor=white&style=flat-square" alt="React 19" />
     <img src="https://img.shields.io/badge/Vite-7-646cff?logo=vite&logoColor=white&style=flat-square" alt="Vite 7" />

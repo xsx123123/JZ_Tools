@@ -4,6 +4,7 @@
   <p>
     <a href="../README.md">English</a> | <strong>简体中文</strong>
   </p>
+  <p>🚀 <a href="https://render.qmuse.pub/p/muse/2842191818002612"><strong>在线体验</strong></a>：https://render.qmuse.pub/p/muse/2842191818002612</p>
   <p>
     <a href="https://render.qmuse.pub/p/muse/2842191818002612/index.html"><img src="https://img.shields.io/badge/在线体验-QMuse 部署-12b76a?style=flat-square" alt="在线体验" /></a>
     <img src="https://img.shields.io/badge/Docker-Compose-2496ED?logo=docker&logoColor=white&style=flat-square" alt="Docker Compose" />
