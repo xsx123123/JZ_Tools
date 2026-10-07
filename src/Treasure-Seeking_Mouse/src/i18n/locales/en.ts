@@ -279,9 +279,12 @@ export const en = {
   // ---- 关于页 ----
   "about.back": "Back to digging",
   "about.highlights": "Highlights",
-  "about.mcpTitle": "Chat backend: seqout-mcp",
+  "about.mcpTitle": "Chat backend & architecture",
   "about.mcpNote":
-    "The chat backend wraps {mcp}, an MCP Server that queries public omics data via {seqout}. It exposes 31 read-only tools covering GEO, SRA, ENA, GSA and NGDC dataset search, project details, sample info, accession lookup, statistics and download links; literature search also covers PubMed, Europe PMC, Crossref, OpenAlex, Semantic Scholar, CORE, arXiv, bioRxiv and medRxiv. It uses stdio transport: the MCP client launches the process and talks over stdin/stdout; regular logs go to stderr only, never polluting the MCP protocol stream. This app ports those tool capabilities declaratively into the chat service as OpenAI function schemas, no local Python MCP process required.",
+    "The backend is driven by an OpenAI-compatible LLM tool-calling loop: provider credentials stay server-side only, responses from every source are normalized into one paper schema, and structured cards travel separately from the model context. Omics goes through the seqout / NGDC public APIs and literature through nine source adapters; tool schemas, adapters and SSE orchestration live in functions/seqout-chat, and the system prompts are the single editable source (run npm run sync:prompts after edits).",
+  "about.litCfg": "Literature API configuration (all optional)",
+  "about.litCfgDesc":
+    "All literature credentials live server-side only — never commit server/.env. PubMed, Europe PMC, Crossref, OpenAlex, arXiv, bioRxiv and medRxiv work without keys; CORE requires a CORE_API_KEY, and NCBI_EMAIL / the MAILTO contacts improve rate-limit handling.",
   "about.deploy": "One-click self-host",
   "about.deployDesc":
     "Fully platform-free: any OpenAI-compatible model (OpenAI / DeepSeek / SiliconFlow / local vLLM) + Docker. Config lives in a single {env} file; without a database it degrades to guest-only mode.",
@@ -303,10 +306,17 @@ export const en = {
   "about.dbsIntro": "It's called \"Research Treasure Mouse\" because research retrieval is a treasure hunt. A-Xun reaches omics databases and follows accessions and topics into related papers:",
   "about.literatureSources": "Literature sources",
   "about.gsaPolicy": "Public GSA data can use domestic direct links from the National Genomics Data Center. GSA-Human controlled data requires a PI to sign in through BIGSSO and apply to the DAC; this platform does not provide controlled-data downloads.",
+  "about.evidence": "Evidence chain",
+  "about.evidenceIntro": "For a GSE, GSM, PMID or GO term, the app builds an evidence chain instead of guessing:",
+  "about.evidence.1": "Resolve the identifier through the authoritative database fields;",
+  "about.evidence.2": "Query the relevant literature indexes for the exact linked paper or identifier;",
+  "about.evidence.3": "Enrich abstracts, DOI metadata and open-access full-text links via Europe PMC and other sources;",
+  "about.evidence.4": "Return the title, authors, journal, year, DOI, abstract outline and related GEO context.",
+  "about.evidenceNote": "Active nine-source search returns normalized paper cards, while the evidence-chain lookup stays optimized for one identifier or one dataset.",
   "about.why.1": "Research Treasure Mouse helps newcomers leave behind cold, labyrinthine bioinformatics databases through a personified \"prospecting for treasure\" interaction. It searches GEO / SRA / ENA / GSA / NGDC and links results to PubMed, Europe PMC, Crossref, OpenAlex, Semantic Scholar, CORE, arXiv, bioRxiv and medRxiv.",
   "about.why.2": "For first-year graduate students, what drains the passion for science is usually not the experiments, it's the blind wandering through icy, hostile database mazes at the very start: can't find the right samples, can't decode the accessions, can't locate the literature. Step one becomes self-doubt and burnout. OmicsTreasure Hunter exists to rescue researchers from that dreary, oppressive first step of data hunting.",
   "about.why.3": "Here, research is no longer a lonely solo grind, and there is no cold wall of code between you and the data. Just chat about your project ideas the way you'd talk with a labmate, the desk pet \"A-Xun\" (阿寻) puts on its miner's helmet, dives into the data lodes, and gleefully digs out the golden datasets and key papers that best match your direction, delivering tidy sample cards right to your hands. Every search is a small adventure, less anxiety at the start of your research journey, more of the pure joy of exploration and steady companionship.",
-  "about.authors": "Built and deployed on {qmuse}, developed with assistance from AI models including DeepSeek-V4, Kimi-K3 and GLM-5.3.",
+  "about.authors": "Developed by JZHANG, using the seqout public data service, NGDC public APIs and OpenAI-compatible model gateways.",
 
   "about.h.1.title": "Conversational retrieval",
   "about.h.1.desc": "Ask in natural language → the LLM calls omics, NGDC and nine-source literature tools → streamed answer + dataset or paper cards + “next dig” suggestions.",
@@ -317,7 +327,7 @@ export const en = {
   "about.h.4.title": "Usage stats",
   "about.h.4.desc": "Top-bar panel showing total chats, token usage, user count and per-tool call counts; aggregated server-side and persisted inside the container.",
   "about.h.5.title": "Pet & achievements",
-  "about.h.5.desc": "The treasure mouse digs as you retrieve, unlocking achievement badges; draggable, long-press to silence.",
+  "about.h.5.desc": "The treasure mouse digs and reads papers as you retrieve, unlocking achievement badges along the way; draggable, right-click to silence.",
   "about.h.6.title": "Mobile adaptive",
   "about.h.6.desc": "Soft keyboard, safe areas and touch interactions fully adapted, dig comfortably on a phone too.",
 

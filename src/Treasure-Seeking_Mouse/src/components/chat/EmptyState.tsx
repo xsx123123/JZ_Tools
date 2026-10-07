@@ -7,6 +7,9 @@ import { useI18n } from "@/i18n/provider";
 import { exampleGroups, type ExampleGroup } from "@/i18n";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import mouseBase from "@/assets/pet/mouse-base.webp";
+import mousePeek from "@/assets/pet/mouse-peek.webp";
+import mouseSniff from "@/assets/pet/mouse-sniff.webp";
+import mouseSleep from "@/assets/pet/mouse-sleep.webp";
 import mouseWink from "@/assets/pet/mouse-wink.webp";
 
 /** 连点次数窗口：相邻两次点击超过该间隔则重新计数 */
@@ -34,6 +37,9 @@ const FIT_TINT = [
   "bg-secondary text-muted-foreground",
 ] as const;
 
+/** 空态英雄头像只从休息/闲置造型中抽取，保持与右上「休息中」状态一致。 */
+const IDLE_AVATARS = [mouseBase, mousePeek, mouseSniff, mouseSleep, mouseWink] as const;
+
 export function EmptyState({ onPick }: { onPick: (q: string) => void }): React.ReactElement {
   const { t, lang } = useI18n();
   // 挂载时或语言切换时每组随机抽样一次；本次空态内保持稳定，重新进入会话再换一批
@@ -41,6 +47,7 @@ export function EmptyState({ onPick }: { onPick: (q: string) => void }): React.R
     () => exampleGroups(lang).map((g) => ({ ...g, items: sample(g.items, g.show) })),
     [lang],
   );
+  const idleAvatar = useMemo(() => IDLE_AVATARS[Math.floor(Math.random() * IDLE_AVATARS.length)], [lang]);
 
   // 彩蛋：连点头像 3 次弹出「鼠鼠我呀」弹窗（与右下角桌宠的连戳彩蛋相互独立）
   const [eggOpen, setEggOpen] = useState(false);
@@ -76,7 +83,7 @@ export function EmptyState({ onPick }: { onPick: (q: string) => void }): React.R
             >
               <img
                 key={bounceKey}
-                src={mouseBase}
+                src={idleAvatar}
                 alt={t("pet.alt")}
                 draggable={false}
                 className="pet-hover-bounce h-full w-full scale-[1.18] object-contain drop-shadow-sm"

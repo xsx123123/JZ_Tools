@@ -53,6 +53,12 @@ const STACK_TAIL: Record<"zh" | "en", string[]> = {
 const DATABASES = ["GEO", "SRA", "ENA", "GSA", "NGDC"];
 const LITERATURE_SOURCES = ["PubMed", "Europe PMC", "Crossref", "OpenAlex", "Semantic Scholar", "CORE", "arXiv", "bioRxiv", "medRxiv"];
 
+// 证据链四步（与 README「Evidence Chain」一节逐条对齐）
+const EVIDENCE_STEPS = ["about.evidence.1", "about.evidence.2", "about.evidence.3", "about.evidence.4"] as const;
+
+// 文献 API 的可选环境变量（与 README「Literature API Configuration」一节对齐）
+const LIT_ENV_KEYS = ["NCBI_EMAIL", "NCBI_API_KEY", "CROSSREF_MAILTO", "OPENALEX_MAILTO", "OPENALEX_API_KEY", "SEMANTIC_SCHOLAR_API_KEY", "CORE_API_KEY"];
+
 const linkBtn =
   "flex items-center gap-1.5 rounded-lg border border-border bg-card px-3 py-1.5 text-[12.5px] text-muted-foreground shadow-sm transition-colors hover:border-helix/50 hover:text-helix";
 const sectionCls = "mt-4 rounded-2xl border border-border bg-card p-5 shadow-soft";
@@ -145,6 +151,20 @@ function AboutPage(): React.ReactElement {
           </div>
         </section>
 
+        {/* 证据链（与 README「Evidence Chain」一节对齐） */}
+        <section className={sectionCls}>
+          <h2 className={h2Cls}>
+            <Link2 size={16} className="text-pet-amber-deep" /> {t("about.evidence")}
+          </h2>
+          <p className="mt-2 text-[12.5px] leading-relaxed text-muted-foreground">{t("about.evidenceIntro")}</p>
+          <ol className="mt-2 list-decimal space-y-1 pl-5 text-[12.5px] leading-relaxed text-foreground/85">
+            {EVIDENCE_STEPS.map((k) => (
+              <li key={k}>{t(k)}</li>
+            ))}
+          </ol>
+          <p className="mt-2 text-[12px] leading-relaxed text-muted-foreground/80">{t("about.evidenceNote")}</p>
+        </section>
+
         {/* 核心亮点（与 README 功能一览逐条对齐） */}
         <section className={sectionCls}>
           <h2 className={h2Cls}>
@@ -163,29 +183,19 @@ function AboutPage(): React.ReactElement {
           </div>
         </section>
 
-        {/* 对话后端：seqout-mcp（README 备注段的等价表述） */}
+        {/* 对话后端与架构（与 README「Architecture」一节对齐） */}
         <section className={sectionCls}>
           <h2 className={h2Cls}>
             <Database size={16} className="text-pet-amber-deep" /> {t("about.mcpTitle")}
           </h2>
-          <p className="mt-2 text-[12.5px] leading-relaxed text-muted-foreground">
-            {t("about.mcpNote", { mcp: "seqout-mcp", seqout: "seqout.org" })
-              .split(/(seqout-mcp|seqout\.org)/)
-              .map((part, i) =>
-                part === "seqout-mcp" || part === "seqout.org" ? (
-                  <code key={i} className="rounded bg-secondary px-1 font-mono text-[11.5px]">{part}</code>
-                ) : (
-                  part
-                ),
-              )}
-          </p>
+          <p className="mt-2 text-[12.5px] leading-relaxed text-muted-foreground">{t("about.mcpNote")}</p>
           <a
-            href="https://github.com/xsx123123/JZ_Tools/tree/main/src/seqout-mcp"
+            href={`${REPO}/tree/main/functions/seqout-chat`}
             target="_blank"
             rel="noreferrer"
             className={`${linkBtn} mt-3 w-fit`}
           >
-            <ExternalLink size={13} /> seqout-mcp
+            <ExternalLink size={13} /> functions/seqout-chat
           </a>
         </section>
 
@@ -204,6 +214,15 @@ make docker-start                    # ${t("about.deploySteps")}`}
           <p className="mt-2 text-[11.5px] text-muted-foreground/80">
             {t("about.deployOpen", { url: "http://localhost:10087/" })}
           </p>
+          <h3 className="mt-4 text-[13px] font-semibold text-foreground/85">{t("about.litCfg")}</h3>
+          <p className="mt-1.5 text-[12px] leading-relaxed text-muted-foreground">{t("about.litCfgDesc")}</p>
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            {LIT_ENV_KEYS.map((k) => (
+              <code key={k} className="rounded border border-border bg-secondary/50 px-2 py-0.5 font-mono text-[10.5px] text-foreground/75">
+                {k}
+              </code>
+            ))}
+          </div>
         </section>
 
         {/* 技术栈 */}

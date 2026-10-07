@@ -277,9 +277,12 @@ export const zh = {
   // ---- 关于页 ----
   "about.back": "返回挖宝",
   "about.highlights": "核心亮点",
-  "about.mcpTitle": "对话后端：seqout-mcp",
+  "about.mcpTitle": "对话后端与架构",
   "about.mcpNote":
-    "本项目对话后端封装的 {mcp} 是一个通过 {seqout} 查询公共组学数据的 MCP Server，提供 31 个只读工具，覆盖 GEO、SRA、ENA、GSA、NGDC 数据集搜索、项目详情、样本信息、编号反查、统计和下载链接；文献检索同时接入 PubMed、Europe PMC、Crossref、OpenAlex、Semantic Scholar、CORE、arXiv、bioRxiv、medRxiv。它使用 stdio 传输：MCP 客户端负责启动进程并通过标准输入/输出通信；普通日志只写入 stderr，不会污染 MCP 协议数据。本应用将这套工具能力以 OpenAI function schema 声明式移植进对话服务，无需在本地运行 Python MCP 进程。",
+    "后端由 OpenAI 兼容模型的 tool-calling 循环驱动：提供商凭证只留在服务端，不同来源的响应归一化成统一的论文 schema，结构化卡片与模型上下文分离传输。组学走 seqout / NGDC 公共 API，文献走九源适配器；工具 schema、适配器与 SSE 编排集中在 functions/seqout-chat，系统提示词是唯一可编辑来源（改后跑 npm run sync:prompts）。",
+  "about.litCfg": "文献 API 配置（均可选）",
+  "about.litCfgDesc":
+    "所有文献凭证只留在服务端，请勿提交 server/.env。PubMed、Europe PMC、Crossref、OpenAlex、arXiv、bioRxiv、medRxiv 可无 Key 使用；CORE 必须申请 CORE_API_KEY，NCBI_EMAIL / 各 MAILTO 邮箱能改善限流待遇。",
   "about.deploy": "一键自托管",
   "about.deployDesc":
     "完全脱离云平台：任意 OpenAI 兼容模型（OpenAI / DeepSeek / 硅基流动 / 本地 vLLM）+ Docker 即可运行，配置只有一份 {env}，不配数据库则自动降级纯游客模式。",
@@ -300,10 +303,17 @@ export const zh = {
   "about.dbsIntro": "叫「科研寻宝鼠」是因为科研检索像是在矿脉里寻宝。阿寻一次下铲可以穿透组学数据库，并沿着编号和主题追到相关文献。",
   "about.literatureSources": "文献检索来源",
   "about.gsaPolicy": "GSA 公开数据可通过国家基因组科学数据中心的国内直链获取；GSA-Human 受控数据需要 PI 经 BIGSSO 登录并向 DAC 申请，本平台不提供受控数据下载。",
+  "about.evidence": "证据链",
+  "about.evidenceIntro": "问到 GSE / GSM / PMID / GO 术语时，阿寻沿证据链查证而不是瞎猜：",
+  "about.evidence.1": "通过权威数据库字段解析编号；",
+  "about.evidence.2": "在对应文献索引里查确切关联的论文或编号；",
+  "about.evidence.3": "经 Europe PMC 等来源补充摘要、DOI 元数据与 OA 全文链接；",
+  "about.evidence.4": "返回标题、作者、期刊、年份、DOI、摘要要点与相关 GEO 上下文。",
+  "about.evidenceNote": "主动的九源文献检索返回标准化论文卡片；证据链查询则针对单个编号或单个数据集优化。",
   "about.why.1": "科研寻宝鼠（Research Treasure Mouse）让新手科研小白告别老旧繁琐的生信数据库迷宫，用拟人化“探矿挖宝”交互，一键检索 GEO / SRA / ENA / GSA / NGDC 等组学数据库，并联动 PubMed、Europe PMC、Crossref、OpenAlex、Semantic Scholar、CORE、arXiv、bioRxiv、medRxiv 文献资源。",
   "about.why.2": "对刚进组的研究生来说，科研最磨灭热情的，往往不是做实验，而是起步时在冰冷、反人类的数据库迷宫里抓瞎，找不对样本、看不懂编号、搜不到文献，第一步就陷入自我怀疑与精神内耗。「科研寻宝鼠」想要做的，是把高校科研人从枯燥压抑的第一步数据搜索中彻底解救出来。",
   "about.why.3": "在这里，科研不再是孤独的单打独斗，也没有冰冷复杂的代码门槛。只要像和同门聊天一样，随口说出你的课题构想，桌宠“阿寻”就会戴上矿工帽一头扎进数据矿脉深处，兴冲冲地帮你刨出与研究方向最贴合的黄金数据与关键文献，将规整的样本卡片稳稳叼到你面前。每一次检索都是一次充满惊喜的挖宝，让科研起步少一点焦虑迷茫，多一份探索的纯粹乐趣与踏实陪伴。",
-  "about.authors": "本应用基于 {qmuse} 构建与部署，并在 DeepSeek-V4、Kimi-K3、GLM-5.3 等 AI 模型的协助下开发完成。",
+  "about.authors": "本项目由 JZHANG 开发，使用 seqout 公共数据服务、NGDC 公共 API 与 OpenAI 兼容模型网关。",
 
   "about.h.1.title": "对话式检索",
   "about.h.1.desc": "自然语言提问 → 大模型自动调用组学、NGDC 与九源文献工具 → 流式回答 + 数据集或论文卡片 +「下一铲建议」。",
@@ -314,7 +324,7 @@ export const zh = {
   "about.h.4.title": "使用统计",
   "about.h.4.desc": "顶栏面板展示累计对话、Token 消耗、使用人数与每个工具的调用次数；服务端聚合，容器内持久化。",
   "about.h.5.title": "桌宠与成就",
-  "about.h.5.desc": "寻宝鼠随检索进度挖宝，累计挖宝解锁成就徽章；可拖拽、长按静默。",
+  "about.h.5.desc": "寻宝鼠随检索进度挖宝、翻文献，累计挖宝解锁成就徽章；可拖拽、右键静默。",
   "about.h.6.title": "移动端自适应",
   "about.h.6.desc": "软键盘、安全区、触摸交互全适配，手机上也能顺畅挖宝。",
 
