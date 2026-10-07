@@ -36,6 +36,7 @@ export function ToolTrace({
   // 文献检索完成后用一枚汇总标记承载来源分布，避免九个来源胶囊挤成一串。
   function renderItem(it: LiveToolEvent, i: number): React.ReactNode {
     const split = it.name === "literature_search" && it.status !== "running" && litSources && litSources.length > 0;
+    const isLiterature = it.name === "literature_search";
     if (!split) {
       return (
         <span
@@ -49,7 +50,7 @@ export function ToolTrace({
           }`}
         >
           {statusIcon(it.status)}
-          {toolLabel(lang, it.name, it.label)}
+          {isLiterature ? (lang === "zh" ? "文献检索" : "Literature search") : toolLabel(lang, it.name, it.label)}
           {it.status !== "running" && typeof it.ms === "number" ? (
             <span className="opacity-60">{it.ms}ms</span>
           ) : null}
