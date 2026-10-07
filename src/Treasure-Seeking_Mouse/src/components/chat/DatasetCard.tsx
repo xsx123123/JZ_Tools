@@ -4,6 +4,7 @@ import { BookOpen, ExternalLink, FileText } from "lucide-react";
 import type { DatasetCard as CardData } from "@/services/seqoutChat";
 import { requestEvidence } from "@/lib/evidenceBus";
 import { useI18n } from "@/i18n/provider";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 const NCBI_BASE: Record<string, string> = {
   GSE: "https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=",
@@ -17,6 +18,23 @@ const NCBI_BASE: Record<string, string> = {
 };
 
 const DAC_URL = "https://ngdc.cncb.ac.cn/gsa-human/";
+
+/** literature_search 来源标识 → 展示名（专有名词，双语同形） */
+export const LIT_SOURCE_LABELS: Record<string, string> = {
+  pubmed: "PubMed",
+  europe_pmc: "Europe PMC",
+  crossref: "Crossref",
+  openalex: "OpenAlex",
+  semantic_scholar: "Semantic Scholar",
+  core: "CORE",
+  arxiv: "arXiv",
+  biorxiv: "bioRxiv",
+  medrxiv: "medRxiv",
+};
+
+export function litSourceLabel(source: string | undefined): string {
+  return (source && LIT_SOURCE_LABELS[source]) || source || "?";
+}
 
 function buildLink(accession: string): string | null {
   if (/^GWH[A-Z0-9]+$/i.test(accession)) return `https://ngdc.cncb.ac.cn/gwh/assembly/${accession.toUpperCase()}`;
@@ -162,7 +180,7 @@ function LiteratureResultCard({ card }: { card: CardData }): React.ReactElement 
         <div className="min-w-0">
           <div className="mb-1 flex flex-wrap items-center gap-1.5">
             <span className="shrink-0 rounded bg-helix-soft px-1.5 py-px font-mono text-[9px] font-semibold uppercase text-helix ring-1 ring-helix/20">
-              {meta.literature_source === "pubmed" ? "PubMed" : "Europe PMC"}
+              {litSourceLabel(meta.literature_source)}
             </span>
             {meta.isOpenAccess === "true" ? <span className="shrink-0 rounded bg-helix-soft px-1.5 py-px text-[9px] text-helix">OA</span> : null}
             <span className="font-mono text-[10px] text-muted-foreground">{meta.pmid ? `PMID: ${meta.pmid}` : card.accession}</span>
@@ -198,5 +216,60 @@ export function DatasetCardGrid({ cards, hostMessageId }: { cards: CardData[]; h
         <DatasetCardView key={`${c.accession}-${i}`} card={c} hostMessageId={hostMessageId} />
       ))}
     </div>
+  );
+}
+
+/** 文献详情弹窗：点击正文列表条目触发，展示该条对应的完整卡片信息 */
+export function LiteratureDetailDialog({ card, onClose }: { card: CardData; onClose: () => void }): React.ReactElement {
+  const { t } = useI18n();
+  const meta = card.meta ?? {};
+  const link = (key: string): string | undefined => meta[`url_${key}`] || undefined;
+  const LINK_KEYS = ["pubmed", "europe_pmc", "doi", "full_text", "google_scholar_search", "crossref", "openalex", "semantic_scholar", "core", "arxiv", "biorxiv", "medrxiv"] as const;
+  return (
+    <Dialog open onOpenChange={(open) => { if (!open) onClose(); }}>
+      <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-xl">
+        <DialogHeader>
+          <div className="mb-1 flex flex-wrap items-center gap-1.5">
+            <span className="shrink-0 rounded bg-helix-soft px-1.5 py-px font-mono text-[9px] font-semibold uppercase text-helix ring-1 ring-helix/20">
+              {litSourceLabel(meta.literature_source)}
+            </span>
+            {meta.isOpenAccess === "true" ? <span className="shrink-0 rounded bg-helix-soft px-1.5 py-px text-[9px] text-helix">OA</span> : null}
+            {meta.pmid ? <span className="font-mono text-[10px] text-muted-foreground">PMID: {meta.pmid}</span> : null}
+            {meta.doi ? <span className="font-mono text-[10px] text-muted-foreground">DOI: {meta.doi}</span> : null}
+          </div>
+          <DialogTitle className="text-[15px] leading-snug">{card.title}</DialogTitle>
+        </DialogHeader>
+        <p className="text-[11.5px] text-muted-foreground">
+          {[meta.authors, meta.journal, meta.year].filter(Boolean).join(" · ")}
+        </p>
+        {card.summary?.trim() ? (
+          <section>
+            <h4 className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground/80">{t("lit.abstract")}</h4>
+            <p className="max-h-56 overflow-y-auto rounded-md border border-border/60 bg-secondary/40 px-3 py-2 text-[12.5px] leading-relaxed text-foreground/85">
+              {card.summary.trim()}
+            </p>
+          </section>
+        ) : null}
+        <section>
+          <h4 className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground/80">{t("lit.links")}</h4>
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
+            {LINK_KEYS.map((key) =>
+              link(key) ? (
+                <a
+                  key={key}
+                  href={link(key)}
+                  target="_blank"
+                  rel="noreferrer noopener"
+                  className="story-link inline-flex items-center gap-1 rounded-md border border-border bg-card px-2 py-1 text-[11px] text-helix shadow-sm transition-colors hover:border-helix/40"
+                >
+                  <ExternalLink size={10} />
+                  {key === "doi" ? t("lit.doi") : key === "full_text" ? t("lit.fullText") : key === "google_scholar_search" ? t("lit.googleScholar") : litSourceLabel(key)}
+                </a>
+              ) : null,
+            )}
+          </div>
+        </section>
+      </DialogContent>
+    </Dialog>
   );
 }

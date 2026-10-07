@@ -4,7 +4,7 @@ export const en = {
   // ---- 品牌 / 通用 ----
   "brand.name": "Research Treasure Mouse",
   "brand.full": "Research Treasure Mouse · Conversational Omics and Literature Explorer",
-  "brand.tagline": "Muse digs up omics treasures for you",
+  "brand.tagline": "Muse digs up omics & literature treasures",
 
   // ---- 顶栏 ----
   "header.newChat": "New chat",
@@ -110,6 +110,10 @@ export const en = {
   "lit.fullText": "OA full text",
   "lit.openPubmed": "Open in PubMed",
   "lit.googleScholar": "Search Google Scholar",
+  "lit.viewDetail": "Click for paper details",
+  "lit.detailTitle": "Paper details",
+  "lit.abstract": "Abstract",
+  "lit.links": "Links",
 
   // ---- ID 浮层 ----
   "idlink.copyId": "Copy ID",
@@ -305,7 +309,7 @@ export const en = {
   "about.authors": "Built and deployed on {qmuse}, developed with assistance from AI models including DeepSeek-V4, Kimi-K3 and GLM-5.3.",
 
   "about.h.1.title": "Conversational retrieval",
-  "about.h.1.desc": "Ask in natural language → the LLM calls omics, NGDC and five-source literature tools → streamed answer + dataset or paper cards + “next dig” suggestions.",
+  "about.h.1.desc": "Ask in natural language → the LLM calls omics, NGDC and nine-source literature tools → streamed answer + dataset or paper cards + “next dig” suggestions.",
   "about.h.2.title": "Inline linked accessions",
   "about.h.2.desc": "GSE/GSM/GO/PMID accessions become clickable links; hover prefetches paper metadata, and one click opens the evidence chain with DOI and open-access links.",
   "about.h.3.title": "Leaderboard",

@@ -7,7 +7,7 @@ import { onPetSettingsChanged, onPetRecall, onPetQuiet, onPetResetPos, onPetTypi
 import { PetSettingsPanel } from "@/components/pet/PetSettingsPanel";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useI18n } from "@/i18n/provider";
-import { petLines, type MessageKey } from "@/i18n";
+import { petLines, type MessageKey, type PetLines } from "@/i18n";
 import IMG_BASE from "@/assets/pet/mouse-base.webp";
 import IMG_CHEST from "@/assets/pet/chest.webp";
 import IMG_SHOVEL from "@/assets/pet/mouse-shovel.webp";
@@ -20,12 +20,18 @@ import IMG_SPIN from "@/assets/pet/mouse-spin.webp";
 import IMG_CROWN from "@/assets/pet/mouse-crown.webp";
 import IMG_PEEK from "@/assets/pet/mouse-peek.webp";
 import IMG_SLEEP from "@/assets/pet/mouse-sleep.webp";
+import IMG_READ_STUDY from "@/assets/pet/mouse-read-study.webp";
+import IMG_READ_MAP from "@/assets/pet/mouse-read-map.webp";
+import IMG_READ_CART from "@/assets/pet/mouse-read-cart.webp";
+import IMG_SPARKLE from "@/assets/pet/mouse-sparkle.webp";
 
-type PetState = "idle" | "digging" | "reveal" | "stow" | "miss" | "poke" | "spin" | "walk" | "look" | "celebrate" | "peek" | "sleep";
+type PetState = "idle" | "digging" | "read" | "litfound" | "reveal" | "stow" | "miss" | "poke" | "spin" | "walk" | "look" | "celebrate" | "peek" | "sleep";
 
 /** 外部流式事件 → 宠物动作 */
 export type PetEvent =
   | { type: "tool_start"; seq: number }
+  | { type: "lit_start"; seq: number }
+  | { type: "lit_cards"; count: number; seq: number }
   | { type: "cards"; count: number; seq: number }
   | { type: "done"; cards: number; seq: number }
   | { type: "error"; seq: number }
@@ -42,6 +48,13 @@ export function makePetEvent(e: DistributiveOmit<PetEvent, "seq">): PetEvent {
 function pick<T>(arr: T[]): T {
   return arr[Math.floor(Math.random() * arr.length)];
 }
+
+/** 文献检索轮播造型：每张图配一套与其内容一致的台词（lit_start 时随机换造型） */
+const READ_VARIANTS: { img: string; lines: (l: PetLines) => string[] }[] = [
+  { img: IMG_READ_STUDY, lines: (l) => l.readStudy },
+  { img: IMG_READ_MAP, lines: (l) => l.readMap },
+  { img: IMG_READ_CART, lines: (l) => l.readCart },
+];
 
 const MOBILE_MAX_W = 768; // 与 useIsMobile / Tailwind md: 断点一致
 const MOBILE_SIZE_CAP = 120; // 移动端即使选大档也封顶，避免遮挡对话
@@ -88,6 +101,7 @@ export function TreasureMouse({ event }: { event: PetEvent | null }): React.Reac
     return { x: window.innerWidth - size - 24, y: 120 };
   });
   const [state, setState] = useState<PetState>("idle");
+  const [readImg, setReadImg] = useState<string>(IMG_READ_STUDY); // read 状态当前轮播到的造型图
   const [bubble, setBubble] = useState<string | null>(null);
   const [gemCount, setGemCount] = useState<number | null>(null);
   const [hearts, setHearts] = useState<Heart[]>([]);
@@ -298,6 +312,26 @@ export function TreasureMouse({ event }: { event: PetEvent | null }): React.Reac
         countedRef.current = false;
         transient("digging", pick(L.dig), 10_000); // 兜底超时回 idle；done/error 会提前打断
         break;
+      case "lit_start": {
+        // 文献检索专属剧场：随机换「研读/思维导图/推书车」造型，台词与图内容一致；
+        // done/error/cards 会提前打断
+        const variant = pick(READ_VARIANTS);
+        setReadImg(variant.img);
+        setGemCount(null);
+        countedRef.current = false;
+        transient("read", pick(variant.lines(L)), 10_000);
+        break;
+      }
+      case "lit_cards": {
+        // 文献出土：闪耀发现造型；宝藏计数与里程碑逻辑和组学卡片一致
+        countedRef.current = true;
+        const total = addTreasure(event.count);
+        setTreasure(total);
+        setChestPopKey((k) => k + 1);
+        if (checkMilestones(total)) break;
+        transient("litfound", pick(L.litFound), 2400);
+        break;
+      }
       case "cards": {
         setGemCount(event.count);
         countedRef.current = true;
@@ -305,7 +339,7 @@ export function TreasureMouse({ event }: { event: PetEvent | null }): React.Reac
         break;
       }
       case "done":
-        if (event.cards > 0 && state !== "reveal" && state !== "stow" && state !== "celebrate") {
+        if (event.cards > 0 && state !== "reveal" && state !== "stow" && state !== "celebrate" && state !== "litfound") {
           setGemCount(event.cards);
           revealStow(event.cards, t("pet.worthIt"), 1600, countedRef.current);
         } else if (event.cards === 0) {
@@ -505,8 +539,8 @@ export function TreasureMouse({ event }: { event: PetEvent | null }): React.Reac
 
   const animCls =
     state === "digging" ? "pet-digging"
-      : state === "reveal" ? "pet-reveal"
-        : state === "stow" ? "pet-reveal"
+      : state === "read" ? "pet-read"
+        : state === "reveal" || state === "stow" || state === "litfound" ? "pet-reveal"
           : state === "miss" ? "pet-miss"
             : state === "poke" ? "pet-poke"
               : state === "spin" ? "pet-spin"
@@ -518,7 +552,9 @@ export function TreasureMouse({ event }: { event: PetEvent | null }): React.Reac
   // 造型与状态一一对应：挖土(暗色换夜探矿洞)/开宝箱/空铲失望/转圈卖萌/加冕/眨眼/嗅探/探头/睡土堆
   const imgSrc =
     state === "digging" || state === "walk" ? (dark ? IMG_NIGHT : IMG_SHOVEL)
-      : state === "reveal" || state === "stow" ? IMG_CHEST_OPEN
+      : state === "read" ? readImg
+        : state === "litfound" ? IMG_SPARKLE
+          : state === "reveal" || state === "stow" ? IMG_CHEST_OPEN
         : state === "miss" ? IMG_SAD
           : state === "poke" ? IMG_WINK
             : state === "spin" ? IMG_SPIN

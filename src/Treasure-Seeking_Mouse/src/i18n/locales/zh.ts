@@ -3,7 +3,7 @@ export const zh = {
   // ---- 品牌 / 通用 ----
   "brand.name": "科研寻宝鼠",
   "brand.full": "科研寻宝鼠 · 对话式组学与文献检索助手",
-  "brand.tagline": "阿寻带你挖组学宝藏",
+  "brand.tagline": "阿寻带你挖组学与文献宝藏",
 
   // ---- 顶栏 ----
   "header.newChat": "新对话",
@@ -109,6 +109,10 @@ export const zh = {
   "lit.fullText": "OA 全文",
   "lit.openPubmed": "在 PubMed 打开",
   "lit.googleScholar": "Google Scholar 搜索",
+  "lit.viewDetail": "点击查看文献详情",
+  "lit.detailTitle": "文献详情",
+  "lit.abstract": "摘要",
+  "lit.links": "原文链接",
 
   // ---- ID 浮层 ----
   "idlink.copyId": "复制 ID",
@@ -302,7 +306,7 @@ export const zh = {
   "about.authors": "本应用基于 {qmuse} 构建与部署，并在 DeepSeek-V4、Kimi-K3、GLM-5.3 等 AI 模型的协助下开发完成。",
 
   "about.h.1.title": "对话式检索",
-  "about.h.1.desc": "自然语言提问 → 大模型自动调用组学、NGDC 与五源文献工具 → 流式回答 + 数据集或论文卡片 +「下一铲建议」。",
+  "about.h.1.desc": "自然语言提问 → 大模型自动调用组学、NGDC 与九源文献工具 → 流式回答 + 数据集或论文卡片 +「下一铲建议」。",
   "about.h.2.title": "正文内嵌链接",
   "about.h.2.desc": "正文里的 GSE/GSM/GO/PMID 编号自动变成可点链接，hover 预取论文元数据，一键查看文献证据链和 DOI / OA 全文。",
   "about.h.3.title": "排行榜",

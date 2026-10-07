@@ -4,7 +4,7 @@ export const en = {
   // ---- 品牌 / 通用 ----
   "brand.name": "GeoMuse",
   "brand.full": "GeoMuse · Conversational Omics Data Explorer",
-  "brand.tagline": "Muse digs up omics treasures for you",
+  "brand.tagline": "Muse digs up omics & literature treasures",
 
   // ---- 顶栏 ----
   "header.newChat": "New chat",

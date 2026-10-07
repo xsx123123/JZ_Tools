@@ -1,6 +1,6 @@
 <div align="center">
   <img src="../src/assets/pet/mouse-base.webp" width="140" alt="科研寻宝鼠" />
-  <h1>科研寻宝鼠 · 对话式组学与文献检索助手</h1>
+  <h1>科研寻宝鼠 · 对话式组学数据与多源文献检索助手</h1>
   <p>
     <a href="../README.md">English</a> | <strong>简体中文</strong>
   </p>
@@ -12,16 +12,16 @@
     <a href="https://github.com/xsx123123/JZ_Tools/blob/main/LICENSE"><img src="https://img.shields.io/badge/License-MIT-yellow?style=flat-square" alt="MIT License" /></a>
   </p>
   <p>🚀 <a href="https://render.qmuse.pub/p/muse/2842191818002612/index.html"><strong>在线体验</strong>：https://render.qmuse.pub/p/muse/2842191818002612/index.html</a>（线上部署版本可能落后于仓库最新代码）</p>
-  <p>把 <a href="https://github.com/xsx123123/JZ_Tools/tree/main/src/seqout-mcp">seqout-mcp</a> 的 31 个组学数据检索工具封装成「聊天式挖宝」——自然语言提问，大模型自动检索 GEO / SRA / ENA / GSA / NGDC，数据卡片 + 文献证据链呈现，附桌宠养成玩法。</p>
+  <p>把组学数据与多源文献检索能力封装成「聊天式挖宝」——自然语言提问，大模型自动检索 GEO / SRA / ENA / GSA / NGDC 和九个文献来源，按证据自动对齐相关 GEO 研究与论文，数据卡片 + 文献证据链呈现，附桌宠养成玩法。</p>
 </div>
 
-> **备注**：本项目对话后端封装的 [seqout-mcp](https://github.com/xsx123123/JZ_Tools/tree/main/src/seqout-mcp) 是一个通过 [seqout.org](https://seqout.org) 与 NGDC 官方 API 查询公共组学数据的 MCP Server，提供 31 个组学只读工具，覆盖 GEO、SRA、ENA、GSA、NGDC 数据集搜索、项目详情、样本信息、编号反查、统计和下载链接，并额外提供 PubMed、Europe PMC、Crossref、OpenAlex、Semantic Scholar 五源文献搜索工具。它使用 stdio 传输：MCP 客户端负责启动进程并通过标准输入/输出通信；普通日志只写入 stderr，不会污染 MCP 协议数据。本应用将这套工具能力以 OpenAI function schema 声明式移植进对话服务，无需在本地运行 Python MCP 进程。
+> **备注**：本项目对话后端封装的 [seqout-mcp](https://github.com/xsx123123/JZ_Tools/tree/main/src/seqout-mcp) 是一个通过 [seqout.org](https://seqout.org) 与 NGDC 官方 API 查询公共组学数据的 MCP Server，提供组学只读工具，覆盖 GEO、SRA、ENA、GSA、NGDC 数据集搜索、项目详情、样本信息、编号反查、统计和下载链接，并额外提供 PubMed、Europe PMC、Crossref、OpenAlex、Semantic Scholar、CORE、arXiv、bioRxiv、medRxiv 九源文献搜索工具。文献结果可结合编号、标题和元数据自动对齐相关 GEO 研究。它使用 stdio 传输：MCP 客户端负责启动进程并通过标准输入/输出通信；普通日志只写入 stderr，不会污染 MCP 协议数据。本应用将这套工具能力以 OpenAI function schema 声明式移植进对话服务，无需在本地运行 Python MCP 进程。
 
-![封面 · 夜探矿洞](寻宝鼠.png)
+![封面 · 夜探矿洞](GEO寻宝鼠组学文献智能探索.png)
 
 ### 立意 · 为什么做这只寻宝鼠
 
-**科研寻宝鼠（Research Treasure Mouse）** 让新手科研小白告别老旧繁琐的生信数据库迷宫，用拟人化"探矿挖宝"交互，一键检索 GEO / SRA / ENA / GSA 等组学数据库，以及 PubMed、Europe PMC 等文献资源。
+**科研寻宝鼠（Research Treasure Mouse）** 让新手科研小白告别老旧繁琐的生信数据库与文献索引迷宫，用拟人化"探矿挖宝"交互，一键检索 GEO / SRA / ENA / GSA 等组学数据库，以及九个主流文献来源；检索结果还能根据编号、标题和元数据自动关联相关 GEO 研究与文献证据。
 
 对刚进组的研究生来说，科研最磨灭热情的，往往不是做实验，而是起步时在冰冷、反人类的数据库迷宫里抓瞎——找不对样本、看不懂编号、搜不到文献，第一步就陷入自我怀疑与精神内耗。「科研寻宝鼠」想要做的，是把高校科研人从枯燥压抑的第一步数据搜索中彻底解救出来。
 
@@ -62,13 +62,14 @@ pnpm run dev       # 前端 dev server（固定 3015 端口）
 
 ## 阿寻能挖的数据库
 
-叫「GEO 寻宝鼠」只是因为 GEO 是最老的那条矿脉——阿寻其实不只能搜 GEO，一次下铲同时穿透 7 个数据库：
+叫「GEO 寻宝鼠」只是因为 GEO 是最老的那条矿脉——阿寻其实不只能搜 GEO，一次下铲同时穿透 7 个组学数据库，并能联动九个文献来源：
 
 GEO · SRA · ArrayExpress · ENA · GSA · DRA · GEA
 
 ## 功能一览
 
-- **对话式检索**：自然语言提问 → LLM tool-calling 自动选择 seqout、NGDC 或文献工具（31 个组学工具加五源文献搜索）→ 流式回答 + 数据集卡片或论文卡片 + 「下一铲建议」
+- **对话式检索**：自然语言提问 → LLM tool-calling 自动选择 seqout、NGDC 或文献工具（组学数据工具加九源文献搜索）→ 流式回答 + 数据集卡片或论文卡片 + 「下一铲建议」
+- **多源文献与 GEO 对齐**：并行检索 PubMed、Europe PMC、Crossref、OpenAlex、Semantic Scholar、CORE、arXiv、bioRxiv、medRxiv，按 DOI / PMID / 标题去重，并自动关联可验证的 GEO 研究、编号和证据链
 - **正文内嵌链接**：GSE/GSM/GO/PMID 编号自动变成可点链接，hover 浮层预取论文元数据，一键查看文献证据链（PubMed 摘要 + DOI / OA 全文）
 - **排行榜**：登录用户榜 + 访客榜，本周 / 累计双维度，自定义昵称
 - **使用统计**：顶栏 📊 面板展示累计对话、Token 消耗、使用人数、每个工具的调用次数（服务端聚合，容器内持久化）

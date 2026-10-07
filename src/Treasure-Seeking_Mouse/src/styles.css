@@ -818,6 +818,23 @@
 .pet-orbit-chest { width: 32px; height: 32px; margin: -16px; background: var(--color-pet-gold-soft); }
 .pet-orbit-badge { width: 22px; height: 22px; margin: -11px; font-size: 10px; }
 
+/* 文献列表条目：与文献卡片标题匹配的可点击项，点击弹详情 */
+.md-body li.lit-ref {
+  cursor: pointer;
+  border-radius: 6px;
+  padding: 1px 6px;
+  margin-left: -6px;
+  transition: background-color 150ms ease;
+}
+.md-body li.lit-ref:hover { background: var(--color-helix-soft); }
+
+/* 文献检索小剧场：read 状态轻微摇晃（图自带道具，无需额外表情） */
+.pet-read { animation: pet-read-sway 1.6s ease-in-out infinite; transform-origin: 50% 92%; }
+@keyframes pet-read-sway {
+  0%, 100% { transform: rotate(-2.5deg); }
+  50% { transform: rotate(2.5deg); }
+}
+
 @media (prefers-reduced-motion: reduce) {
   /* Global backstop for utility classes; targeted rules above preserve useful fades. */
   *, *::before, *::after {
@@ -851,7 +868,7 @@
     transition-duration: 0.01ms;
   }
   .pet-orbit-item { transition: opacity 150ms ease; transform: rotate(var(--orbit-angle)) translateY(calc(var(--orbit-radius) * -1)) rotate(calc(var(--orbit-angle) * -1)); }
-  .pet-idle, .pet-digging, .pet-reveal, .pet-miss, .pet-dust, .pet-poke,
+  .pet-idle, .pet-digging, .pet-read, .pet-reveal, .pet-miss, .pet-dust, .pet-poke,
   .pet-spin, .pet-walk, .pet-look, .pet-sleep, .pet-heart, .pet-chest-pop,
   .pet-burst, .pet-celebrate, .pet-halo, .pet-banner, .pet-badge-in,
   .pet-hover-bounce, .pet-ears-perk { animation: none; }

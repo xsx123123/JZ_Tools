@@ -1,22 +1,24 @@
 # 文献搜索与证据链设计说明
 
-> 状态：现状梳理 + 后续设计建议
+> 状态：已落地能力说明 + 后续演进建议
 >
-> 适用范围：GEO 寻宝鼠 / GeoMuse 的 PubMed、Europe PMC 文献联动，以及后续主动文献搜索功能。
+> 适用范围：科研寻宝鼠的多源文献检索、GEO 文献联动与证据链能力。
 
 ## 1. 结论
 
-当前项目**已经接入 PubMed 与 Europe PMC**，但现有能力属于“编号关联文献证据链”，还不是完整的“关键词文献搜索”。
+当前项目已经接入九个文献来源，并同时提供编号关联证据链与主动关键词文献搜索：PubMed、Europe PMC、Crossref、OpenAlex、Semantic Scholar、CORE、arXiv、bioRxiv、medRxiv。
 
 现有能力可以：
 
 - 点击 `GSE`、`GSM`、`PMID`、`GO` 编号；
 - 获取关联论文的标题、期刊、年份、PMID、DOI 和摘要分段；
-- 在 NCBI E-utilities 失败或限流时降级到 Europe PMC；
+- 并行查询多个来源，按 DOI、PMID 或标准化标题去重；
+- 在单个来源失败或限流时保留其他来源结果，并在响应中记录 warning；
 - 在数据集卡片或正文编号下打开文献证据链卡片；
-- 提供 PubMed、DOI 和开放获取全文链接。
+- 提供 PubMed、DOI、来源页和开放获取全文链接；
+- 根据编号、标题和元数据将文献结果与相关 GEO 研究自动对齐。
 
-后续如果要支持“搜索某个疾病、基因、物种或研究方向的多篇论文”，建议新增独立的 `literature_search` 工具。这个工具复用当前对话服务和 SSE 架构，但不要把主动搜索逻辑混入现有的编号证据链。
+主动搜索已通过独立的 `literature_search` 工具接入当前对话服务和 SSE 架构，与编号证据链保持分工，避免把多篇论文检索逻辑混入单编号详情链。
 
 ## 2. 数据源选择
 
@@ -258,21 +260,19 @@ interface LiteratureCard {
 
 ## 6. 当前能力边界
 
-当前实现还没有以下功能：
+以下仍属于后续演进方向：
 
-- 输入自然语言主题后返回多篇论文；
-- 分页或游标；
+- 更完整的分页或游标体验；
 - 按年份、作者、期刊或开放获取过滤；
-- 多来源结果去重；
 - 按相关性、年份或引用数排序；
 - 论文结果卡片批量导出；
-- 直接从论文结果反查 GEO、SRA 或 NGDC 数据集。
+- 从论文结果反查 GEO、SRA 或 NGDC 数据集的专用工具。
 
-所以现阶段产品文案应称为“文献证据链”或“关联文献查看”，不能宣传成完整学术搜索引擎。
+因此产品文案可以同时使用“多源文献搜索”和“文献证据链”，但不应将其宣传成覆盖所有学术数据库的通用搜索引擎。
 
-## 7. 后续主动文献搜索设计
+## 7. 主动文献搜索接口与后续演进
 
-建议新增独立工具：
+当前使用独立工具：
 
 ```text
 literature_search
@@ -283,7 +283,7 @@ literature_search
 | 参数 | 类型 | 说明 |
 |---|---|---|
 | `query` | string | 关键词、短语或 PubMed 查询式 |
-| `source` | enum | `all`、`pubmed`、`europe_pmc` |
+| `source` | enum | `all`、`pubmed`、`europe_pmc`、`crossref`、`openalex`、`semantic_scholar`、`core`、`arxiv`、`biorxiv`、`medrxiv` |
 | `year_from` | number | 起始年份，可选 |
 | `year_to` | number | 结束年份，可选 |
 | `author` | string | 作者过滤，可选 |
@@ -295,7 +295,7 @@ literature_search
 
 ```ts
 interface LiteratureSearchResult {
-  source: "pubmed" | "europe_pmc";
+  source: "pubmed" | "europe_pmc" | "crossref" | "openalex" | "semantic_scholar" | "core" | "arxiv" | "biorxiv" | "medrxiv";
   id: string;
   title: string;
   authors?: string[];
@@ -315,14 +315,12 @@ interface LiteratureSearchResult {
 }
 ```
 
-推荐执行顺序：
+当前执行流程：
 
-1. `source=all` 时以 Europe PMC 作为主搜索，获取完整字段和 OA 信息；
-2. 对缺少 PMID、DOI 或摘要的结果用 PubMed 批量补齐；
-3. 以 PMID 优先、DOI 次优先、标准化标题再次去重；
-4. 结果经过统一字段裁剪后进入 LLM；
-5. 完整结果通过独立 `cards` SSE 事件发送给前端；
-6. 前端显示多论文列表，单篇点击后复用现有证据链卡片。
+1. `source=all` 时并行查询九个来源，单源失败降级为 warning；
+2. 将各来源结果归一化，按 DOI、PMID、标准化标题去重；
+3. 结果截断到请求限制后进入 LLM，完整论文卡片通过独立 `cards` SSE 事件发送给前端；
+4. 前端显示多论文列表，单篇点击后复用现有证据链卡片，并尝试关联 GEO 研究。
 
 ### 7.1 与现有对话工具的关系
 
@@ -366,10 +364,9 @@ AI Omics & Literature Assistant
 
 ## 9. 实施顺序建议
 
-1. 保留现有 PubMed / Europe PMC 证据链，先补测试和监控；
-2. 新增 `literature_search` 后端工具和统一结果 schema；
-3. 增加多论文卡片、分页、去重和来源标签；
-4. 增加“论文 → 数据集”反查入口；
-5. 最后统一品牌和 README 文案。
+1. 继续完善九源适配器的测试、限流和监控；
+2. 增加多论文卡片的分页、筛选和来源标签；
+3. 增加“论文 → 数据集”反查入口；
+4. 持续统一品牌和 README 文案。
 
 这样可以先扩展实际能力，再做名称迁移，避免产品名先变宽但功能仍停留在 GEO 关联文献阶段。

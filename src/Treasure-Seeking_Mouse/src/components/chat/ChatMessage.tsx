@@ -1,11 +1,11 @@
 // 单条聊天消息：用户右对齐气泡 / 助手左对齐 + Markdown + 工具轨迹 + 结果卡片 + 复制/重试
 // v2.1/T2：接收 evidenceBus 请求，在本条消息下方渲染文献证据链卡片
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Check, Copy, RotateCcw, User } from "lucide-react";
 import { BrandMark } from "@/components/BrandMark";
 import { Markdown } from "./Markdown";
 import { ToolTrace, type LiveToolEvent } from "./ToolTrace";
-import { DatasetCardGrid } from "./DatasetCard";
+import { DatasetCardGrid, LiteratureDetailDialog } from "./DatasetCard";
 import { DownloadBoostCard } from "./DownloadBoostCard";
 import { SuggestionBlock, extractFollowups } from "./SuggestionBlock";
 import { LiteratureCardPanel } from "./LiteratureCard";
@@ -85,6 +85,19 @@ export function ChatMessage({
   const isTouch = useIsTouch();
   // T2：本条消息挂载的文献证据链请求（来自正文 IdLink 或 DatasetCard 的文献入口）
   const [evidence, setEvidence] = useState<EvidenceRequest | null>(null);
+  // 文献详情弹窗：正文列表条目点击后展示对应卡片
+  const [litDetail, setLitDetail] = useState<DatasetCard | null>(null);
+  // 文献卡片与「来源 → 命中数」分布：useMemo 保持引用稳定，避免 Markdown memo 失效导致流式重解析
+  const litCards = useMemo(() => (msg.cards ?? []).filter((c) => c.meta?.source === "literature"), [msg.cards]);
+  const litSources = useMemo<[string, number][]>(() => {
+    const m = new Map<string, number>();
+    for (const c of litCards) {
+      const s = c.meta?.literature_source ?? "unknown";
+      m.set(s, (m.get(s) ?? 0) + 1);
+    }
+    return [...m.entries()];
+  }, [litCards]);
+  const openLitDetail = useCallback((card: DatasetCard) => setLitDetail(card), []);
   useEffect(() => {
     // 多播监听：只认领 hostMessageId 是本条消息的请求
     return addEvidenceListener((req) => {
@@ -128,11 +141,20 @@ export function ChatMessage({
           ) : null}
         </p>
         {(msg.toolLogs?.length ?? 0) > 0 || (msg.liveTools?.length ?? 0) > 0 ? (
-          <ToolTrace logs={msg.toolLogs ?? []} live={msg.liveTools} />
+          <ToolTrace logs={msg.toolLogs ?? []} live={msg.liveTools} litSources={litSources} />
         ) : null}
         {hasBody ? (
           <div className="rounded-xl rounded-tl-sm border border-border bg-card px-4 py-3 shadow-soft">
-            {main ? <Markdown text={main} hostMessageId={msg.id} allowLinkHint={linkHint && !msg.streaming} /> : null}
+            {main ? (
+              <Markdown
+                text={main}
+                hostMessageId={msg.id}
+                allowLinkHint={linkHint && !msg.streaming}
+                litCards={litCards.length > 0 ? litCards : undefined}
+                litOpenHint={t("lit.viewDetail")}
+                onLitOpen={openLitDetail}
+              />
+            ) : null}
             {!msg.content && msg.streaming ? (
               <span className="text-[13px] text-muted-foreground">{t("msg.thinking")}</span>
             ) : null}
@@ -148,6 +170,7 @@ export function ChatMessage({
         {evidence ? (
           <LiteratureCardPanel kind={evidence.kind} id={evidence.id} onClose={() => setEvidence(null)} />
         ) : null}
+        {litDetail ? <LiteratureDetailDialog card={litDetail} onClose={() => setLitDetail(null)} /> : null}
         {!msg.streaming && items.length > 0 ? <SuggestionBlock items={items} onPick={onPickSuggestion} /> : null}
         {msg.error ? (
           <p className="mt-2 rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-[13px] text-destructive">

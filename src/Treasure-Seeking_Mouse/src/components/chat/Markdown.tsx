@@ -6,6 +6,7 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeHighlight from "rehype-highlight";
 import { scanText, type IdMatch } from "@/lib/linkify";
+import type { DatasetCard } from "@/services/seqoutChat";
 import { IdLink } from "./IdLink";
 
 /** 宿主消息 id 上下文：IdLink 的"查看证据链"请求据此锚定渲染位置 */
@@ -136,21 +137,79 @@ const COMPONENTS = {
   ),
 };
 
+// ---------- 文献列表联动：li 文本 ↔ 文献卡片按标题匹配（点击弹详情） ----------
+
+/** React 子树提取纯文本（idlink 等无 children 的自定义元素自然跳过，不影响标题匹配） */
+function textOf(node: React.ReactNode): string {
+  if (node === null || node === undefined || typeof node === "boolean") return "";
+  if (typeof node === "string" || typeof node === "number") return String(node);
+  if (Array.isArray(node)) return node.map(textOf).join("");
+  if (typeof node === "object" && "props" in (node as { props?: unknown })) {
+    return textOf(((node as { props: { children?: React.ReactNode } }).props).children);
+  }
+  return "";
+}
+
+/** 归一化：小写 + 去掉所有空白与标点，供标题包含匹配 */
+function normText(s: string): string {
+  return s.toLowerCase().replace(/[\s\p{P}\p{S}]+/gu, "");
+}
+
+function matchLitCard(children: React.ReactNode, cards: DatasetCard[]): DatasetCard | undefined {
+  const text = normText(textOf(children));
+  if (text.length < 8) return undefined;
+  return cards.find((c) => {
+    const title = normText(c.title);
+    return title.length >= 8 && (text.includes(title) || title.includes(text));
+  });
+}
+
 export const Markdown = memo(function Markdown({
   text,
   hostMessageId,
   allowLinkHint = true,
+  litCards,
+  litOpenHint,
+  onLitOpen,
 }: {
   text: string;
   hostMessageId?: string;
   /** 流式期间传 false：提示只在消息定稿后消费/展示（默认 true，历史消息等无流式场景无需关心） */
   allowLinkHint?: boolean;
+  /** 文献卡片：传入后正文中与卡片标题匹配的列表条目变为可点击（点击经 onLitOpen 弹详情） */
+  litCards?: DatasetCard[];
+  /** 可点击条目的悬停提示（i18n 由调用方注入，组件内不依赖 i18n） */
+  litOpenHint?: string;
+  onLitOpen?: (card: DatasetCard) => void;
 }): React.ReactElement {
+  const components = litCards && litCards.length > 0 && onLitOpen
+    ? {
+        ...COMPONENTS,
+        li: ({ node: _n, children, ...props }: { node?: unknown; children?: React.ReactNode } & React.ComponentProps<"li">) => {
+          const card = matchLitCard(children, litCards);
+          if (!card) return <li {...props}>{children}</li>;
+          return (
+            <li
+              {...props}
+              className="lit-ref"
+              title={litOpenHint}
+              onClick={(e) => {
+                // 条目内若点了编号链接/外链，只走链接不弹窗
+                if ((e.target as HTMLElement | null)?.closest?.("a,button,idlink")) return;
+                onLitOpen(card);
+              }}
+            >
+              {children}
+            </li>
+          );
+        },
+      }
+    : COMPONENTS;
   return (
     <HostMessageContext.Provider value={hostMessageId ?? null}>
       <AllowLinkHintContext.Provider value={allowLinkHint}>
         <div className="md-body text-[14.5px]">
-          <ReactMarkdown remarkPlugins={REMARK_PLUGINS} rehypePlugins={REHYPE_PLUGINS} components={COMPONENTS}>
+          <ReactMarkdown remarkPlugins={REMARK_PLUGINS} rehypePlugins={REHYPE_PLUGINS} components={components}>
             {text}
           </ReactMarkdown>
         </div>

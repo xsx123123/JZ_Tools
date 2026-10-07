@@ -145,6 +145,14 @@ export function toolLabel(lang: Lang, name: string, fallback?: string): string {
 export interface PetLines {
   idle: string[];
   dig: string[];
+  /** 文献检索·研读造型台词（与 mouse-read-study 图一致） */
+  readStudy: string[];
+  /** 文献检索·思维导图造型台词（与 mouse-read-map 图一致） */
+  readMap: string[];
+  /** 文献检索·推书车造型台词（与 mouse-read-cart 图一致） */
+  readCart: string[];
+  /** 文献出土·闪耀发现造型台词（与 mouse-sparkle 图一致） */
+  litFound: string[];
   poke: string[];
   spin: string[];
   miss: string[];
@@ -164,6 +172,10 @@ const PET_LINES: Record<Lang, PetLines> = {
       "这片土里有单细胞的味道…", "今天也来挖 GSE 吧！", "嗅到了高分文献的气息", "我的铲子呢…哦在背包里", "宝藏藏在第三铲之后",
     ],
     dig: ["挖挖挖…", "GEO? SRA?", "这块土有点硬", "快出来了快出来了", "阿寻挖矿中，请勿投喂"],
+    readStudy: ["逐句研读中…这段方法论得划重点", "眼镜一戴，谁也别吵阿寻", "笔记记满三页了，快啃完了！"],
+    readMap: ["把线索串成思维导图…", "这条证据链好像能连上！", "文献和数据都对上了，嘎嘣脆"],
+    readCart: ["拖了一车文献回来！", "Nature、Science、Cell…全搬进洞里", "书车吱呀吱呀，腰都压弯了…"],
+    litFound: ["哇！这篇正合你意！", "宝藏文献出土，闪闪发亮！", "快看快看，这篇引用不低哦！"],
     poke: ["吱!", "别戳啦~", "背包里掉出一张 GSM 卡片", "给你看我的宝贝收藏", "再戳就咬你哦（轻轻）"],
     spin: ["转圈圈！宝藏多多！", "被爱了吱吱吱", "嘿嘿，痒"],
     miss: ["唉，只有石头…", "这铲土是空的", "一定是姿势不对，再试一次!"],
@@ -181,6 +193,10 @@ const PET_LINES: Record<Lang, PetLines> = {
       "I smell single cells in this soil…", "Let's dig up a GSE today!", "I sense a high-impact paper", "Where's my shovel… oh, in the pack", "Treasure lies past the third dig",
     ],
     dig: ["Dig, dig, dig…", "GEO? SRA?", "This soil's a bit hard", "Almost out, almost out", "Muse is digging — do not feed"],
+    readStudy: ["Reading line by line… highlighting the methods", "Glasses on — do not disturb", "Three pages of notes, almost done!"],
+    readMap: ["Stringing clues into a mind-map…", "This evidence chain connects!", "Papers and data all check out"],
+    readCart: ["Hauled a whole cart of papers back!", "Nature, Science, Cell… into the burrow", "The cart creaks under all these books…"],
+    litFound: ["Ooh, this paper fits you perfectly!", "A treasure paper, shining bright!", "Look look — this one's well cited!"],
     poke: ["Squeak!", "Don't poke me~", "A GSM card fell out of my pack", "Wanna see my collection?", "Poke again and I'll bite (gently)"],
     spin: ["Spinning! So much treasure!", "Loved it, squeak squeak", "Hehe, that tickles"],
     miss: ["Sigh, just rocks…", "This scoop was empty", "Wrong angle — one more try!"],

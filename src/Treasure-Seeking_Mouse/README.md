@@ -11,11 +11,11 @@
   </p>
 </div>
 
-Research Treasure Mouse is a chat-based research assistant for finding public omics datasets and related papers. Ask a question in natural language; the backend selects the appropriate read-only tool, queries the source API, and returns a concise answer with structured dataset or paper cards.
+Research Treasure Mouse is a chat-based research assistant for finding public omics datasets and research literature. Ask a question in natural language; the backend selects the appropriate read-only tool, queries the source API, and returns a concise answer with structured dataset or paper cards. Literature searches can run across multiple indexes and are automatically connected to related GEO identifiers, studies and papers when the evidence supports that link.
 
 The project is designed for self-hosting. Any OpenAI-compatible model gateway can be used, and the frontend can run as a guest without Supabase. The Chinese product name is **科研寻宝鼠**; its desk pet is called **A-Xun** (阿寻).
 
-![UI preview](docs/geo寻宝鼠.gif)
+![UI preview](docs/GEO寻宝鼠组学文献智能探索.png)
 
 ## What It Searches
 
@@ -43,12 +43,12 @@ The `literature_search` tool supports nine sources:
 
 ## Evidence Chain
 
-When a user asks about a GSE, GSM, PMID or GO term, the application can build an evidence chain instead of guessing:
+When a user asks about a GSE, GSM, PMID or GO term, the application can build an evidence chain instead of guessing. Literature results can also be aligned with related GEO studies when identifiers, titles or metadata provide a reliable match:
 
 1. Resolve the identifier through the authoritative database fields.
-2. Query PubMed for the exact linked paper or identifier.
-3. Use Europe PMC to enrich abstracts and open-access full-text links.
-4. Return the title, authors, journal, year, DOI, abstract outline and source links.
+2. Query the relevant literature indexes for the exact linked paper or identifier.
+3. Use Europe PMC and other available sources to enrich abstracts, DOI metadata and open-access full-text links.
+4. Return the title, authors, journal, year, DOI, abstract outline, source links and related GEO context.
 
 The active literature search returns normalized paper cards, while the evidence-chain lookup remains optimized for one identifier or one dataset.
 
@@ -57,7 +57,8 @@ The active literature search returns normalized paper cards, while the evidence-
 - Natural-language tool calling with streamed SSE responses
 - Dataset cards and normalized paper cards with source links
 - GSE/GSM/GO/PMID links that open metadata or literature evidence
-- PubMed, Europe PMC, Crossref, OpenAlex and Semantic Scholar search
+- Nine-source literature search: PubMed, Europe PMC, Crossref, OpenAlex, Semantic Scholar, CORE, arXiv, bioRxiv and medRxiv
+- Automatic literature-to-GEO alignment for evidence discovery
 - Guest mode with local sessions; optional Supabase or self-hosted accounts
 - Login history, leaderboard and usage statistics in self-hosted mode
 - Draggable desk pet, activity states and achievement badges

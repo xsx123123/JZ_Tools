@@ -3,7 +3,7 @@ export const zh = {
   // ---- 品牌 / 通用 ----
   "brand.name": "GEO寻宝鼠",
   "brand.full": "GEO寻宝鼠 · 对话式组学数据检索助手",
-  "brand.tagline": "阿寻带你挖组学宝藏",
+  "brand.tagline": "阿寻带你挖组学与文献宝藏",
 
   // ---- 顶栏 ----
   "header.newChat": "新对话",

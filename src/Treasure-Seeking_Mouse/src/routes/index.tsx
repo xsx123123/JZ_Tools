@@ -375,7 +375,8 @@ function ChatPage(): React.ReactElement {
         onTool: (evt) => {
           if (evt.status === "running") {
             statRef.current.digs += 1;
-            setPetEvent(makePetEvent({ type: "tool_start" }));
+            // 文献检索走专属「读书」剧场，其余工具仍是挖宝
+            setPetEvent(makePetEvent(evt.name === "literature_search" ? { type: "lit_start" } : { type: "tool_start" }));
           }
           patch((m) => {
             const live = [...(m.liveTools ?? [])];
@@ -390,7 +391,11 @@ function ChatPage(): React.ReactElement {
         },
         onCards: (cards) => {
           finalCards = cards;
-          if (petCardsRef.current === 0 && cards.length > 0) setPetEvent(makePetEvent({ type: "cards", count: cards.length }));
+          // 文献卡片（literature_search 出货）走「闪耀发现」剧场，组学卡片仍走开箱剧场
+          const petEvt = cards.length > 0 && cards[0]?.meta?.source === "literature"
+            ? makePetEvent({ type: "lit_cards", count: cards.length })
+            : makePetEvent({ type: "cards", count: cards.length });
+          if (petCardsRef.current === 0 && cards.length > 0) setPetEvent(petEvt);
           petCardsRef.current = Math.max(petCardsRef.current, cards.length);
           patch((m) => ({ ...m, cards }));
         },
