@@ -38,6 +38,7 @@
 
 - [English README](../README.md)
 - [详细开发文档](DETAILED_README.md)
+- [26 项标准化组学检索 MCP 工具清单（附录）](info/26-tools-appendix.md)
 - [技术与工程设计白皮书](寻宝鼠_技术与工程设计白皮书_v1.docx)
 
 ## 快速开始
