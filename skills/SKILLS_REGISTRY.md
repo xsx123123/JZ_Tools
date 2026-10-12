@@ -25,6 +25,7 @@
 | maftools-gistic2 | maftools-gistic2 | `src/maftools_gistic2/` | 可执行型 | 0.9.0 | 待验证 | 无 | 从 GISTIC2 结果提取基因与样本信息。 |
 | md5 | MD5 manifest verifier | `src/md5/` | 可执行型 | 0.9.0 | 待验证 | 无 | 校验已有 MD5 manifest。 |
 | mutational-patterns | mutational-patterns | `src/MutationalPatterns/` | 可执行型 | 0.9.0 | 待验证 | hg19/hg38 Bioconductor 参考包 | 供给说明见 `mutational-patterns/references/provisioning.md`。 |
+| research-eln | Research ELN 计算实验笔记本 | 无（知识型技能，非 src/ 脚本转换） | 知识型（附校验脚本） | 1.0.0 | 待验证 | 可选 PyMuPDF（PDF 预检） | 从脚本/日志/结果重建时序化电子实验笔记本；audit/draft/build/update/validate 五模式；`scripts/validate_notebook.py` 仅标准库即可做结构 QA。 |
 | r-plot-library | r-plot-library | `src/R_plot_library/Plot_code/` | 可执行型 | 0.9.0 | 待验证 | 无 | Venn、volcano 与 ATAC UpSet 绘图。 |
 | rmats | rMATS event merger | `src/rMATS/merge_rmats_summary.py` | 可执行型 | 0.9.0 | 待验证 | 无 | 合并已有 rMATS 事件表。 |
 | scrna-seq | scrna-seq | `src/scRNA-seq/infercnv/` | 可执行型 | 0.9.0 | 待验证 | inferCNV 与 AnnoProbe 资源 | 供给说明见 `scrna-seq/references/provisioning.md`。 |
@@ -50,5 +51,6 @@
 
 | 日期 | 变更 | 涉及技能 |
 |---|---|---|
+| 2026-10-12 | 新增 `research-eln` 知识型技能（计算生物项目证据化电子实验笔记本，含 5 模式工作流与 `validate_notebook.py` 结构校验脚本），并回写台账。 | research-eln |
 | 2026-09-15 | 新增 `tanglegram` 技能（src/tanglegramplot 魔改函数 + optparse CLI wrapper），并回写台账。 | tanglegram |
 | 2026-08-03 | 建立首版汇总台账，登记当前已转换的 24 个技能，并记录尚未 skill 化模块。 | 全部已登记技能 |
