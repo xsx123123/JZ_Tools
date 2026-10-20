@@ -1,0 +1,77 @@
+/* 「继续寻宝」建议块：与现有 .card 体系同风格，全类选择器，dark 主题可读 */
+.suggest {
+  margin-top: 16px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--card);
+  overflow: hidden;
+}
+
+.suggest__head {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 10px;
+  padding: 16px 22px;
+}
+
+.suggest__arrow {
+  font-size: 24px;
+  color: var(--primary);
+  line-height: 1;
+}
+
+.suggest__title {
+  font-size: 25px;
+  font-weight: 500;
+  color: var(--foreground);
+  opacity: 0.85;
+}
+
+.suggest__count {
+  font-size: 20px;
+  font-family: monospace;
+  border-radius: 999px;
+  background: var(--helix-soft);
+  color: var(--primary);
+  padding: 2px 12px;
+}
+
+.suggest__chevron {
+  margin-left: auto;
+  font-size: 28px;
+  color: var(--muted);
+  line-height: 1;
+}
+
+.suggest__list {
+  border-top: 1px solid var(--border);
+  padding: 10px;
+}
+
+.suggest__item {
+  display: flex;
+  flex-direction: row;
+  align-items: baseline;
+  gap: 14px;
+  border-radius: 8px;
+  padding: 14px 18px;
+}
+
+.suggest__item:active {
+  background: var(--helix-soft);
+}
+
+.suggest__num {
+  font-size: 22px;
+  font-weight: 600;
+  font-family: monospace;
+  color: var(--pet-amber-deep);
+}
+
+.suggest__text {
+  flex: 1;
+  font-size: 26px;
+  line-height: 1.4;
+  color: var(--muted);
+}

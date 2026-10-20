@@ -1,0 +1,19 @@
+# 构建上下文噪音不进镜像
+node_modules
+dist
+server/.env
+.env
+.env.*
+!.env*.example
+!nginx.docker.conf
+!docker-compose.yml
+*.local
+.git
+.gitignore
+.tsbuildinfo
+.pytest_cache
+docs
+crawler
+qmuse
+.DS_Store
+截屏*.png

@@ -1,0 +1,275 @@
+/* 【小程序版】聊天页样式
+   约束：禁 oklch 色彩函数（低版本 WebView 不认）、禁属性选择器、禁带参伪类。
+   R2：全部硬编码色改为 theme.css 的语义变量（--background/--card/--helix...），
+   dark 主题由 index.tsx 根 View 上的 .dark 类驱动（WXSS 自定义属性按使用点惰性求值）。 */
+
+.chat {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  background-color: var(--background);
+  color: var(--foreground);
+}
+
+.chat__bar {
+  display: flex;
+  align-items: center;
+  gap: 16rpx;
+  padding: 16rpx 24rpx;
+  border-bottom: 1rpx solid var(--border);
+  background-color: var(--card);
+}
+
+.chat__model {
+  flex: 1;
+  font-size: 24rpx;
+  color: var(--muted-foreground);
+}
+
+.chat__btn {
+  padding: 8rpx 20rpx;
+  font-size: 24rpx;
+  color: var(--helix);
+  border: 1rpx solid var(--helix);
+  border-radius: 8rpx;
+}
+
+.chat__theme {
+  padding: 8rpx 16rpx;
+  font-size: 26rpx;
+  border: 1rpx solid var(--border);
+  border-radius: 8rpx;
+  background-color: var(--secondary);
+}
+
+.chat__lang {
+  font-size: 22rpx;
+  color: var(--muted-foreground);
+}
+
+.chat__list {
+  flex: 1;
+  padding: 24rpx;
+}
+
+.chat__anchor {
+  height: 1rpx;
+}
+
+.chat__empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 60rpx 32rpx;
+}
+
+.chat__empty-hero {
+  width: 100%;
+  padding: 48rpx 36rpx;
+  background-color: var(--card);
+  border: 1rpx solid var(--border);
+  border-radius: 32rpx;
+  box-shadow: 0 8rpx 40rpx -4rpx rgba(120, 113, 108, 0.08);
+}
+
+.chat__empty-title {
+  display: block;
+  font-size: 40rpx;
+  font-weight: 700;
+  color: var(--foreground);
+  text-align: center;
+}
+
+.chat__empty-title-green {
+  color: var(--miner-green);
+}
+
+.chat__empty-title-gold {
+  color: var(--gold);
+}
+
+.chat__empty-sub {
+  display: block;
+  margin-top: 20rpx;
+  font-size: 26rpx;
+  color: var(--muted-foreground);
+  text-align: center;
+}
+
+.chat__empty-desc {
+  display: block;
+  margin-top: 28rpx;
+  padding: 28rpx 24rpx;
+  font-size: 26rpx;
+  line-height: 1.7;
+  color: var(--muted-foreground);
+  text-align: center;
+  background-color: var(--secondary);
+  border-radius: 24rpx;
+}
+
+/* 消息 */
+.msg {
+  margin-bottom: 32rpx;
+}
+
+.msg__who {
+  display: block;
+  margin-bottom: 8rpx;
+  font-size: 22rpx;
+  color: var(--muted-foreground);
+}
+
+.msg--user .msg__body {
+  background-color: var(--helix);
+}
+
+.msg--user .msg__text {
+  color: var(--primary-foreground);
+}
+
+.msg--assistant .msg__body {
+  background-color: var(--card);
+  border: 1rpx solid var(--border);
+}
+
+.msg__body {
+  padding: 20rpx 24rpx;
+  border-radius: 16rpx;
+}
+
+.msg__text {
+  font-size: 28rpx;
+  line-height: 1.7;
+  color: var(--foreground);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.msg__text--dim {
+  color: var(--muted-foreground);
+}
+
+.msg__err {
+  display: block;
+  margin-top: 12rpx;
+  padding: 12rpx 20rpx;
+  font-size: 24rpx;
+  color: var(--destructive);
+  background-color: var(--secondary);
+  border-radius: 8rpx;
+}
+
+/* 工具轨迹 */
+.tools {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8rpx;
+  margin-bottom: 12rpx;
+}
+
+.tools__item {
+  padding: 6rpx 16rpx;
+  font-size: 22rpx;
+  color: var(--muted-foreground);
+  background-color: var(--secondary);
+  border-radius: 999rpx;
+}
+
+.tools__item--err {
+  color: var(--destructive);
+  background-color: var(--secondary);
+}
+
+/* 数据卡片 */
+.cards {
+  margin-top: 16rpx;
+}
+
+.card {
+  margin-bottom: 16rpx;
+  padding: 20rpx 24rpx;
+  background-color: var(--card);
+  border: 1rpx solid var(--border);
+  border-left: 6rpx solid var(--pet-amber);
+  border-radius: 12rpx;
+}
+
+.card__acc {
+  font-size: 26rpx;
+  font-weight: 600;
+  color: var(--helix);
+}
+
+.card__title {
+  display: block;
+  margin-top: 8rpx;
+  font-size: 26rpx;
+  color: var(--foreground);
+}
+
+.card__org {
+  display: block;
+  margin-top: 6rpx;
+  font-size: 22rpx;
+  color: var(--strand);
+}
+
+.card__actions {
+  display: flex;
+  gap: 24rpx;
+  margin-top: 14rpx;
+  padding-top: 14rpx;
+  border-top: 1rpx solid var(--border);
+}
+
+.card__action {
+  font-size: 22rpx;
+  color: var(--helix);
+}
+
+/* 输入区 */
+.composer {
+  display: flex;
+  align-items: flex-end;
+  gap: 16rpx;
+  padding: 16rpx 24rpx;
+  border-top: 1rpx solid var(--border);
+  background-color: var(--card);
+}
+
+.composer__input {
+  flex: 1;
+  min-height: 72rpx;
+  max-height: 240rpx;
+  padding: 16rpx 20rpx;
+  font-size: 28rpx;
+  background-color: var(--background);
+  border: 1rpx solid var(--border);
+  border-radius: 12rpx;
+}
+
+.composer__send {
+  padding: 16rpx 28rpx;
+  font-size: 26rpx;
+  color: var(--primary-foreground);
+  background-color: var(--helix);
+  border-radius: 12rpx;
+}
+
+.composer__send--stop {
+  background-color: var(--destructive);
+  color: var(--destructive-foreground);
+}
+
+.composer__send--off {
+  opacity: 0.4;
+}
+
+.composer__note {
+  display: block;
+  padding: 8rpx 24rpx 16rpx;
+  font-size: 20rpx;
+  color: var(--muted-foreground);
+  background-color: var(--card);
+}

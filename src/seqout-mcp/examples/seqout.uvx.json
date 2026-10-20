@@ -1,0 +1,15 @@
+{
+  "mcpServers": {
+    "seqout": {
+      "command": "uvx",
+      "args": [
+        "--from",
+        "git+https://github.com/xsx123123/JZ_Tools.git#subdirectory=src/seqout-mcp",
+        "seqout-mcp"
+      ],
+      "env": {
+        "SEQOUT_BASE_URL": "https://seqout.org/api"
+      }
+    }
+  }
+}

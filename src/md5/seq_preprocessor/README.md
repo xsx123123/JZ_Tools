@@ -1,90 +1,99 @@
 # seq_preprocessor
 
-一个用于自动整理不同来源测序数据的 Rust 工具，支持双端（PE）和单端（SE）数据，统一命名和目录结构。
+A Rust tool for automatically organizing sequencing data from various sources. It supports paired-end (PE) and single-end (SE) data and unifies naming and directory structure.
 
-## 功能特性
+## Features
 
-- 🔗 **软链接方式**：Unix 系统下使用符号链接，不占用额外磁盘空间
-- 🧬 **多类型支持**：支持 Illumina、SRA (SRR/ERR/DRR)、Generic 等多种数据格式
-- 🔄 **PE/SE 自动识别**：自动区分双端（Short-read）和单端（Long-read）数据
-- 📝 **MD5 校验**：支持解析和生成 MD5 校验文件
-- 📊 **JSON 报告**：生成详细的样本重命名报告
-- 🏷️ **样本重命名**：通过 CSV 样本表批量重命名样本
+- 🔗 **Symlink mode**: Uses symbolic links on Unix systems without consuming extra disk space.
+- 🧬 **Multiple format support**: Supports Illumina, SRA (SRR/ERR/DRR), Generic, and other naming formats.
+- 🔄 **PE/SE auto-detection**: Automatically distinguishes paired-end (Short-read) and single-end (Long-read) data.
+- 📝 **MD5 checksums**: Parses and generates MD5 checksum files.
+- 📊 **JSON report**: Generates a detailed sample renaming report.
+- 🏷️ **Sample renaming**: Batch-renames samples via a CSV sample sheet.
+- 📜 **Structured logging**: Supports `--log-level` / `--log-format`; log files are automatically named with timestamps.
 
-## 安装
+## Installation
 
 ```bash
-# 克隆仓库
+# Clone the repository
 git clone <repository-url>
 cd seq_preprocessor
 
-# 编译发布版本
+# Build the release binary
 cargo build --release
 
-# 二进制文件位于 target/release/seq_preprocessor
+# The binary is located at target/release/seq_preprocessor
 ```
 
-## 使用方法
+## Usage
 
-### 基本用法
+### Basic usage
 
 ```bash
-# 处理单个输入目录
+# Process a single input directory
 seq_preprocessor -i /path/to/raw_data -o /path/to/output
 
-# 处理多个输入目录
+# Process multiple input directories
 seq_preprocessor -i /data/batch1 -i /data/batch2 -o ./output
 
-# 仅处理 PE 数据
+# Process PE data only
 seq_preprocessor -i /path/to/data -o ./output --library-type short-read
 
-# 仅处理 SE 数据  
+# Process SE data only
 seq_preprocessor -i /path/to/data -o ./output --library-type long-read
 ```
 
-### 高级选项
+### Advanced options
 
 ```bash
-# 生成总 MD5 文件
+# Generate a combined MD5 file
 seq_preprocessor -i ./raw -o ./output --summary-md5 checksums.txt
 
-# 生成 JSON 报告
+# Generate a JSON report
 seq_preprocessor -i ./raw -o ./output --json-report report.json
 
-# 使用样本表重命名
+# Rename using a sample sheet
 seq_preprocessor -i ./raw -o ./output --sample-sheet rename.csv
 
-# 禁用每个样本的独立 MD5 文件
+# Disable per-sample MD5 files
 seq_preprocessor -i ./raw -o ./output --no-per-sample-md5
+
+# Use JSON-format console logs
+seq_preprocessor -i ./raw -o ./output --log-format json
+
+# Adjust console log level (RUST_LOG env var is also supported)
+seq_preprocessor -i ./raw -o ./output --log-level debug
 ```
 
-## 支持的文件格式
+> Log files are automatically named with timestamps (e.g. `seq_preprocessor_2026-07-22_14-47-15.log`) and saved under `--output`. Use `--log-file` to override the path.
 
-### 双端数据（PE）格式
+## Supported file formats
 
-| 格式类型 | 示例文件名 | 提取的样本名 |
-|---------|-----------|-------------|
+### Paired-end (PE) formats
+
+| Format type | Example filename | Extracted sample name |
+|-------------|------------------|-----------------------|
 | **Illumina** | `sample_S1_L001_R1_001.fastq.gz` | `sample` |
-| **下划线分隔** | `sample_R1.clean.fastq.gz` | `sample` |
-| **点分隔** | `sample.1.trimmed.fq.gz` | `sample` |
-| **带中间后缀** | `sample_R1.filtered.fastq.gz` | `sample` |
-| **带 .raw** | `sample.R1.raw.fastq.gz` | `sample` |
+| **Underscore-separated** | `sample_R1.clean.fastq.gz` | `sample` |
+| **Dot-separated** | `sample.1.trimmed.fq.gz` | `sample` |
+| **With middle suffix** | `sample_R1.filtered.fastq.gz` | `sample` |
+| **With .raw** | `sample.R1.raw.fq.gz` | `sample` |
 | **SRA** | `SRR123456_1.fastq.gz` | `SRR123456` |
 
-### 单端数据（SE）格式
+### Single-end (SE) formats
 
-| 格式类型 | 示例文件名 | 提取的样本名 |
-|---------|-----------|-------------|
-| **普通** | `sample.fq.gz` | `sample` |
+| Format type | Example filename | Extracted sample name |
+|-------------|------------------|-----------------------|
+| **Generic** | `sample.fq.gz` | `sample` |
 | **SRA** | `ERR123456.fastq.gz` | `ERR123456` |
 
-### 支持的中间后缀
+### Supported middle suffixes
 
-`.clean`, `.trimmed`, `.trim`, `.filtered`, `.filter`, `.qc`, `.val`, `.processed`, `.raw` 等
+`.clean`, `.trimmed`, `.trim`, `.filtered`, `.filter`, `.qc`, `.val`, `.processed`, `.raw`, etc.
 
-## 样本表格式
+## Sample sheet format
 
-CSV 文件必须包含以下表头：
+The CSV file must contain the following headers:
 
 ```csv
 sample,sample_name
@@ -93,10 +102,10 @@ KO-1,Knockout_Rep1
 SRR123456,Control_1
 ```
 
-- `sample`: 原始文件名中的样本名
-- `sample_name`: 新的样本名
+- `sample`: The sample name as it appears in the original filename.
+- `sample_name`: The new sample name.
 
-## 输出结构
+## Output structure
 
 ```
 output/
@@ -114,37 +123,41 @@ output/
 └── (optional) checksums.txt
 ```
 
-## 命令行参数
+## Command-line options
 
 ```
 Usage: seq_preprocessor [OPTIONS] --input <INPUT>... --output <OUTPUT>
 
 Options:
-  -i, --input <INPUT>...       原始数据所在的根目录路径 (可指定一个或多个)
-  -o, --output <OUTPUT>        整理后数据的输出目录路径
-      --md5-name <MD5_NAME>    指定每个样本文件夹中 MD5 文件的名称 [default: md5.txt]
-      --summary-md5 <SUMMARY_MD5>  在输出目录顶层生成总 MD5 文件
-      --no-per-sample-md5      禁止在每个样本子目录中创建独立的 MD5 文件
-      --json-report <JSON_REPORT>  生成 JSON 格式的重命名报告文件
-      --sample-sheet <SAMPLE_SHEET>  包含样本重命名信息的 CSV 文件
-      --library-type <LIBRARY_TYPE>  指定要处理的文库类型 [default: auto]
-                                 [possible values: short-read, long-read, auto]
-  -h, --help                   打印帮助信息
-  -V, --version                打印版本信息
+  -i, --input <INPUT>...         Root directory(ies) containing raw data. Can be specified multiple times
+  -o, --output <OUTPUT>          Output directory for organized data
+      --md5-name <MD5_NAME>      Name of the per-sample MD5 file created inside each sample folder [default: md5.txt]
+      --summary-md5 <SUMMARY_MD5>  Create a combined MD5 file at the top level of the output directory
+      --no-per-sample-md5        Do not create per-sample MD5 files in sample subdirectories
+      --json-report <JSON_REPORT>  Generate a JSON renaming report
+      --sample-sheet <SAMPLE_SHEET>  Optional CSV file with sample renaming rules
+      --library-type <LIBRARY_TYPE>  Library type to process [default: auto]
+                                   [possible values: short-read, long-read, auto]
+      --log-file <FILE>          Log file path (auto-generated timestamped log by default)
+      --log-level <LOG_LEVEL>    Console log level [default: info]
+      --log-format <LOG_FORMAT>  Console log format [default: text]
+                                   [possible values: text, json]
+  -h, --help                     Print help
+  -V, --version                  Print version
 ```
 
-## 示例
+## Examples
 
-### 示例 1：基础数据处理
+### Example 1: Basic data processing
 
 ```bash
 seq_preprocessor -i ./raw_fastq -o ./processed
 ```
 
-### 示例 2：完整流程
+### Example 2: Full workflow
 
 ```bash
-# 1. 处理数据并生成报告
+# 1. Process data and generate reports
 seq_preprocessor \
   -i ./raw_data \
   -o ./standardized \
@@ -152,17 +165,17 @@ seq_preprocessor \
   --json-report rename_report.json \
   --sample-sheet sample_info.csv
 
-# 2. 查看生成的目录结构
+# 2. Inspect the generated directory structure
 tree ./standardized
 
-# 3. 验证 MD5
+# 3. Verify MD5 checksums
 cd ./standardized && md5sum -c md5_all.txt
 ```
 
-### 示例 3：处理来自不同来源的数据
+### Example 3: Process data from different sources
 
 ```bash
-# 合并处理 Illumina、SRA 和 Clean 数据
+# Combine Illumina, SRA, and clean data
 seq_preprocessor \
   -i ./illumina_data \
   -i ./sra_downloads \
@@ -171,15 +184,15 @@ seq_preprocessor \
   --library-type auto
 ```
 
-## 依赖
+## Dependencies
 
 - Rust 1.70+
-- 支持的系统：Linux、macOS（Windows 使用文件复制而非软链接）
+- Supported systems: Linux, macOS (Windows uses file copy instead of symlinks)
 
-## 许可证
+## License
 
 MIT
 
-## 贡献
+## Contributing
 
-欢迎提交 Issue 和 Pull Request！
+Issues and Pull Requests are welcome!

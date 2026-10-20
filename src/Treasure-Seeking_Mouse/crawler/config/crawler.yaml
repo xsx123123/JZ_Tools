@@ -1,0 +1,6 @@
+# 捉虫休眠机制配置（T1）
+crawler:
+  idle_backoff: [60, 300, 900, 1800]     # 秒；IDLE 退避阶梯，成功执行任务后索引重置 0；封顶不续涨
+  deep_sleep_after_cycles: 3             # IDLE 连续 N 个周期后进 SLEEP
+  heartbeat_interval: 1800               # SLEEP 期心跳秒数；0 = 关闭心跳
+  wake_on_queue: true                    # 任务入队即 set Event（立即唤醒）

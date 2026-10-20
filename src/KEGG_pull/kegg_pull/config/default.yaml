@@ -1,0 +1,21 @@
+software:
+  version: "0.1.0"
+  app_name: "kegg-pull"
+  author: "JZ Tools"
+  email: ""
+  url: "https://rest.kegg.jp"
+  description: "Offline KEGG organism annotation downloader and GMT builder"
+
+logs:
+  log_level: INFO
+  more_info: false
+  Label: kegg_pull
+  style: default
+
+kegg:
+  base_url: "https://rest.kegg.jp"
+  delay: 1.0
+  timeout: 60.0
+  retries: 3
+  backoff: 2.0
+  user_agent: "jz-tools-kegg-downloader/1.0"

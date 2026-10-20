@@ -1,0 +1,7 @@
+/* 全局样式入口：引入主题 token（由主仓库 styles.css 转换，oklch 已降级为 rgb） */
+@import './styles/theme.css';
+
+page {
+  background-color: #f9fafb;
+  font-family: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, sans-serif;
+}

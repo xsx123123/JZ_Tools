@@ -1,0 +1,105 @@
+{
+  "databaseId": "qmuse-app-db",
+  "projectAlias": "default",
+  "tables": [
+    {
+      "tableId": "profiles",
+      "name": "Profiles",
+      "columns": [
+        { "key": "user_id", "type": "string", "size": 36, "required": true, "comment": "平台用户ID" },
+        { "key": "username", "type": "string", "size": 64, "comment": "登录用户名/邮箱" },
+        { "key": "display_name", "type": "string", "size": 64, "comment": "展示昵称" },
+        { "key": "updated_at", "type": "datetime", "comment": "资料更新时间" }
+      ],
+      "indexes": [
+        { "key": "uniq_profiles_user_id", "type": "unique", "attributes": ["user_id"] }
+      ]
+    },
+    {
+      "tableId": "chat_sessions",
+      "name": "Chat Sessions",
+      "columns": [
+        { "key": "user_id", "type": "string", "size": 36, "required": true, "comment": "所属平台用户ID" },
+        { "key": "title", "type": "string", "size": 120, "required": true, "comment": "会话标题" },
+        { "key": "updated_at", "type": "datetime", "comment": "最近活跃时间（ISO 字符串）" }
+      ],
+      "indexes": [
+        { "key": "idx_sessions_user", "type": "key", "attributes": ["user_id"] }
+      ]
+    },
+    {
+      "tableId": "chat_messages",
+      "name": "Chat Messages",
+      "columns": [
+        { "key": "session_id", "type": "string", "size": 36, "required": true, "comment": "所属会话ID" },
+        { "key": "user_id", "type": "string", "size": 36, "required": true, "comment": "所属平台用户ID" },
+        {
+          "key": "role",
+          "type": "string",
+          "size": 16,
+          "format": "enum",
+          "elements": ["user", "assistant"],
+          "required": true,
+          "comment": "消息角色"
+        },
+        { "key": "content", "type": "string", "size": 200000, "required": true, "comment": "消息正文" },
+        { "key": "cards", "type": "string", "size": 100000, "comment": "出土卡片数据（JSON 字符串）" },
+        { "key": "tool_logs", "type": "string", "size": 50000, "comment": "工具调用日志（JSON 字符串）" }
+      ],
+      "indexes": [
+        { "key": "idx_messages_session", "type": "key", "attributes": ["session_id"] }
+      ]
+    },
+    {
+      "tableId": "user_stats",
+      "name": "User Stats",
+      "columns": [
+        { "key": "user_id", "type": "string", "size": 36, "required": true, "comment": "平台用户ID" },
+        { "key": "username", "type": "string", "size": 120, "comment": "登录用户名/邮箱" },
+        { "key": "display_name", "type": "string", "size": 64, "comment": "自定义展示昵称" },
+        { "key": "treasures", "type": "integer", "default": 0, "comment": "累计出土卡片数" },
+        { "key": "digs", "type": "integer", "default": 0, "comment": "累计工具回合数" },
+        { "key": "chats", "type": "integer", "default": 0, "comment": "累计对话轮数" },
+        { "key": "week_treasures", "type": "integer", "default": 0, "comment": "本周出土卡片数" },
+        { "key": "week_digs", "type": "integer", "default": 0, "comment": "本周工具回合数" },
+        { "key": "week_chats", "type": "integer", "default": 0, "comment": "本周对话轮数" },
+        { "key": "week_base", "type": "string", "size": 10, "comment": "本周周一日期 YYYY-MM-DD，跨周归零基准" }
+      ],
+      "indexes": [
+        { "key": "uniq_user_stats_user", "type": "unique", "attributes": ["user_id"] }
+      ]
+    },
+    {
+      "tableId": "guest_stats",
+      "name": "Guest Stats",
+      "columns": [
+        { "key": "device_id", "type": "string", "size": 32, "required": true, "comment": "匿名设备指纹" },
+        { "key": "nickname", "type": "string", "size": 64, "comment": "历史昵称字段" },
+        { "key": "display_name", "type": "string", "size": 64, "comment": "自定义展示昵称" },
+        { "key": "treasures", "type": "integer", "default": 0, "comment": "累计出土卡片数" },
+        { "key": "digs", "type": "integer", "default": 0, "comment": "累计工具回合数" },
+        { "key": "chats", "type": "integer", "default": 0, "comment": "累计对话轮数" },
+        { "key": "week_treasures", "type": "integer", "default": 0, "comment": "本周出土卡片数" },
+        { "key": "week_digs", "type": "integer", "default": 0, "comment": "本周工具回合数" },
+        { "key": "week_chats", "type": "integer", "default": 0, "comment": "本周对话轮数" },
+        { "key": "week_base", "type": "string", "size": 10, "comment": "本周周一日期 YYYY-MM-DD，跨周归零基准" }
+      ],
+      "indexes": [
+        { "key": "uniq_guest_stats_device", "type": "unique", "attributes": ["device_id"] }
+      ]
+    }
+  ],
+  "functions": [
+    {
+      "functionId": "seqout-chat",
+      "name": "GEO寻宝鼠后端服务",
+      "runtime": "node-22",
+      "entrypoint": "src/main.js",
+      "timeout": 300,
+      "enabled": true,
+      "execute": ["any"],
+      "scopes": ["databases.read", "databases.write", "rows.read", "rows.write"],
+      "path": "functions/seqout-chat"
+    }
+  ]
+}

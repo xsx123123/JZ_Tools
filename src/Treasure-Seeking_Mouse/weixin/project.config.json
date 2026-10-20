@@ -1,0 +1,15 @@
+{
+  "miniprogramRoot": "dist/",
+  "projectname": "geo-muse-weixin",
+  "description": "GEO寻宝鼠 · 微信小程序版",
+  "appid": "touristappid",
+  "setting": {
+    "urlCheck": true,
+    "es6": false,
+    "enhance": false,
+    "compileHotReLoad": false,
+    "postcss": false,
+    "minified": false
+  },
+  "compileType": "miniprogram"
+}
