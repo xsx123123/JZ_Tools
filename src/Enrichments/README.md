@@ -1,0 +1,189 @@
+# Enrichments：GO / KEGG 富集分析
+
+本目录提供基于差异分析结果的 GO 和 KEGG 过度富集分析（ORA）脚本。脚本只负责富集分析，不负责差异分析、参考注释下载或基因 ID 注释构建；OBO、基因关联表和 KEGG 通路映射需要在运行前准备好。
+
+## 文件说明
+
+| 文件 | 用途 |
+| --- | --- |
+| `go_enricher.r` | R 版 GO 富集。读取一张差异表，分别分析 UP 和 DOWN 基因。 |
+| `kegg_enricher.r` | R 版 KEGG 富集。支持命令行差异表模式，也保留可被其他 R 脚本调用的函数接口。 |
+| `deg_enrich_wrapper.py` | 批量读取多个 contrast，并调用 GO R 脚本；可选地同时调用 KEGG R 脚本。 |
+| `python/go_enrich.py` | Python 版 GO 富集，支持基因列表和差异表两种入口。 |
+| `python/requirments.yaml` | Python 运行依赖清单（文件名沿用仓库现状）。 |
+
+`python/README.md` 是 Python 脚本的独立说明；本文档说明整个目录的选择和组合方式。
+
+## 运行前准备
+
+### R 环境
+
+GO 脚本需要以下 R 包：`optparse`、`log4r`、`tidyverse`、`ontologyIndex`、`clusterProfiler`。
+
+KEGG 命令行脚本需要 `optparse`、`clusterProfiler` 和 `dplyr`；使用 `--id_map` 时还需要 `readr`，旧的 XLSX 函数接口需要 `readxl`，使用 `--plot` 时需要 `enrichplot`、`ggplot2`、`ggpubr` 和 `patchwork`。
+
+### Python 环境
+
+建议 Python 3.10 或更高版本（脚本使用 `str | list` 类型标注）。可在当前目录执行：
+
+```bash
+python -m pip install -r python/requirments.yaml
+```
+
+该文件虽然扩展名为 `.yaml`，内容实际是逐行的 pip requirements 格式。
+
+### 参考文件
+
+- GO OBO：例如 `go-basic.obo`。
+- GO 关联表：必须与输入基因 ID 使用同一物种、同一版本的注释。
+- KEGG 基因 ID 映射：可选的无表头两列 TSV（输入基因 ID、KEGG 基因 ID），并固定版本保存。KEGG 通路注释由 `clusterProfiler::enrichKEGG` 按 `--organism` 获取，因此运行时通常需要网络或可用缓存。
+
+大型参考文件不随代码分发。建议记录版本、下载日期和 SHA-256；运行前先确认基因 ID（包括是否带版本号）能与关联表匹配。
+
+## 1. R 版 GO 富集
+
+`go_enricher.r` 当前只接受差异表模式。表格可以是 CSV 或 TSV（脚本根据首行是否含逗号自动判断），默认需要以下列：
+
+| 列 | 默认名称 | 含义 |
+| --- | --- | --- |
+| 基因 ID | `GeneID` | 输入基因标识 |
+| 校正 p 值 | `padj` | 用于筛选差异基因 |
+| log fold change | `log2FoldChange` | 用于区分 UP/DOWN |
+
+筛选规则为 `padj < --padj_th` 且 `log2FoldChange >= --lfc_th`（UP）或 `<= - --lfc_th`（DOWN）。脚本会读取 OBO 和关联表建立 `TERM2GENE`，并在匹配率很低时尝试去除基因 ID 末尾的数字版本号。
+
+示例：
+
+```bash
+Rscript src/Enrichments/go_enricher.r \
+  --obo ref/go-basic.obo \
+  --assoc ref/gene_association.tsv \
+  --table results/contrast_DEG.csv \
+  --name Control_vs_Treated \
+  --out_dir results/enrichment \
+  --padj_th 0.05 \
+  --lfc_th 1 \
+  --cutoff 0.05
+```
+
+常用参数还包括 `--gene_col`、`--padj_col`、`--lfc_col` 和 `--gene_regex 'pattern/replacement'`。`--cutoff` 是富集结果的显著性阈值；`--padj_th` 和 `--lfc_th` 是差异基因筛选阈值，三者作用不同。
+
+输出目录中会生成：
+
+- `{name}_UP.csv`
+- `{name}_DOWN.csv`
+
+即使没有匹配基因或没有显著通路，也会写出带有原因和计数信息的空结果表。运行日志写入当前工作目录的 `go_enrichment.log`。
+
+## 2. R 版 KEGG 富集
+
+`kegg_enricher.r` 与 `go_enricher.r` 一样是命令行脚本：读取一张差异表，按阈值拆分 UP/DOWN 后调用 `clusterProfiler::enrichKEGG`。`--id_map` 用于把物种基因 ID 转换为 KEGG ID；如果输入表已经是 KEGG 基因 ID，可以省略该参数。
+
+运行示例：
+
+```bash
+Rscript src/Enrichments/kegg_enricher.r \
+  --table results/contrast_DEG.csv \
+  --name Control_vs_Treated \
+  --out_dir results/kegg \
+  --organism sly \
+  --id_map ref/ITAG4.1.kegg.id \
+  --cutoff 0.05 \
+  --padj_th 0.05 \
+  --lfc_th 1 \
+  --min_gs 10 \
+  --plot
+```
+
+KEGG 输入表必须包含 `--gene_col` 指定的基因列（默认 `GeneID`），以及 `padj`、`log2FoldChange` 两列（可分别用 `--padj_col`、`--lfc_col` 修改）。`--id_map` 必须是无表头两列 TSV：第一列为输入基因 ID，第二列为 KEGG 基因 ID；脚本会清理物种前缀和末尾版本号。
+
+脚本默认不绘图；加上 `--plot` 后会为有显著结果的方向输出 PNG/PDF，需安装 `enrichplot`、`ggplot2`、`ggpubr` 和 `patchwork`。KEGG 通路查询依赖 `clusterProfiler` 的 KEGG 支持和网络/缓存状态。
+
+每个方向通常会生成：
+
+- `{name}_UP_enrichments.csv` / `{name}_DOWN_enrichments.csv`：按 `p.adjust < --cutoff` 筛选后的主结果；
+- `{name}_UP_enrichments_full.csv` / `{name}_DOWN_enrichments_full.csv`：完整测试结果（有可测试结果时生成）；
+- `--plot` 且安装绘图依赖时的对应 `.png` 和 `.pdf` 图。
+
+## 3. 批量处理多个 contrast
+
+`deg_enrich_wrapper.py` 从 `--deg_info` 的第一列读取 contrast 名称，并按文库类型寻找差异表：
+
+- `RNA`：`{contrast}_DEG.csv`
+- `ATAC`：`{contrast}_Differential_Peaks.csv`
+
+示例：
+
+```bash
+python src/Enrichments/deg_enrich_wrapper.py \
+  --rscript src/Enrichments/go_enricher.r \
+  --deg_info results/All_Contrast_DEG_Statistics.csv \
+  --deg_dir results/DEG \
+  --lib_type RNA \
+  --obo ref/go-basic.obo \
+  --assoc ref/gene_association.tsv \
+  --out_dir results/enrichment_batch \
+  --gene_col GeneID \
+  --cutoff 0.05 \
+  --padj_th 0.05 \
+  --lfc_th 1
+```
+
+启用 KEGG 时，配置文件至少包含 `enabled`、`organism`，并额外传入 `--kegg_rscript`；可选 `id_map`：
+
+```json
+{
+  "enabled": true,
+  "organism": "sly",
+  "gene_col": "GeneID",
+  "id_map": "ref/gene_to_kegg.tsv"
+}
+```
+
+```bash
+python src/Enrichments/deg_enrich_wrapper.py ... \
+  --kegg_config ref/kegg.json \
+  --kegg_rscript src/Enrichments/kegg_enricher.r
+```
+
+批量脚本会为每个 contrast 依次调用 GO（以及启用时的 KEGG）。任一 contrast 文件缺失或子进程失败，最终命令会以非零状态退出；请检查日志中列出的 contrast 名称和文件名。
+
+## 4. Python GO 富集
+
+Python 版适合不需要 R 的轻量工作流，底层使用 Polars 读取关联表、GOATOOLS 解析 OBO、GSEApy 执行富集。
+
+### 基因列表模式
+
+```bash
+python src/Enrichments/python/go_enrich.py run-list \
+  --gene-list data/genes.txt \
+  --obo ref/go-basic.obo \
+  --assoc ref/gene_go.tsv \
+  --out-dir results/go_python \
+  --cutoff 0.05
+```
+
+### 差异表模式
+
+```bash
+python src/Enrichments/python/go_enrich.py run-table \
+  --table results/contrast_DEG.csv \
+  --gene-col GeneID \
+  --padj-col padj \
+  --lfc-col log2FoldChange \
+  --padj-th 0.05 \
+  --lfc-th 1 \
+  --obo ref/go-basic.obo \
+  --assoc ref/gene_go.tsv \
+  --out-dir results/go_python
+```
+
+Python 版关联文件按“无表头、两列、每行一个关系”读取：`GeneID<TAB>GOID`。这与 R 版允许一行包含逗号分隔多个 GO ID 的关联格式不同；不要直接混用两种文件格式。差异表模式会额外保存 `filtered_gene_list.txt`，其余结果文件由 GSEApy 写入输出目录。
+
+## 结果检查与常见问题
+
+1. 结果为空时先区分“没有基因通过差异阈值”“基因不在背景库”还是“没有通路达到多重校正阈值”；R 版空 CSV 会记录原因和计数。
+2. 检查输入基因 ID 的物种、版本号和大小写是否与关联表或 KEGG 映射一致；必要时使用 `--gene_regex` 或 `--id_map`。
+3. 确认 `padj`、`log2FoldChange` 不是文本中的非法值，且列名与命令参数一致。
+4. KEGG 的 `p.adjust` 使用 BH 校正；`--cutoff` 只筛选结果，不替代差异基因的 `--padj_th`/`--lfc_th`。
+5. 富集分析依赖输入注释版本。发布结果时应同时保存命令、参考文件版本和校验和。
