@@ -6,6 +6,7 @@ import sys
 import subprocess
 import pandas as pd
 import argparse
+import json
 from loguru import logger
 
 def get_args():
@@ -24,11 +25,25 @@ def get_args():
     parser.add_argument("--gene_regex", default=None, help="基因名清理正则")
     parser.add_argument("--cutoff", default="0.05", help="P-value 阈值")
     
+    parser.add_argument("--kegg_config", help="JSON 配置文件，包含 organism/gene_col/id_map")
+    parser.add_argument("--kegg_rscript", help="离线 KEGG R 脚本")
+    parser.add_argument("--padj_th", default="0.05")
+    parser.add_argument("--lfc_th", default="1")
     return parser.parse_args()
 
 def main():
     args = get_args()
     
+    kegg = {}
+    if args.kegg_config:
+        with open(args.kegg_config) as handle:
+            kegg = json.load(handle)
+    if kegg.get("enabled", False):
+        if not kegg.get("organism") or not args.kegg_rscript:
+            raise ValueError("KEGG 启用时必须配置 organism 和 kegg_rscript")
+        if kegg.get("id_map") and not os.path.isfile(kegg["id_map"]):
+            raise FileNotFoundError(kegg["id_map"])
+
     # 1. 读取对照信息
     if not os.path.exists(args.deg_info):
         logger.error(f"找不到 DEG info 文件: {args.deg_info}")
@@ -43,6 +58,7 @@ def main():
     if not os.path.exists(args.out_dir):
         os.makedirs(args.out_dir)
 
+    failures = []
     # 2. 遍历并调用 R
     for contrast in contrasts:
         if args.lib_type == 'ATAC':
@@ -54,6 +70,7 @@ def main():
 
         if not os.path.exists(input_table):
             logger.warning(f"⚠️ 跳过: 找不到文件 {input_table}")
+            failures.append(contrast)
             continue
             
         logger.info(f"✨ 正在分析对照组: {contrast}")
@@ -67,19 +84,38 @@ def main():
             "-n", contrast,
             "-d", args.out_dir,
             "-c", args.cutoff,
-            "--gene_col", args.gene_col
+            "--gene_col", args.gene_col,
+            "--padj_th", args.padj_th, "--lfc_th", args.lfc_th
         ]
         
         if args.gene_regex:
             cmd.extend(["--gene_regex", args.gene_regex])
 
+        commands = [cmd]
+        if kegg.get("enabled", False):
+            kegg_cmd = [
+                "Rscript", args.kegg_rscript, "--table", input_table,
+                "--name", contrast, "--out_dir", args.out_dir,
+                "--organism", kegg["organism"],
+                "--gene_col", kegg.get("gene_col", args.gene_col),
+                "--cutoff", args.cutoff,
+                "--padj_th", args.padj_th, "--lfc_th", args.lfc_th,
+            ]
+            if kegg.get("id_map"):
+                kegg_cmd.extend(["--id_map", kegg["id_map"]])
+            commands.append(kegg_cmd)
+
         # 执行
         try:
             # shell=False 在独立脚本中更安全，且能继承当前 conda 环境
-            subprocess.run(cmd, check=True)
+            for command in commands:
+                subprocess.run(command, check=True)
             logger.success(f"✅ {contrast} 分析成功")
         except subprocess.CalledProcessError:
             logger.error(f"❌ {contrast} 分析失败，请检查 R 脚本输出")
+            failures.append(contrast)
+    if failures:
+        raise SystemExit(f"Enrichment failed: {', '.join(failures)}")
 
 if __name__ == "__main__":
     main()

@@ -1,0 +1,159 @@
+/* 【小程序版】Markdown 消息排版（View/Text 版，配合 Markdown.tsx）
+   网页版的 .md-body p/ul/li 等标签选择器在小程序无对应元素，
+   改为渲染层打 .md-* 显式类名（WXSS 约束：只用类选择器）。全部走 theme.css 语义变量。 */
+
+.md-body {
+  line-height: 1.75;
+  /* 英文模式：优先按词边界换行，只在长 token（URL/编号）确实溢出时才断，避免单词被拦腰折断 */
+  word-break: normal;
+  overflow-wrap: break-word;
+  font-size: 28rpx;
+  color: var(--foreground);
+}
+
+.md-p {
+  margin: 0.35em 0;
+}
+
+.md-h {
+  font-weight: 700;
+  margin: 0.8em 0 0.35em;
+  letter-spacing: 0.01em;
+  color: var(--foreground);
+}
+.md-h--1 { font-size: 34rpx; }
+.md-h--2 { font-size: 31rpx; }
+.md-h--3 { font-size: 29rpx; }
+
+/* 列表：小程序无 ul/li 元素，marker 用渲染层显式文本（"• "/"1. "） */
+.md-ul,
+.md-ol {
+  margin: 0.4em 0;
+}
+.md-li {
+  margin: 0.2em 0;
+}
+.md-li__marker {
+  color: var(--helix);
+  margin-right: 0.35em;
+}
+
+.md-code {
+  font-family: var(--font-mono);
+  font-size: 0.86em;
+  background: var(--secondary);
+  border: 1rpx solid var(--border);
+  border-radius: 4px;
+  padding: 0 0.4em;
+  color: var(--strand);
+}
+
+.md-pre {
+  background: var(--secondary);
+  border: 1rpx solid var(--border);
+  border-radius: 8px;
+  padding: 0.8em 1em;
+  margin: 0.5em 0;
+}
+.md-pre__code {
+  font-family: var(--font-mono);
+  font-size: 24rpx;
+  color: var(--foreground);
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+.md-pre__lang {
+  display: block;
+  text-align: right;
+  font-family: var(--font-mono);
+  font-size: 20rpx;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted-foreground);
+  margin-bottom: 0.3em;
+}
+
+.md-quote {
+  border-left: 3px solid var(--helix);
+  margin: 0.5em 0;
+  padding: 0.15em 0 0.15em 0.9em;
+  color: var(--muted-foreground);
+  background: var(--helix-soft);
+}
+
+.md-hr {
+  border: none;
+  border-top: 1rpx dashed var(--border);
+  margin: 0.8em 0;
+}
+
+/* [text](url) 行内链接：小程序无新窗口打开能力，点击复制链接（交互见 Markdown.tsx 注释） */
+.md-link {
+  color: var(--strand);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+/* 新用户发现性提示：首个编号的高亮扫光 + 气泡（由首个 IdLink 挂载 .id-link--hint 触发，
+   6s 自动消失或点出 ActionSheet 即消失；全程只出现一次，见 lib/linkHint.ts）。
+   注：网页版渐变用 color-mix 生成半透明主色，小程序不支持 → 直接写死 rgba 等价色，
+   暗色档在 .dark 下覆盖（与 theme.css .id-link 的既有处理一致）。 */
+@keyframes idlink-shine {
+  from { background-position: -120% 0; }
+  to { background-position: 220% 0; }
+}
+@keyframes idlink-bubble-in {
+  from { opacity: 0; transform: translate(-50%, 8rpx); }
+  to { opacity: 1; transform: translate(-50%, 0); }
+}
+.id-link--hint {
+  border-bottom-color: transparent;
+  background-image: linear-gradient(
+    100deg,
+    rgba(0, 150, 137, 0.45) 40%,
+    rgb(0, 150, 137) 50%,
+    rgba(0, 150, 137, 0.45) 60%
+  );
+  background-repeat: no-repeat;
+  background-size: 220% 1px;
+  background-position: -120% 100%;
+  animation: idlink-shine 1.6s ease-in-out 3;
+}
+.dark .id-link--hint {
+  background-image: linear-gradient(
+    100deg,
+    rgba(20, 189, 173, 0.45) 40%,
+    rgb(20, 189, 173) 50%,
+    rgba(20, 189, 173, 0.45) 60%
+  );
+}
+/* 气泡锚在 md-body 顶部（小程序 Text 内不能嵌 View，无法贴着行内链接定位，
+   退而求其次锚在消息排版容器上方，视觉上仍在首个编号附近） */
+.md-body {
+  position: relative;
+}
+.id-link-hint-bubble {
+  position: absolute;
+  top: -8rpx;
+  left: 50%;
+  transform: translate(-50%, -100%);
+  z-index: 30;
+  white-space: nowrap;
+  padding: 8rpx 18rpx;
+  font-size: 21rpx;
+  line-height: 1.4;
+  color: var(--background);
+  background-color: var(--foreground);
+  border-radius: 14rpx;
+  pointer-events: none;
+  animation: idlink-bubble-in 0.25s ease-out both;
+}
+.id-link-hint-bubble::after {
+  content: "";
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  margin-left: -8rpx;
+  border: 8rpx solid transparent;
+  border-top-color: var(--foreground);
+}

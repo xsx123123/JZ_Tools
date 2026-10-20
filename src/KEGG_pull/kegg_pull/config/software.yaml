@@ -1,0 +1,10 @@
+software:
+  version: "0.1.0"
+  app_name: "kegg-pull"
+  author: "JZ Tools"
+  email: ""
+  url: "https://rest.kegg.jp"
+  description: "Offline KEGG organism annotation downloader and GMT builder"
+  rice_color: "bold cyan"
+
+external_tools: []
