@@ -1,4 +1,5 @@
 <!-- Notebook file: EXPERIMENT_NOTEBOOK.md. Replace examples with evidence. -->
+<!-- Body prose must contain NO calendar dates or relative date expressions; dates appear only in date headings, the Date evidence field, the Prepared line, and CSV manifests. Refer to other experiments by title/ID, not by date. -->
 # [Study Title] Computational Experiment Notebook
 
 **Prepared:** [preparation date; explicitly not an experiment date]

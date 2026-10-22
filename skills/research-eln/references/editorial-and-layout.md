@@ -6,7 +6,7 @@
 - One scientific experiment per distinct investigation; several on the same day belong under one date heading.
 - Five familiar sections: Objective & Environment → Workflow → Implementation → Outputs & Findings → Troubleshooting & Next Steps.
 - Substantive steps and exact parameters displayed briefly (e.g., BLAST settings; a `miniprot` command; rules for CACTA terminal mismatches), instead of generic software boilerplate.
-- Observed result **numbers** in the main narrative; method modifications linked across dates.
+- Observed result **numbers** in the main narrative; method modifications linked across experiments (by experiment title/ID, not by date in prose).
 - Figures adjacent to results, concise English captions; formal, neutral and unembellished style.
 
 ## Improve rather than copy the reference's shortcomings
@@ -31,6 +31,8 @@ Each experiment should answer in 15–45 seconds of reading:
 5. What failed, what was changed, what evidence remains missing, and what follows?
 
 Prefer clear operational scientific English. Do not pad paragraphs with unsupported background. Separate real outcomes from proposed follow-up actions.
+
+**No dates in body prose.** Never write calendar dates or relative time expressions inside descriptive sentences (objective, workflow explanation, results, interpretation, captions, troubleshooting, synthesis). The `# YYYY-MM-DD` heading and the experiment's `Date evidence` field already carry the chronology; the prose underneath should read date-free. Refer to other experiments by title or ID ("the preceding experiment", "Experiment Dual-1-Mismatch Terminal-Motif Re-screening above"), never by date.
 
 ## Experiment type adjustments
 

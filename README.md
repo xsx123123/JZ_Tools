@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="docs/JZ_Tools.png" alt="RNAFlow logo" width="200">
+</p>
+
 # JZ_Tools
 
 > 生物信息分析工具集：脚本源码、Agent 技能（Skills）与独立应用的三合一仓库。
@@ -105,8 +109,12 @@ make docker-start                    # 预检密钥 → 构建 → 启动
 [MIT](LICENSE)
 
 ---
+
 **Author**: JZHANG | **Version**: JZ_Tools_v0.1.0
 
-## 🔗 Links
-- GitHub: [repository](https://github.com/xsx123123/JZ_Tools)
-- LINUX DO: [Announcement](https://linux.do/)
+---
+
+<p align="center">
+  <img src="docs/Slogo.png" alt="CygnusX research ecosystem" width="1100">
+</p>
+

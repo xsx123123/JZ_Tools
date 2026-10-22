@@ -60,7 +60,7 @@ experiment_id,figure_number,figure_path,source_evidence_ids,caption,provenance_s
 
 ## Date grouping
 
-Under `# YYYY-MM-DD`, put each independent experiment in a separate `## Experiment: ...` section. A study can have a general chronological Introduction and a brief methodological synthesis, but date-based grouping remains the backbone. If the original execution dates are unknown, create a separate `# [DATE_TBD]` section with clear provenance labels; do not assign preparation date to experiments.
+Under `# YYYY-MM-DD`, put each independent experiment in a separate `## Experiment: ...` section. A study can have a general chronological Introduction and a brief methodological synthesis, but date-based grouping remains the backbone. If the original execution dates are unknown, create a separate `# [DATE_TBD]` section with clear provenance labels; do not assign preparation date to experiments. The date heading and the experiment's `date_label`/`date_basis` fields are the only places dates appear in the notebook Markdown: the prose under each heading must contain no calendar dates, timestamps, or relative date expressions ("the next day", "later that week", "on this date"); refer to ordering via headings and experiment IDs instead.
 
 ## Claim verification checklist
 
