@@ -14,11 +14,68 @@ suppressPackageStartupMessages({
   library(dplyr)
 })
 
+# 简单横向柱状图：按 BH p.adjust 排序，最多展示 top_n 条显著通路。
+plot_enrichment_top_terms <- function(results, output_prefix, title,
+                                      cutoff = 0.05, top_n = 10) {
+  if (length(top_n) != 1 || !is.finite(top_n) || top_n < 1) {
+    stop("top_n must be a positive integer")
+  }
+  padj <- suppressWarnings(as.numeric(results$p.adjust))
+  count <- suppressWarnings(as.numeric(results$Count))
+  keep <- is.finite(padj) & padj >= 0 & padj < cutoff &
+    is.finite(count) & count > 0 & !is.na(results$ID) & results$ID != "None"
+  selected <- results[keep, , drop = FALSE]
+  selected$p.adjust <- padj[keep]
+  selected$Count <- count[keep]
+  selected <- head(selected[order(selected$p.adjust, selected$ID), , drop = FALSE],
+                   as.integer(top_n))
+  plot_title <- paste(strwrap(title, width = 75), collapse = "\n")
+
+  if (nrow(selected)) {
+    descriptions <- as.character(selected$Description)
+    missing <- is.na(descriptions) | !nzchar(descriptions)
+    descriptions[missing] <- as.character(selected$ID[missing])
+    wrapped <- lapply(descriptions, strwrap, width = 50)
+    labels <- setNames(vapply(wrapped, paste, character(1), collapse = "\n"),
+                       seq_len(nrow(selected)))
+    selected$Pathway <- factor(seq_len(nrow(selected)),
+                               levels = rev(seq_len(nrow(selected))))
+    p <- ggplot2::ggplot(selected, ggplot2::aes(x = Count, y = Pathway)) +
+      ggplot2::geom_col(width = 0.7, fill = "#3579AD") +
+      ggplot2::scale_y_discrete(labels = labels) +
+      ggplot2::labs(
+        title = plot_title,
+        subtitle = paste0("Top ", nrow(selected),
+                          " significant terms ranked by adjusted P-value (cutoff ", cutoff, ")"),
+        x = "Gene count", y = NULL
+      ) +
+      ggplot2::theme_minimal(base_size = 11) +
+      ggplot2::theme(
+        panel.grid.major.y = ggplot2::element_blank(),
+        panel.grid.minor = ggplot2::element_blank(),
+        plot.title = ggplot2::element_text(face = "bold")
+      )
+    height <- max(3.5, 1.8 + 0.4 * sum(pmax(1, lengths(wrapped))))
+  } else {
+    p <- ggplot2::ggplot() +
+      ggplot2::annotate("text", x = 0, y = 0,
+                       label = paste0("No significant pathways\n(adjusted P < ", cutoff, ")"),
+                       size = 5, colour = "#555555") +
+      ggplot2::xlim(-1, 1) + ggplot2::ylim(-1, 1) +
+      ggplot2::labs(title = plot_title) + ggplot2::theme_void(base_size = 11)
+    height <- 3.5
+  }
+
+  dir.create(dirname(output_prefix), recursive = TRUE, showWarnings = FALSE)
+  ggplot2::ggsave(paste0(output_prefix, ".png"), plot = p, width = 10, height = height, dpi = 300)
+  ggplot2::ggsave(paste0(output_prefix, ".pdf"), plot = p, width = 10, height = height)
+  invisible(p)
+}
+
 # -----------------------------------------------------------------------------
 # 读取并预处理 KEGG ID 映射表（只需读一次，可重复使用）
-#
-# @param id_map_file  两列无表头 TSV：输入基因 ID / KEGG 基因 ID
-# @return data.frame，列：gene_id（原始，带版本号）/ ncbi / symbol（剥掉全部版本号）
+# @param id_map_file 两列无表头 TSV：输入基因 ID / KEGG 基因 ID
+# @return gene_id（原始）、ncbi、symbol（剥掉版本号）
 # -----------------------------------------------------------------------------
 load_kegg_id_map <- function(id_map_file) {
   if (!file.exists(id_map_file)) stop("KEGG ID 映射文件不存在: ", id_map_file)
@@ -66,7 +123,7 @@ make_identity_map <- function(genes, organism) {
 # @param universe    可选：背景基因（你的 NCBI/KEGG ID 向量）。缺省用 KEGG 全基因组注释
 # @param minGSSize / maxGSSize  通路大小过滤；maxGSSize=Inf 放行 sly01100/01110 等大通路
 # @param top_n       图中展示通路数
-# @param make_plot   是否输出 dotplot+barplot 合并图（png/pdf）
+# @param make_plot   是否输出显著通路的简单柱状图（png/pdf）
 # @return list(result, full, sig, total_genes, mapped_genes)
 # -----------------------------------------------------------------------------
 run_kegg_enrichment <- function(genes,
@@ -82,6 +139,16 @@ run_kegg_enrichment <- function(genes,
                                 make_plot   = TRUE) {
 
   message("正在处理项目: ", prefix)
+
+  save_empty_result <- function(empty) {
+    if (!dir.exists(save_dir)) dir.create(save_dir, recursive = TRUE)
+    write.csv(empty, file.path(save_dir, paste0(prefix, "_enrichments.csv")),
+              row.names = FALSE)
+    if (isTRUE(make_plot)) {
+      plot_enrichment_top_terms(empty, file.path(save_dir, paste0(prefix, "_enrichments")),
+                                paste("KEGG enrichment:", prefix), padj_cutoff, top_n)
+    }
+  }
 
   # --- 提取并清洗查询基因 ---
   if (is.data.frame(genes)) {
@@ -99,8 +166,7 @@ run_kegg_enrichment <- function(genes,
       Input_Gene_Count = 0, Background_Match_Count = 0,
       stringsAsFactors = FALSE
     )
-    write.csv(empty, file.path(save_dir, paste0(prefix, "_enrichments.csv")),
-              row.names = FALSE)
+    save_empty_result(empty)
     return(list(result = NULL, full = NULL, sig = empty,
                 total_genes = 0, mapped_genes = 0))
   }
@@ -124,8 +190,7 @@ run_kegg_enrichment <- function(genes,
       Input_Gene_Count = length(query), Background_Match_Count = 0,
       stringsAsFactors = FALSE
     )
-    write.csv(empty, file.path(save_dir, paste0(prefix, "_enrichments.csv")),
-              row.names = FALSE)
+    save_empty_result(empty)
     return(list(result = NULL, full = NULL, sig = empty,
                 total_genes = length(query), mapped_genes = n_mapped))
   }
@@ -157,8 +222,7 @@ run_kegg_enrichment <- function(genes,
       Input_Gene_Count = length(query), Background_Match_Count = length(genes_kegg),
       stringsAsFactors = FALSE
     )
-    write.csv(empty, file.path(save_dir, paste0(prefix, "_enrichments.csv")),
-              row.names = FALSE)
+    save_empty_result(empty)
     return(list(result = NULL, full = NULL, sig = NULL,
                 total_genes = length(query), mapped_genes = n_mapped))
   }
@@ -166,7 +230,7 @@ run_kegg_enrichment <- function(genes,
   res_df <- res_df[order(res_df$p.adjust), ]
   res_df$Input_Gene_Count <- length(query)
   res_df$Background_Match_Count <- length(genes_kegg)
-  sig_df <- res_df[res_df$p.adjust < padj_cutoff, ]
+  sig_df <- res_df[!is.na(res_df$p.adjust) & res_df$p.adjust < padj_cutoff, , drop = FALSE]
 
   if (!nrow(sig_df)) {
     sig_df <- data.frame(
@@ -188,35 +252,9 @@ run_kegg_enrichment <- function(genes,
 
   # --- 作图（只画显著部分） ---
   n_sig <- sum(res_df$p.adjust < padj_cutoff, na.rm = TRUE)
-  if (isTRUE(make_plot) && n_sig > 0) {
-    plot_packages <- c("enrichplot", "ggplot2", "ggpubr", "patchwork")
-    missing_plot_packages <- plot_packages[
-      !vapply(plot_packages, requireNamespace, logical(1), quietly = TRUE)
-    ]
-    if (length(missing_plot_packages)) {
-      warning("跳过 KEGG 绘图，缺少 R 包: ",
-              paste(missing_plot_packages, collapse = ", "))
-    } else {
-    sig_res <- kegg_res
-    sig_res@result <- sig_res@result[sig_res@result$p.adjust < padj_cutoff, ]
-
-    p1 <- enrichplot::dotplot(sig_res, showCategory = min(top_n, n_sig)) +
-      ggplot2::ggtitle(paste0("KEGG Enrichment of (", prefix, ")")) +
-      ggpubr::theme_pubclean() +
-      ggplot2::theme(legend.position = "right")
-
-    p2 <- enrichplot::barplot(sig_res, showCategory = min(top_n, n_sig)) +
-      ggplot2::ggtitle(paste0("KEGG Enrichment of (", prefix, ")")) +
-      ggpubr::theme_pubclean() +
-      ggplot2::theme(legend.position = "right")
-
-    merge_plot <- p1 + p2 + patchwork::plot_annotation(tag_levels = "a")
-
-    ggplot2::ggsave(file.path(save_dir, paste0(prefix, "_enrichments.png")),
-           width = 12, height = 6, dpi = 600, plot = merge_plot)
-    ggplot2::ggsave(file.path(save_dir, paste0(prefix, "_enrichments.pdf")),
-           width = 12, height = 6, plot = merge_plot)
-    }
+  if (isTRUE(make_plot)) {
+    plot_enrichment_top_terms(res_df, file.path(save_dir, paste0(prefix, "_enrichments")),
+                              paste("KEGG enrichment:", prefix), padj_cutoff, top_n)
   }
 
   message(prefix, " 完成：全量通路 ", nrow(res_df),
@@ -297,7 +335,7 @@ run_kegg_deg_table <- function(table_path,
                                min_gs = 10,
                                max_gs = 0,
                                top_n = 10,
-                               make_plot = FALSE,
+                               make_plot = TRUE,
                                gene_regex = NULL) {
   df <- read_kegg_table(table_path)
   required <- c(gene_col, padj_col, lfc_col)
@@ -384,8 +422,8 @@ command_line_main <- function() {
                 help = "最大通路基因集大小；0 表示不限制 [default: %default]"),
     make_option("--top_n", type = "integer", default = 10,
                 help = "绘图展示的通路数 [default: %default]"),
-    make_option("--plot", action = "store_true", default = FALSE,
-                help = "输出显著通路的 PNG/PDF 图") ,
+    make_option("--plot", action = "store_true", default = TRUE,
+                help = "输出前 10 个显著通路的 PNG/PDF 图（默认开启）") ,
     make_option("--gene_regex", type = "character", default = NULL,
                 help = "基因 ID 清洗正则，格式为 pattern/replacement")
   )

@@ -20,7 +20,7 @@
 
 GO 脚本需要以下 R 包：`optparse`、`log4r`、`tidyverse`、`ontologyIndex`、`clusterProfiler`。
 
-KEGG 命令行脚本需要 `optparse`、`clusterProfiler` 和 `dplyr`；使用 `--id_map` 时还需要 `readr`，旧的 XLSX 函数接口需要 `readxl`，使用 `--plot` 时需要 `enrichplot`、`ggplot2`、`ggpubr` 和 `patchwork`。
+KEGG 命令行脚本需要 `optparse`、`clusterProfiler`、`dplyr` 和 `ggplot2`；使用 `--id_map` 时还需要 `readr`，旧的 XLSX 函数接口需要 `readxl`。
 
 ### Python 环境
 
@@ -72,6 +72,10 @@ Rscript src/Enrichments/go_enricher.r \
 
 - `{name}_UP.csv`
 - `{name}_DOWN.csv`
+- `{name}_UP.png` / `{name}_UP.pdf`
+- `{name}_DOWN.png` / `{name}_DOWN.pdf`
+
+每个方向默认生成简单横向柱状图：按 `p.adjust` 从小到大选择最多 10 条显著通路（`p.adjust < --cutoff`），横轴为命中基因数。不足 10 条时展示实际条数；没有显著通路时输出提示图。可用 `--top_n` 调整显示数量。
 
 即使没有匹配基因或没有显著通路，也会写出带有原因和计数信息的空结果表。运行错误会以非零状态退出。运行日志写入输出目录的 `{name}_GO.log`，不同比较组使用独立日志。
 
@@ -97,13 +101,15 @@ Rscript src/Enrichments/kegg_enricher.r \
 
 KEGG 输入表必须包含 `--gene_col` 指定的基因列（默认 `GeneID`），以及 `padj`、`log2FoldChange` 两列（可分别用 `--padj_col`、`--lfc_col` 修改）。`--id_map` 必须是无表头两列 TSV：第一列为输入基因 ID，第二列为 KEGG 基因 ID；脚本会清理物种前缀和末尾版本号。
 
-脚本默认不绘图；加上 `--plot` 后会为有显著结果的方向输出 PNG/PDF，需安装 `enrichplot`、`ggplot2`、`ggpubr` 和 `patchwork`。KEGG 通路查询依赖 `clusterProfiler` 的 KEGG 支持和网络/缓存状态。
+脚本默认生成 PNG/PDF 柱状图，不再需要额外加 `--plot`。每个方向按 `p.adjust` 排序展示最多 10 条显著通路，横轴为命中基因数；没有显著通路时生成提示图。`--top_n` 默认为 10。KEGG 通路查询依赖 `clusterProfiler` 的 KEGG 支持和网络/缓存状态。
 
 每个方向通常会生成：
 
 - `{name}_UP_enrichments.csv` / `{name}_DOWN_enrichments.csv`：按 `p.adjust < --cutoff` 筛选后的主结果；
 - `{name}_UP_enrichments_full.csv` / `{name}_DOWN_enrichments_full.csv`：完整测试结果（有可测试结果时生成）；
-- `--plot` 且安装绘图依赖时的对应 `.png` 和 `.pdf` 图。
+- `{name}_UP_enrichments.png` / `.pdf` 与 `{name}_DOWN_enrichments.png` / `.pdf`。
+
+主表与 `_full` 表使用同一次富集计算：主表是全量表中 `p.adjust < --cutoff` 的显著通路子集（默认阈值 0.05），`_full` 表还包含未达到该阈值的通路。两者都来自同一方向的基因列表；`_full` 并不表示整个 KEGG 数据库，仍受基因匹配、背景及通路大小等条件限制。如果没有显著通路，主表会写一行 `ID=None, Count=0` 的说明记录，这行不是实际通路。图形只选择显著通路，不会用全量表中的非显著条目补足 10 条。
 
 ## 3. 批量处理多个 contrast
 
@@ -156,6 +162,8 @@ RNAFlow 的各组控制台日志位于 `logs/07.Enrichments/contrasts/`，规则
 ## 4. Python GO 富集
 
 Python 版适合不需要 R 的轻量工作流，底层使用 Polars 读取关联表、GOATOOLS 解析 OBO、GSEApy 执行富集。
+
+成功计算后默认额外输出 `GO_enrichment_top10.png` / `.pdf`，按 `Adjusted P-value` 排序展示最多 10 条显著 GO 条目；无显著结果时输出提示图。
 
 ### 基因列表模式
 

@@ -17,6 +17,8 @@
 * 🎨 **优雅交互**：基于 rich-click 和 loguru 提供赏心悦目的终端输出。  
 * 📊 **标准算法**：底层调用 GSEApy 进行准确的超几何分布/Fisher 精确检验。
 
+默认额外输出 `GO_enrichment_top10.png` 和 `GO_enrichment_top10.pdf`：按 `Adjusted P-value` 从小到大展示最多 10 条显著 GO 条目，横轴为命中基因数；没有显著条目时输出提示图。
+
 ## **📦 安装依赖**
 
 建议使用 Python 3.8+ 环境。
