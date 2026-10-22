@@ -86,7 +86,7 @@ prepare_annotation <- function(obo_path, assoc_path) {
 # ==========================================
 
 run_core_enricher <- function(genes, annot, out_dir, prefix, suffix, cutoff) {
-  filename <- paste0(prefix, "_", suffix, ".csv")
+  filename <- paste0(prefix, "_GO_", suffix, ".csv")
   out_path <- file.path(out_dir, filename)
   
   # 1. 统计输入信息

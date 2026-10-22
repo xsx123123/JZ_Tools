@@ -74,6 +74,8 @@ run_kegg_enrichment <- function(genes,
                                 prefix,
                                 save_dir,
                                 organism    = "sly",
+                                term2gene   = NULL,
+                                term2name   = NULL,
                                 padj_cutoff = 0.05,
                                 universe    = NULL,
                                 minGSSize   = 10,
@@ -133,17 +135,31 @@ run_kegg_enrichment <- function(genes,
   # --- 富集 ---
   # pvalueCutoff/qvalueCutoff 置 1 跑全量：clusterProfiler 的 pvalueCutoff
   # 实际卡 p.adjust，且 NA qvalue 会静默丢行；事后自己筛，避免通路被偷偷滤掉。
-  kegg_res <- enrichKEGG(
-    gene          = genes_kegg,
-    organism      = organism,
-    keyType       = "kegg",
-    universe      = universe,
-    pAdjustMethod = "BH",
-    pvalueCutoff  = 1,
-    qvalueCutoff  = 1,
-    minGSSize     = minGSSize,
-    maxGSSize     = maxGSSize
-  )
+  if (!is.null(term2gene)) {
+    kegg_res <- enricher(
+      gene          = genes_kegg,
+      universe      = universe,
+      TERM2GENE     = term2gene,
+      TERM2NAME     = term2name,
+      pAdjustMethod = "BH",
+      pvalueCutoff  = 1,
+      qvalueCutoff  = 1,
+      minGSSize     = minGSSize,
+      maxGSSize     = maxGSSize
+    )
+  } else {
+    kegg_res <- enrichKEGG(
+      gene          = genes_kegg,
+      organism      = organism,
+      keyType       = "kegg",
+      universe      = universe,
+      pAdjustMethod = "BH",
+      pvalueCutoff  = 1,
+      qvalueCutoff  = 1,
+      minGSSize     = minGSSize,
+      maxGSSize     = maxGSSize
+    )
+  }
 
   res_df <- as.data.frame(kegg_res)
   if (!nrow(res_df)) {
@@ -288,6 +304,8 @@ run_kegg_deg_table <- function(table_path,
                                out_dir = "kegg_results",
                                name = "Enrich",
                                organism = "sly",
+                               term2gene_file = NULL,
+                               term2name_file = NULL,
                                gene_col = "GeneID",
                                padj_col = "padj",
                                lfc_col = "log2FoldChange",
@@ -330,6 +348,22 @@ run_kegg_deg_table <- function(table_path,
   }
 
   max_gs_value <- if (is.null(max_gs) || max_gs <= 0) Inf else max_gs
+  term2gene <- NULL
+  term2name <- NULL
+  if (!is.null(term2gene_file)) {
+    term2gene <- read.delim(term2gene_file, header = FALSE,
+                            stringsAsFactors = FALSE, check.names = FALSE)
+    if (ncol(term2gene) < 2) stop("term2gene 必须至少包含两列：通路ID和基因ID")
+    term2gene <- term2gene[, 1:2]
+    names(term2gene) <- c("term", "gene")
+    if (!is.null(term2name_file)) {
+      term2name <- read.delim(term2name_file, header = FALSE,
+                              stringsAsFactors = FALSE, check.names = FALSE)
+      if (ncol(term2name) < 2) stop("term2name 必须至少包含两列：通路ID和通路名称")
+      term2name <- term2name[, 1:2]
+      names(term2name) <- c("term", "name")
+    }
+  }
   up <- unique(ids[padj < padj_th & lfc >= lfc_th])
   down <- unique(ids[padj < padj_th & lfc <= -lfc_th])
   message("差异筛选: padj < ", padj_th, "; |log2FC| >= ", lfc_th,
@@ -340,6 +374,8 @@ run_kegg_deg_table <- function(table_path,
     kegg_id_map = id_map,
     save_dir = out_dir,
     organism = organism,
+    term2gene = term2gene,
+    term2name = term2name,
     padj_cutoff = cutoff,
     universe = unique(id_map$ncbi),
     minGSSize = min_gs,
@@ -348,9 +384,9 @@ run_kegg_deg_table <- function(table_path,
     make_plot = make_plot
   )
   up_result <- do.call(run_kegg_enrichment,
-                       c(list(genes = up, prefix = paste0(name, "_UP")), common))
+                       c(list(genes = up, prefix = paste0(name, "_KEGG_UP")), common))
   down_result <- do.call(run_kegg_enrichment,
-                         c(list(genes = down, prefix = paste0(name, "_DOWN")), common))
+                         c(list(genes = down, prefix = paste0(name, "_KEGG_DOWN")), common))
   invisible(list(UP = up_result, DOWN = down_result))
 }
 
@@ -366,6 +402,10 @@ command_line_main <- function() {
                 help = "KEGG 物种代码 [default: %default]"),
     make_option("--id_map", type = "character",
                 help = "无表头两列 TSV：输入基因 ID、KEGG 基因 ID"),
+    make_option("--term2gene", type = "character",
+                help = "本地 TERM2GENE 文件（无表头两列：通路ID、基因ID）"),
+    make_option("--term2name", type = "character",
+                help = "本地 TERM2NAME 文件（无表头两列：通路ID、通路名称）"),
     make_option("--gene_col", type = "character", default = "GeneID",
                 help = "基因 ID 列名 [default: %default]"),
     make_option("--padj_col", type = "character", default = "padj",
@@ -404,6 +444,8 @@ command_line_main <- function() {
     out_dir = opt$out_dir,
     name = opt$name,
     organism = opt$organism,
+    term2gene_file = opt$term2gene,
+    term2name_file = opt$term2name,
     gene_col = opt$gene_col,
     padj_col = opt$padj_col,
     lfc_col = opt$lfc_col,

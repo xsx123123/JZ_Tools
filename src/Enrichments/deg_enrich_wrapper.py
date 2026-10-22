@@ -39,10 +39,16 @@ def main():
         with open(args.kegg_config) as handle:
             kegg = json.load(handle)
     if kegg.get("enabled", False):
-        if not kegg.get("organism") or not args.kegg_rscript:
-            raise ValueError("KEGG 启用时必须配置 organism 和 kegg_rscript")
+        if not args.kegg_rscript:
+            raise ValueError("KEGG 启用时必须配置 kegg_rscript")
+        if not kegg.get("organism") and not kegg.get("term2gene"):
+            raise ValueError("KEGG 启用时必须配置 organism，或提供本地 term2gene")
         if kegg.get("id_map") and not os.path.isfile(kegg["id_map"]):
             raise FileNotFoundError(kegg["id_map"])
+        if kegg.get("term2gene") and not os.path.isfile(kegg["term2gene"]):
+            raise FileNotFoundError(kegg["term2gene"])
+        if kegg.get("term2name") and not os.path.isfile(kegg["term2name"]):
+            raise FileNotFoundError(kegg["term2name"])
 
     # 1. 读取对照信息
     if not os.path.exists(args.deg_info):
@@ -96,13 +102,18 @@ def main():
             kegg_cmd = [
                 "Rscript", args.kegg_rscript, "--table", input_table,
                 "--name", contrast, "--out_dir", args.out_dir,
-                "--organism", kegg["organism"],
                 "--gene_col", kegg.get("gene_col", args.gene_col),
                 "--cutoff", args.cutoff,
                 "--padj_th", args.padj_th, "--lfc_th", args.lfc_th,
             ]
+            if kegg.get("organism"):
+                kegg_cmd.extend(["--organism", kegg["organism"]])
             if kegg.get("id_map"):
                 kegg_cmd.extend(["--id_map", kegg["id_map"]])
+            if kegg.get("term2gene"):
+                kegg_cmd.extend(["--term2gene", kegg["term2gene"]])
+            if kegg.get("term2name"):
+                kegg_cmd.extend(["--term2name", kegg["term2name"]])
             commands.append(kegg_cmd)
 
         # 执行
