@@ -1,6 +1,6 @@
 # Enrichments：GO / KEGG 富集分析
 
-本目录提供基于差异分析结果的 GO 和 KEGG 过度富集分析（ORA）脚本。脚本只负责富集分析，不负责差异分析、参考注释下载或基因 ID 注释构建；OBO、基因关联表和 KEGG 通路映射需要在运行前准备好。
+本目录提供基于差异分析结果的 GO 和 KEGG 过度富集分析（ORA）脚本。脚本不负责差异分析或参考注释下载；对于 eggNOG 风格的非模式物种注释，可用转换器自动构建 GO 关联表和本地 KEGG 通路映射。
 
 ## 文件说明
 
@@ -9,6 +9,7 @@
 | `go_enricher.r` | R 版 GO 富集。读取一张差异表，分别分析 UP 和 DOWN 基因。 |
 | `kegg_enricher.r` | R 版 KEGG 富集。支持命令行差异表模式，也保留可被其他 R 脚本调用的函数接口。 |
 | `deg_enrich_wrapper.py` | 批量读取多个 contrast，并调用 GO R 脚本；可选地同时调用 KEGG R 脚本。 |
+| `annotation_to_enrichment.py` | 将 eggNOG 注释表转换为 RNAFlow 所需的 GO 关联和本地 KEGG 映射。 |
 | `python/go_enrich.py` | Python 版 GO 富集，支持基因列表和差异表两种入口。 |
 | `python/requirments.yaml` | Python 运行依赖清单（文件名沿用仓库现状）。 |
 
@@ -40,6 +41,19 @@ python -m pip install -r python/requirments.yaml
 
 大型参考文件不随代码分发。建议记录版本、下载日期和 SHA-256；运行前先确认基因 ID（包括是否带版本号）能与关联表匹配。
 
+### 非模式物种（eggNOG 注释）
+
+非模式物种不需要伪造 KEGG organism code。配置 `STAR_index.<Genome_Version>.annotation_table` 后，工作流会在富集任务中自动生成：
+
+- `go_annotation.tsv`：`gene<TAB>GO1,GO2,...`；
+- `kegg_id_map.tsv`：输入基因 ID 到自身 ID 的本地映射；
+- `kegg_term2gene.tsv`：`koXXXXX<TAB>gene`；
+- `kegg_term2name.tsv`：本地 pathway ID 名称表。
+
+eggNOG 表需要包含 `query`、`gos` 和 `kegg_pathway` 列。`query` 末尾的 `_mRNA` 会自动去掉，以匹配 RSEM/DESeq2 的 gene ID。`kegg_pathway` 中使用 `koXXXXX` 通路；`mapXXXXX` 记录会被忽略，避免把物种无关的 map 通路与基因重复计数。
+
+例如 Dioscorea `ziyushenshu_v1` 可直接使用 `eggnog_highconf.tsv`；GO 使用同一个 OBO 文件解析，KEGG 使用本地 pathway-gene 映射，不调用 `enrichKEGG` 的物种数据库。番茄等已有 `organism`、`id_map`、`term2gene` 配置的物种仍走原有分支。
+
 ## 1. R 版 GO 富集
 
 `go_enricher.r` 当前只接受差异表模式。表格可以是 CSV 或 TSV（脚本根据首行是否含逗号自动判断），默认需要以下列：
@@ -70,12 +84,17 @@ Rscript src/Enrichments/go_enricher.r \
 
 输出目录中会生成：
 
+<<<<<<< HEAD
 - `{name}_UP.csv`
 - `{name}_DOWN.csv`
 - `{name}_UP.png` / `{name}_UP.pdf`
 - `{name}_DOWN.png` / `{name}_DOWN.pdf`
 
 每个方向默认生成简单横向柱状图：按 `p.adjust` 从小到大选择最多 10 条显著通路（`p.adjust < --cutoff`），横轴为命中基因数。不足 10 条时展示实际条数；没有显著通路时输出提示图。可用 `--top_n` 调整显示数量。
+=======
+- `{name}_GO_UP.csv`
+- `{name}_GO_DOWN.csv`
+>>>>>>> e092e3be5bce3410be5902c5ef98cb9df55d75a1
 
 即使没有匹配基因或没有显著通路，也会写出带有原因和计数信息的空结果表。运行错误会以非零状态退出。运行日志写入输出目录的 `{name}_GO.log`，不同比较组使用独立日志。
 
@@ -105,11 +124,17 @@ KEGG 输入表必须包含 `--gene_col` 指定的基因列（默认 `GeneID`）�
 
 每个方向通常会生成：
 
+<<<<<<< HEAD
 - `{name}_UP_enrichments.csv` / `{name}_DOWN_enrichments.csv`：按 `p.adjust < --cutoff` 筛选后的主结果；
 - `{name}_UP_enrichments_full.csv` / `{name}_DOWN_enrichments_full.csv`：完整测试结果（有可测试结果时生成）；
 - `{name}_UP_enrichments.png` / `.pdf` 与 `{name}_DOWN_enrichments.png` / `.pdf`。
 
 主表与 `_full` 表使用同一次富集计算：主表是全量表中 `p.adjust < --cutoff` 的显著通路子集（默认阈值 0.05），`_full` 表还包含未达到该阈值的通路。两者都来自同一方向的基因列表；`_full` 并不表示整个 KEGG 数据库，仍受基因匹配、背景及通路大小等条件限制。如果没有显著通路，主表会写一行 `ID=None, Count=0` 的说明记录，这行不是实际通路。图形只选择显著通路，不会用全量表中的非显著条目补足 10 条。
+=======
+- `{name}_KEGG_UP_enrichments.csv` / `{name}_KEGG_DOWN_enrichments.csv`：按 `p.adjust < --cutoff` 筛选后的主结果；
+- `{name}_KEGG_UP_enrichments_full.csv` / `{name}_KEGG_DOWN_enrichments_full.csv`：完整测试结果（有可测试结果时生成）；
+- `--plot` 且安装绘图依赖时的对应 `.png` 和 `.pdf` 图。
+>>>>>>> e092e3be5bce3410be5902c5ef98cb9df55d75a1
 
 ## 3. 批量处理多个 contrast
 
