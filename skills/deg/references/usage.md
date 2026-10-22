@@ -4,7 +4,7 @@
 
 | Mode | Required manifest fields | Optional fields |
 |---|---|---|
-| `deseq2` | `counts`, `metadata`, `pairs` | `annotation`, `lfc`, `pval`, `log_file` |
+| `deseq2` | `counts`, `metadata`, `pairs` | `annotation`, `lfc`, `pval`, `log_file`, `threads` (default 1) |
 | `atac-deseq2` | `counts`, `metadata`, `pairs` | `samples`, `count_cutoff`, `lfc`, `pval`, `label_col` |
 | `distribution` | `metadata`, one of `tpm`/`fpkm` | `width`, `height`, `log_file` |
 | `pheatmap` | `matrix`, `metadata` | `min_exp`, `top_n` |

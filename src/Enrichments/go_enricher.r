@@ -23,9 +23,7 @@ suppressPackageStartupMessages({
 # 1. 基础组件 (Logging & Utils)
 # ==========================================
 
-logger <- create.logger()
-logfile(logger) <- "go_enrichment.log"
-level(logger) <- "INFO"
+logger <- NULL
 
 log_info <- function(msg) {
   timestamp <- format(Sys.time(), "%H:%M:%S")
@@ -85,7 +83,65 @@ prepare_annotation <- function(obo_path, assoc_path) {
 # 3. 富集分析引擎 (核心修改部分)
 # ==========================================
 
-run_core_enricher <- function(genes, annot, out_dir, prefix, suffix, cutoff) {
+# 简单横向柱状图：按 BH p.adjust 排序，最多展示 top_n 条显著通路。
+plot_enrichment_top_terms <- function(results, output_prefix, title,
+                                      cutoff = 0.05, top_n = 10) {
+  if (length(top_n) != 1 || !is.finite(top_n) || top_n < 1) {
+    stop("top_n must be a positive integer")
+  }
+  padj <- suppressWarnings(as.numeric(results$p.adjust))
+  count <- suppressWarnings(as.numeric(results$Count))
+  keep <- is.finite(padj) & padj >= 0 & padj < cutoff &
+    is.finite(count) & count > 0 & !is.na(results$ID) & results$ID != "None"
+  selected <- results[keep, , drop = FALSE]
+  selected$p.adjust <- padj[keep]
+  selected$Count <- count[keep]
+  selected <- head(selected[order(selected$p.adjust, selected$ID), , drop = FALSE],
+                   as.integer(top_n))
+  plot_title <- paste(strwrap(title, width = 75), collapse = "\n")
+
+  if (nrow(selected)) {
+    descriptions <- as.character(selected$Description)
+    missing <- is.na(descriptions) | !nzchar(descriptions)
+    descriptions[missing] <- as.character(selected$ID[missing])
+    wrapped <- lapply(descriptions, strwrap, width = 50)
+    labels <- setNames(vapply(wrapped, paste, character(1), collapse = "\n"),
+                       seq_len(nrow(selected)))
+    selected$Pathway <- factor(seq_len(nrow(selected)),
+                               levels = rev(seq_len(nrow(selected))))
+    p <- ggplot2::ggplot(selected, ggplot2::aes(x = Count, y = Pathway)) +
+      ggplot2::geom_col(width = 0.7, fill = "#3579AD") +
+      ggplot2::scale_y_discrete(labels = labels) +
+      ggplot2::labs(
+        title = plot_title,
+        subtitle = paste0("Top ", nrow(selected),
+                          " significant terms ranked by adjusted P-value (cutoff ", cutoff, ")"),
+        x = "Gene count", y = NULL
+      ) +
+      ggplot2::theme_minimal(base_size = 11) +
+      ggplot2::theme(
+        panel.grid.major.y = ggplot2::element_blank(),
+        panel.grid.minor = ggplot2::element_blank(),
+        plot.title = ggplot2::element_text(face = "bold")
+      )
+    height <- max(3.5, 1.8 + 0.4 * sum(pmax(1, lengths(wrapped))))
+  } else {
+    p <- ggplot2::ggplot() +
+      ggplot2::annotate("text", x = 0, y = 0,
+                       label = paste0("No significant pathways\n(adjusted P < ", cutoff, ")"),
+                       size = 5, colour = "#555555") +
+      ggplot2::xlim(-1, 1) + ggplot2::ylim(-1, 1) +
+      ggplot2::labs(title = plot_title) + ggplot2::theme_void(base_size = 11)
+    height <- 3.5
+  }
+
+  dir.create(dirname(output_prefix), recursive = TRUE, showWarnings = FALSE)
+  ggplot2::ggsave(paste0(output_prefix, ".png"), plot = p, width = 10, height = height, dpi = 300)
+  ggplot2::ggsave(paste0(output_prefix, ".pdf"), plot = p, width = 10, height = height)
+  invisible(p)
+}
+
+run_core_enricher <- function(genes, annot, out_dir, prefix, suffix, cutoff, top_n = 10) {
   filename <- paste0(prefix, "_", suffix, ".csv")
   out_path <- file.path(out_dir, filename)
   
@@ -116,6 +172,8 @@ run_core_enricher <- function(genes, annot, out_dir, prefix, suffix, cutoff) {
       Background_Match_Count = valid_count  # 添加统计列
     )
     write.csv(empty_df, out_path, row.names = FALSE)
+    plot_enrichment_top_terms(empty_df, tools::file_path_sans_ext(out_path),
+                              paste("GO enrichment:", prefix, suffix), cutoff, top_n)
   }
   
   # 3. 预判：如果没有基因或匹配数为0
@@ -142,11 +200,13 @@ run_core_enricher <- function(genes, annot, out_dir, prefix, suffix, cutoff) {
       res_df$Background_Match_Count <- valid_count
       
       write.csv(res_df, out_path, row.names = FALSE)
+      plot_enrichment_top_terms(res_df, tools::file_path_sans_ext(out_path),
+                                paste("GO enrichment:", prefix, suffix), cutoff, top_n)
       log_info(paste0(">>> 成功! [", suffix, "] 发现 ", nrow(res_df), " 个通路。已保存至: ", filename))
     }
   }, error = function(e) {
     log_error(paste0(suffix, " 分析过程报错: ", e$message))
-    write_empty_result(paste0("Error: ", e$message))
+    stop(e)
   })
 }
 
@@ -220,8 +280,8 @@ module_process_table <- function(opt, annot) {
   log_info(paste("UP 基因数:", length(genes_up)))
   log_info(paste("DOWN 基因数:", length(genes_down)))
   
-  run_core_enricher(genes_up, annot, opt$out_dir, opt$name, "UP", opt$cutoff)
-  run_core_enricher(genes_down, annot, opt$out_dir, opt$name, "DOWN", opt$cutoff)
+  run_core_enricher(genes_up, annot, opt$out_dir, paste0(opt$name, "_GO"), "UP", opt$cutoff, opt$top_n)
+  run_core_enricher(genes_down, annot, opt$out_dir, paste0(opt$name, "_GO"), "DOWN", opt$cutoff, opt$top_n)
 }
 
 # ==========================================
@@ -235,6 +295,7 @@ main <- function() {
     make_option(c("-d", "--out_dir"), type="character", default="go_results", help="输出文件夹"),
     make_option(c("-n", "--name"), type="character", default="Enrich", help="输出文件前缀"),
     make_option(c("-c", "--cutoff"), type="numeric", default=0.05, help="富集分析 P-value 阈值"),
+    make_option(c("--top_n"), type="integer", default=10, help="图中最多显示的显著通路数 [默认: 10]"),
     make_option(c("-t", "--table"), type="character", help="差异分析表格"),
     make_option(c("--gene_col"), default="GeneID", help="基因列名"),
     make_option(c("--padj_col"), default="padj", help="Padj列名"),
@@ -252,6 +313,10 @@ main <- function() {
   }
   
   if (!dir.exists(opt$out_dir)) dir.create(opt$out_dir, recursive = TRUE)
+  logger <<- log4r::logger(
+    threshold = "INFO",
+    appenders = log4r::file_appender(file.path(opt$out_dir, paste0(opt$name, "_GO.log")))
+  )
   
   annot <- prepare_annotation(opt$obo, opt$assoc)
   

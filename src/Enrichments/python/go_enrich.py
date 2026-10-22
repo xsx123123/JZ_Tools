@@ -7,6 +7,8 @@ import gseapy as gp
 from goatools.obo_parser import GODag
 import os
 import sys
+import textwrap
+from pathlib import Path
 import rich_click as click
 from loguru import logger
 from rich.console import Console
@@ -14,6 +16,48 @@ from rich.table import Table
 
 # 初始化 Rich 控制台
 console = Console()
+
+def plot_enrichment_top_terms(results, out_dir, cutoff=0.05, top_n=10):
+    """Save a simple bar chart of the most significant GO terms as PNG/PDF."""
+    from matplotlib.backends.backend_agg import FigureCanvasAgg
+    from matplotlib.figure import Figure
+
+    selected = pd.DataFrame()
+    if isinstance(results, pd.DataFrame) and not results.empty:
+        selected = results.copy()
+        selected['Adjusted P-value'] = pd.to_numeric(selected['Adjusted P-value'], errors='coerce')
+        selected['Count'] = pd.to_numeric(selected['Overlap'].str.split('/').str[0], errors='coerce')
+        selected = selected.loc[
+            selected['Adjusted P-value'].ge(0) & selected['Adjusted P-value'].lt(cutoff)
+            & selected['Count'].gt(0)
+        ].sort_values(['Adjusted P-value', 'Term']).head(top_n)
+
+    labels = [textwrap.fill(str(term), width=50) for term in selected.get('Term', [])]
+    height = max(3.5, 1.8 + 0.4 * sum(label.count('\n') + 1 for label in labels))
+    figure = Figure(figsize=(10, height))
+    FigureCanvasAgg(figure)
+    axis = figure.subplots()
+    if len(selected):
+        axis.barh(range(len(selected)), selected['Count'], color='#3579AD', height=0.7)
+        axis.set_yticks(range(len(selected)), labels)
+        axis.invert_yaxis()
+        axis.set_xlabel('Gene count')
+        axis.set_title(f'GO enrichment\nTop {len(selected)} significant terms ranked by adjusted P-value (cutoff {cutoff})', loc='left')
+        axis.grid(axis='x', color='#E5E5E5')
+        axis.set_axisbelow(True)
+        for spine in ['top', 'right', 'left']:
+            axis.spines[spine].set_visible(False)
+    else:
+        axis.text(0.5, 0.5, f'No significant pathways\n(adjusted P < {cutoff})',
+                  ha='center', va='center', transform=axis.transAxes, color='#555555')
+        axis.set_title('GO enrichment', loc='left')
+        axis.set_axis_off()
+    figure.tight_layout()
+    output = Path(out_dir)
+    output.mkdir(parents=True, exist_ok=True)
+    for extension in ['png', 'pdf']:
+        figure.savefig(output / f'GO_enrichment_top10.{extension}', dpi=300)
+    return selected
 
 # --- 1. 核心业务逻辑 (Core Logic) ---
 
@@ -42,6 +86,7 @@ def go_enricher(
 
     if not target_genes:
         logger.warning("目标基因列表为空，跳过分析。")
+        plot_enrichment_top_terms(pd.DataFrame(), out_dir, cutoff)
         return None
 
     # B. 解析 OBO
@@ -103,6 +148,7 @@ def go_enricher(
             cutoff=cutoff,
             verbose=False
         )
+        plot_enrichment_top_terms(enr.results, out_dir, cutoff)
         return enr
     except Exception as e:
         logger.error(f"GSEApy 运行内部错误: {e}")
@@ -220,6 +266,7 @@ def run_table(table, gene_col, padj_col, lfc_col, padj_th, lfc_th, obo, assoc, o
     
     if not genes:
         logger.warning("筛选结果为空，终止运行。")
+        plot_enrichment_top_terms(pd.DataFrame(), out_dir, cutoff)
         sys.exit(0)
     
     # 2. 保存筛选后的基因列表
