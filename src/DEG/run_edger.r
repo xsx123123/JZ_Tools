@@ -200,6 +200,8 @@ option_list <- list(
   make_option(c("-l", "--log_file"), type = "character", default = "edger.log", help = "Log Filename"),
   make_option(c("--lfc"), type = "numeric", default = 1.0, help = "Log2 Fold Change Cutoff"),
   make_option(c("--pval"), type = "numeric", default = 0.05, help = "Raw P-value Cutoff"),
+  make_option(c("--skip-pca"), dest = "skip_pca", action = "store_true", default = FALSE,
+              help = "Skip global PCA (used by parallel contrast workers)"),
   make_option(c("--bcv"), type = "numeric", default = 0.4,
               help = "Biological Coefficient of Variation for NO-replicate (1v1) contrasts. 0.4=human subjects (default), 0.1=isogenic model organisms/cell lines, 0.01=technical replicates"),
   make_option(c("--min-rep"), type = "integer", default = 2,
@@ -258,6 +260,7 @@ if(!is.null(opt$annotation)){
 }
 
 # 5. Global PCA Analysis (log2-CPM, 与 DESeq2 版的 vst-PCA 对应) ------------
+if (!opt$skip_pca) {
 log4r::info(logger, ">>> Running Global PCA Analysis...")
 
 tryCatch({
@@ -303,6 +306,7 @@ tryCatch({
 }, error = function(e){
   log4r::error(logger, paste0("PCA Analysis Failed: ", e$message))
 })
+}
 
 # 6. 差异分析主循环 & 统计 --------------------------------------------
 contrast_pairs <- read.csv(opt$pairs, stringsAsFactors = F)

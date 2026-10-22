@@ -7,6 +7,8 @@ import subprocess
 import pandas as pd
 import argparse
 import json
+from concurrent.futures import ThreadPoolExecutor
+from pathlib import Path
 from loguru import logger
 
 def get_args():
@@ -16,6 +18,8 @@ def get_args():
     parser.add_argument("--deg_info", required=True, help="All_Contrast_DEG_Statistics.csv 的路径")
     parser.add_argument("--deg_dir", required=True, help="包含具体差异分析结果 CSV 的文件夹")
     parser.add_argument("--lib_type", default="RNA", help="富集分析的文库类型")
+    parser.add_argument("--threads", type=int, default=1, help="最多同时运行的比较组数 [默认: 1]")
+    parser.add_argument("--log-dir", help="比较组控制台日志目录 [默认: OUT_DIR/logs]")
     
     # 转发给 R 的参数
     parser.add_argument("-o", "--obo", required=True, help="GO obo 文件")
@@ -29,7 +33,10 @@ def get_args():
     parser.add_argument("--kegg_rscript", help="离线 KEGG R 脚本")
     parser.add_argument("--padj_th", default="0.05")
     parser.add_argument("--lfc_th", default="1")
-    return parser.parse_args()
+    args = parser.parse_args()
+    if args.threads < 1:
+        parser.error("--threads 必须至少为 1")
+    return args
 
 def main():
     args = get_args()
@@ -58,15 +65,23 @@ def main():
     df = pd.read_csv(args.deg_info)
     # 获取第一列 Contrast，去除引号
     contrasts = df.iloc[:, 0].str.replace('"', '').tolist()
+    if any(not isinstance(name, str) or not name or "/" in name or "\\" in name for name in contrasts):
+        raise ValueError("Contrast 名称不能为空或包含路径分隔符")
+    if len(set(contrasts)) != len(contrasts):
+        raise ValueError("Contrast 名称重复会覆盖富集结果文件")
     
-    logger.info(f"🚀 开始批量处理 {len(contrasts)} 个对比组...")
+    workers = min(args.threads, max(len(contrasts), 1))
+    logger.info(f"🚀 开始批量处理 {len(contrasts)} 个对比组，并发数: {workers}")
 
-    if not os.path.exists(args.out_dir):
-        os.makedirs(args.out_dir)
+    logs = Path(args.log_dir) if args.log_dir else Path(args.out_dir) / "logs"
+    logs.mkdir(parents=True, exist_ok=True)
+    Path(args.out_dir).mkdir(parents=True, exist_ok=True)
+    env = os.environ.copy()
+    for key in ("OMP_NUM_THREADS", "OPENBLAS_NUM_THREADS", "MKL_NUM_THREADS", "VECLIB_MAXIMUM_THREADS", "BLIS_NUM_THREADS", "NUMEXPR_NUM_THREADS"):
+        env[key] = "1"
 
-    failures = []
-    # 2. 遍历并调用 R
-    for contrast in contrasts:
+    # 每个任务串行执行该比较组的 GO/KEGG；比较组之间并行，避免嵌套并行超额使用 CPU。
+    def run_contrast(contrast):
         if args.lib_type == 'ATAC':
             input_table = os.path.join(args.deg_dir, f"{contrast}_Differential_Peaks.csv")
         elif args.lib_type == 'RNA':
@@ -76,8 +91,7 @@ def main():
 
         if not os.path.exists(input_table):
             logger.warning(f"⚠️ 跳过: 找不到文件 {input_table}")
-            failures.append(contrast)
-            continue
+            return False
             
         logger.info(f"✨ 正在分析对照组: {contrast}")
         
@@ -117,14 +131,20 @@ def main():
             commands.append(kegg_cmd)
 
         # 执行
+        console_log = logs / f"{contrast}.console.log"
         try:
-            # shell=False 在独立脚本中更安全，且能继承当前 conda 环境
-            for command in commands:
-                subprocess.run(command, check=True)
+            with console_log.open("w", encoding="utf-8") as handle:
+                for command in commands:
+                    subprocess.run(command, check=True, env=env, stdout=handle, stderr=subprocess.STDOUT)
             logger.success(f"✅ {contrast} 分析成功")
-        except subprocess.CalledProcessError:
-            logger.error(f"❌ {contrast} 分析失败，请检查 R 脚本输出")
-            failures.append(contrast)
+            return True
+        except (OSError, subprocess.CalledProcessError) as error:
+            logger.error(f"❌ {contrast} 分析失败: {error}；日志: {console_log}")
+            return False
+
+    with ThreadPoolExecutor(max_workers=workers) as pool:
+        results = list(pool.map(run_contrast, contrasts))
+    failures = [contrast for contrast, success in zip(contrasts, results) if not success]
     if failures:
         raise SystemExit(f"Enrichment failed: {', '.join(failures)}")
 

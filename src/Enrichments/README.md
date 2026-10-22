@@ -87,7 +87,7 @@ Rscript src/Enrichments/go_enricher.r \
 - `{name}_GO_UP.csv`
 - `{name}_GO_DOWN.csv`
 
-即使没有匹配基因或没有显著通路，也会写出带有原因和计数信息的空结果表。运行日志写入当前工作目录的 `go_enrichment.log`。
+即使没有匹配基因或没有显著通路，也会写出带有原因和计数信息的空结果表。运行错误会以非零状态退出。运行日志写入输出目录的 `{name}_GO.log`，不同比较组使用独立日志。
 
 ## 2. R 版 KEGG 富集
 
@@ -140,7 +140,8 @@ python src/Enrichments/deg_enrich_wrapper.py \
   --gene_col GeneID \
   --cutoff 0.05 \
   --padj_th 0.05 \
-  --lfc_th 1
+  --lfc_th 1 \
+  --threads 4
 ```
 
 启用 KEGG 时，配置文件至少包含 `enabled`、`organism`，并额外传入 `--kegg_rscript`；可选 `id_map`：
@@ -160,7 +161,11 @@ python src/Enrichments/deg_enrich_wrapper.py ... \
   --kegg_rscript src/Enrichments/kegg_enricher.r
 ```
 
-批量脚本会为每个 contrast 依次调用 GO（以及启用时的 KEGG）。任一 contrast 文件缺失或子进程失败，最终命令会以非零状态退出；请检查日志中列出的 contrast 名称和文件名。
+`--threads` 指定同时运行的比较组数量，独立调用默认 1。每个比较组内依次执行 GO、KEGG，比较组之间并行；每个 R 进程的 BLAS/OpenMP 限制为 1 线程。各组的标准输出和错误输出分别写入 `logs/{contrast}.console.log`。任一 contrast 文件缺失或子进程失败，最终命令会以非零状态退出；请检查日志中列出的 contrast 名称和文件名。
+
+RNAFlow 中通过 `parameter.threads.Enrichments` 配置并发数（默认 4），实际受 Snakemake 分配的 CPU 数限制。enrichments skill 的 `batch` manifest 同样支持 `"threads": 4`。每个并行 R 进程会独立加载参考注释，增加并发数时也需要增加可用内存。
+
+RNAFlow 的各组控制台日志位于 `logs/07.Enrichments/contrasts/`，规则失败后也能保留。独立调用可使用 `--log-dir` 指定该目录。
 
 ## 4. Python GO 富集
 

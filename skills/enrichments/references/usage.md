@@ -5,7 +5,7 @@ The manifest selects `single` or `batch` mode. `single` sends one differential t
 | Mode | Required fields | Important optional fields |
 |---|---|---|
 | `single` | `obo`, `assoc`, `table` | `name`, `gene_col`, `padj_col`, `lfc_col`, `padj_th`, `lfc_th`, `gene_regex`, `cutoff` |
-| `batch` | `obo`, `assoc`, `deg_info`, `deg_dir` | `lib_type` (`RNA` or `ATAC`), `gene_col`, `gene_regex`, `cutoff` |
+| `batch` | `obo`, `assoc`, `deg_info`, `deg_dir` | `lib_type` (`RNA` or `ATAC`), `gene_col`, `gene_regex`, `cutoff`, `padj_th`, `lfc_th`, `threads` (default 1) |
 
 ```bash
 python /workspace/.skills/enrichments/scripts/run_enrichment.py --input enrich.json --output results

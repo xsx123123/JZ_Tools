@@ -30,8 +30,8 @@ def require(payload: dict, key: str) -> str:
 def build_command(payload: dict, output: Path) -> list[str]:
     mode = payload["mode"]
     if mode == "deseq2":
-        command = ["Rscript", str(SCRIPT_DIR / "run_deseq2.r"), "--counts", require(payload, "counts"), "--metadata", require(payload, "metadata"), "--pairs", require(payload, "pairs"), "--outdir", str(output)]
-        for manifest_key, flag in (("annotation", "--annotation"), ("log_file", "--log_file"), ("lfc", "--lfc"), ("pval", "--pval")):
+        command = [sys.executable, str(SCRIPT_DIR / "run_deg_parallel.py"), "--rscript", str(SCRIPT_DIR / "run_deseq2.r"), "--counts", require(payload, "counts"), "--metadata", require(payload, "metadata"), "--pairs", require(payload, "pairs"), "--outdir", str(output)]
+        for manifest_key, flag in (("annotation", "--annotation"), ("log_file", "--log_file"), ("lfc", "--lfc"), ("pval", "--pval"), ("threads", "--threads")):
             if payload.get(manifest_key) is not None:
                 command.extend([flag, str(payload[manifest_key])])
         return command
