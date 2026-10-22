@@ -4,7 +4,7 @@
 # Expression Distribution Pipeline (TPM & FPKM)
 # Author: Jian Zhang (Integrated by Hajimi)
 # Date: 2026-01-07
-# Version: 1.2 (Fixed: Continuous value to discrete scale error)
+# Version: 1.3 (Automatic palette for more than 15 groups)
 # ==============================================================================
 
 # 0. 加载必要的包 ---------------------------------------------------------
@@ -43,11 +43,11 @@ log4r_init <- function(level = "INFO", log_file = NULL){
 }
 
 # 2. 定义绘图函数 ---------------------------------------------------------
-# 定义更丰富的色板，防止分组过多时颜色不够
+# 保留现有配色；分组数超过色板长度时自动使用 R 内置 HCL 色板
 colors_discrete_friendly_long <- c("#CC79A7","#0072B2","#56B4E9","#009E73","#F5C710","#E69F00","#D55E00", 
                                    "#999999", "#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E00", "#CC79A7")
 
-plot_expression_distribution <- function(data_matrix, meta_df, type_name = "TPM"){
+plot_expression_distribution <- function(data_matrix, meta_df, group_colors, type_name = "TPM"){
   keep_genes <- rowMeans(data_matrix) > 1
   filtered_data <- data_matrix[keep_genes, ]
   
@@ -73,7 +73,7 @@ plot_expression_distribution <- function(data_matrix, meta_df, type_name = "TPM"
     geom_violin(alpha = 1, trim = FALSE, linewidth = 0) + 
     geom_boxplot(width = 0.4, fill = "white", alpha = 0.6, outlier.shape = NA) + 
     theme_bw() +
-    scale_fill_manual(values = colors_discrete_friendly_long) +
+    scale_fill_manual(values = group_colors) +
     labs(title = paste0("Sample ", type_name, " Distribution"),
          subtitle = 'Filtered for mean expression > 1', 
          x = NULL,
@@ -149,6 +149,17 @@ tryCatch({
   # 【FIX】强制转换为 Factor，解决 "Continuous value to discrete scale" 报错
   meta_df$Group <- as.factor(meta_df$Group)
   log4r::info(logger, paste0("Group Levels: ", paste(levels(meta_df$Group), collapse = ", ")))
+
+  # 按完整 Metadata 建立命名颜色映射，确保 TPM/FPKM 即使样本子集不同也保持配色一致
+  n_groups <- nlevels(meta_df$Group)
+  if(n_groups <= length(colors_discrete_friendly_long)) {
+    group_colors <- colors_discrete_friendly_long[seq_len(n_groups)]
+  } else {
+    group_colors <- grDevices::hcl.colors(n_groups, palette = "Dark 3")
+    log4r::info(logger, paste0("Using built-in HCL palette 'Dark 3' for ", n_groups,
+                              " groups (custom palette supports ", length(colors_discrete_friendly_long), ")."))
+  }
+  names(group_colors) <- levels(meta_df$Group)
   
   # --- Step 2: 处理 TPM ---
   log4r::info(logger, "Processing TPM Data...")
@@ -159,7 +170,7 @@ tryCatch({
   tpm_data <- tpm_data[, common_tpm]
   meta_tpm <- meta_df[meta_df$Sample %in% common_tpm, ]
   
-  p1 <- plot_expression_distribution(tpm_data, meta_tpm, type_name = "TPM")
+  p1 <- plot_expression_distribution(tpm_data, meta_tpm, group_colors, type_name = "TPM")
   
   # --- Step 3: 处理 FPKM ---
   log4r::info(logger, "Processing FPKM Data...")
@@ -170,7 +181,7 @@ tryCatch({
   fpkm_data <- fpkm_data[, common_fpkm]
   meta_fpkm <- meta_df[meta_df$Sample %in% common_fpkm, ]
   
-  p2 <- plot_expression_distribution(fpkm_data, meta_fpkm, type_name = "FPKM")
+  p2 <- plot_expression_distribution(fpkm_data, meta_fpkm, group_colors, type_name = "FPKM")
   
   # --- Step 4: 拼图与保存 ---
   log4r::info(logger, "Combining plots and saving...")

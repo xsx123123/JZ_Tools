@@ -42,6 +42,35 @@
   * 修复了常规流程中 Log10(0) 的报错问题。  
 * **📝 详细日志**：利用 log4r 提供详细的运行日志（屏幕输出 \+ 文件记录），便于追踪和排错。
 
+## 多个比较组并行执行
+
+RNAFlow 的 DEG 规则通过 `run_deg_parallel.py` 调度多个独立 R 进程。并发数由 `parameter.threads.DEG` 配置（默认 4），实际使用 Snakemake 分配的核数，且不超过比较对数量。每个进程分批处理比较对，全局 PCA 只在第一个进程中运行；每个 R 进程的 BLAS/OpenMP 限制为 1 线程。
+
+```sh
+python run_deg_parallel.py \
+  --rscript run_deseq2.r \
+  --counts counts.tsv --metadata metadata.csv --pairs contrasts.csv \
+  --outdir Analysis_Results --threads 4 --lfc 1 --pval 0.05
+```
+
+独立调用 Python 脚本时 `--threads` 默认为 1；也可以通过 `--rscript run_edger.r` 运行 edgeR，并传入 `--bcv`、`--min-rep`。结果表、火山图和 PCA 的文件名保持原样，统计总表按输入比较对顺序合并。进程日志位于 `logs/worker_*.console.log` 和 `logs/worker_*.*.log`。任一进程失败时命令返回非零状态，不生成成功统计总表，并保留 `.deg-workers-*` 中间结果供排错。并发进程各自加载表达矩阵，内存占用随并发数增加。
+
+DEG skill 的 `deseq2` manifest 同样支持 `"threads": 4`。
+
+RNAFlow 将工作进程日志和失败中间结果存放在 `logs/06.DEG/contrasts/`，避免规则失败后随输出目录一起被清理。独立调用可通过 `--log-dir` 指定日志位置。
+
+## 表达分布绘图（run_dist.r）
+
+`run_dist.r` 汇总 TPM、FPKM 表达分布并输出 PNG/PDF。分组数不超过 15 时沿用原配色；超过 15 时自动使用 R 内置 HCL `Dark 3` 色板，按分组数生成颜色，无需额外安装包。颜色按完整样本信息表中的分组名称绑定，确保 TPM、FPKM 包含不同样本子集时同一分组仍使用相同颜色；自动切换会记录到日志。
+
+```sh
+Rscript run_dist.r \
+  --tpm merge_rsem_tpm.tsv \
+  --fpkm merge_rsem_fpkm.tsv \
+  --metadata samples.csv \
+  --outdir Gene_Expression
+```
+
 ## **🛠️ 依赖环境 (Prerequisites)**
 
 请确保你的 R 环境中已安装以下包：

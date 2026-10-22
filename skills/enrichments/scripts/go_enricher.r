@@ -23,9 +23,7 @@ suppressPackageStartupMessages({
 # 1. 基础组件 (Logging & Utils)
 # ==========================================
 
-logger <- create.logger()
-logfile(logger) <- "go_enrichment.log"
-level(logger) <- "INFO"
+logger <- NULL
 
 log_info <- function(msg) {
   timestamp <- format(Sys.time(), "%H:%M:%S")
@@ -146,7 +144,7 @@ run_core_enricher <- function(genes, annot, out_dir, prefix, suffix, cutoff) {
     }
   }, error = function(e) {
     log_error(paste0(suffix, " 分析过程报错: ", e$message))
-    write_empty_result(paste0("Error: ", e$message))
+    stop(e)
   })
 }
 
@@ -252,6 +250,10 @@ main <- function() {
   }
   
   if (!dir.exists(opt$out_dir)) dir.create(opt$out_dir, recursive = TRUE)
+  logger <<- log4r::logger(
+    threshold = "INFO",
+    appenders = log4r::file_appender(file.path(opt$out_dir, paste0(opt$name, "_GO.log")))
+  )
   
   annot <- prepare_annotation(opt$obo, opt$assoc)
   
