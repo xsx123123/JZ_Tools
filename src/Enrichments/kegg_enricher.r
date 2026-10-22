@@ -261,8 +261,6 @@ run_kegg_enrichment <- function(genes,
 
   # --- 保存 ---
   if (!dir.exists(save_dir)) dir.create(save_dir, recursive = TRUE)
-  write.csv(res_df, file.path(save_dir, paste0(prefix, "_enrichments_full.csv")),
-            row.names = FALSE)   # 全量表：所有通路的 p / p.adjust，可自行放宽阈值
   write.csv(sig_df, file.path(save_dir, paste0(prefix, "_enrichments.csv")),
             row.names = FALSE)   # 主表：p.adjust < padj_cutoff
 

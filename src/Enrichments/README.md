@@ -120,10 +120,9 @@ KEGG 输入表必须包含 `--gene_col` 指定的基因列（默认 `GeneID`）�
 每个方向通常会生成：
 
 - `{name}_KEGG_UP_enrichments.csv` / `{name}_KEGG_DOWN_enrichments.csv`：按 `p.adjust < --cutoff` 筛选后的主结果；
-- `{name}_KEGG_UP_enrichments_full.csv` / `{name}_KEGG_DOWN_enrichments_full.csv`：完整测试结果（有可测试结果时生成）；
 - `{name}_KEGG_UP_enrichments.png` / `.pdf` 与 `{name}_KEGG_DOWN_enrichments.png` / `.pdf`。
 
-主表与 `_full` 表使用同一次富集计算：主表是全量表中 `p.adjust < --cutoff` 的显著通路子集（默认阈值 0.05），`_full` 表还包含未达到该阈值的通路。两者都来自同一方向的基因列表；`_full` 并不表示整个 KEGG 数据库，仍受基因匹配、背景及通路大小等条件限制。如果没有显著通路，主表会写一行 `ID=None, Count=0` 的说明记录，这行不是实际通路。图形只选择显著通路，不会用全量表中的非显著条目补足 10 条。
+如果没有显著通路，主表会写一行 `ID=None, Count=0` 的说明记录，这行不是实际通路。图形只选择显著通路，不会用未达阈值的条目补足 10 条。
 
 ## 3. 批量处理多个 contrast
 
