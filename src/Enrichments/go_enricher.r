@@ -83,7 +83,6 @@ prepare_annotation <- function(obo_path, assoc_path) {
 # 3. 富集分析引擎 (核心修改部分)
 # ==========================================
 
-<<<<<<< HEAD
 # 简单横向柱状图：按 BH p.adjust 排序，最多展示 top_n 条显著通路。
 plot_enrichment_top_terms <- function(results, output_prefix, title,
                                       cutoff = 0.05, top_n = 10) {
@@ -144,10 +143,6 @@ plot_enrichment_top_terms <- function(results, output_prefix, title,
 
 run_core_enricher <- function(genes, annot, out_dir, prefix, suffix, cutoff, top_n = 10) {
   filename <- paste0(prefix, "_", suffix, ".csv")
-=======
-run_core_enricher <- function(genes, annot, out_dir, prefix, suffix, cutoff) {
-  filename <- paste0(prefix, "_GO_", suffix, ".csv")
->>>>>>> e092e3be5bce3410be5902c5ef98cb9df55d75a1
   out_path <- file.path(out_dir, filename)
   
   # 1. 统计输入信息
@@ -285,8 +280,8 @@ module_process_table <- function(opt, annot) {
   log_info(paste("UP 基因数:", length(genes_up)))
   log_info(paste("DOWN 基因数:", length(genes_down)))
   
-  run_core_enricher(genes_up, annot, opt$out_dir, opt$name, "UP", opt$cutoff, opt$top_n)
-  run_core_enricher(genes_down, annot, opt$out_dir, opt$name, "DOWN", opt$cutoff, opt$top_n)
+  run_core_enricher(genes_up, annot, opt$out_dir, paste0(opt$name, "_GO"), "UP", opt$cutoff, opt$top_n)
+  run_core_enricher(genes_down, annot, opt$out_dir, paste0(opt$name, "_GO"), "DOWN", opt$cutoff, opt$top_n)
 }
 
 # ==========================================

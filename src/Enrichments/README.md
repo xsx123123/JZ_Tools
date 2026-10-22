@@ -84,17 +84,12 @@ Rscript src/Enrichments/go_enricher.r \
 
 输出目录中会生成：
 
-<<<<<<< HEAD
-- `{name}_UP.csv`
-- `{name}_DOWN.csv`
-- `{name}_UP.png` / `{name}_UP.pdf`
-- `{name}_DOWN.png` / `{name}_DOWN.pdf`
-
-每个方向默认生成简单横向柱状图：按 `p.adjust` 从小到大选择最多 10 条显著通路（`p.adjust < --cutoff`），横轴为命中基因数。不足 10 条时展示实际条数；没有显著通路时输出提示图。可用 `--top_n` 调整显示数量。
-=======
 - `{name}_GO_UP.csv`
 - `{name}_GO_DOWN.csv`
->>>>>>> e092e3be5bce3410be5902c5ef98cb9df55d75a1
+- `{name}_GO_UP.png` / `{name}_GO_UP.pdf`
+- `{name}_GO_DOWN.png` / `{name}_GO_DOWN.pdf`
+
+每个方向默认生成简单横向柱状图：按 `p.adjust` 从小到大选择最多 10 条显著通路（`p.adjust < --cutoff`），横轴为命中基因数。不足 10 条时展示实际条数；没有显著通路时输出提示图。可用 `--top_n` 调整显示数量。
 
 即使没有匹配基因或没有显著通路，也会写出带有原因和计数信息的空结果表。运行错误会以非零状态退出。运行日志写入输出目录的 `{name}_GO.log`，不同比较组使用独立日志。
 
@@ -124,17 +119,11 @@ KEGG 输入表必须包含 `--gene_col` 指定的基因列（默认 `GeneID`）�
 
 每个方向通常会生成：
 
-<<<<<<< HEAD
-- `{name}_UP_enrichments.csv` / `{name}_DOWN_enrichments.csv`：按 `p.adjust < --cutoff` 筛选后的主结果；
-- `{name}_UP_enrichments_full.csv` / `{name}_DOWN_enrichments_full.csv`：完整测试结果（有可测试结果时生成）；
-- `{name}_UP_enrichments.png` / `.pdf` 与 `{name}_DOWN_enrichments.png` / `.pdf`。
-
-主表与 `_full` 表使用同一次富集计算：主表是全量表中 `p.adjust < --cutoff` 的显著通路子集（默认阈值 0.05），`_full` 表还包含未达到该阈值的通路。两者都来自同一方向的基因列表；`_full` 并不表示整个 KEGG 数据库，仍受基因匹配、背景及通路大小等条件限制。如果没有显著通路，主表会写一行 `ID=None, Count=0` 的说明记录，这行不是实际通路。图形只选择显著通路，不会用全量表中的非显著条目补足 10 条。
-=======
 - `{name}_KEGG_UP_enrichments.csv` / `{name}_KEGG_DOWN_enrichments.csv`：按 `p.adjust < --cutoff` 筛选后的主结果；
 - `{name}_KEGG_UP_enrichments_full.csv` / `{name}_KEGG_DOWN_enrichments_full.csv`：完整测试结果（有可测试结果时生成）；
-- `--plot` 且安装绘图依赖时的对应 `.png` 和 `.pdf` 图。
->>>>>>> e092e3be5bce3410be5902c5ef98cb9df55d75a1
+- `{name}_KEGG_UP_enrichments.png` / `.pdf` 与 `{name}_KEGG_DOWN_enrichments.png` / `.pdf`。
+
+主表与 `_full` 表使用同一次富集计算：主表是全量表中 `p.adjust < --cutoff` 的显著通路子集（默认阈值 0.05），`_full` 表还包含未达到该阈值的通路。两者都来自同一方向的基因列表；`_full` 并不表示整个 KEGG 数据库，仍受基因匹配、背景及通路大小等条件限制。如果没有显著通路，主表会写一行 `ID=None, Count=0` 的说明记录，这行不是实际通路。图形只选择显著通路，不会用全量表中的非显著条目补足 10 条。
 
 ## 3. 批量处理多个 contrast
 
