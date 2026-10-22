@@ -6,10 +6,65 @@ import argparse
 import csv
 import json
 import re
+import sys
 from pathlib import Path
 
 GO_RE = re.compile(r"^GO:\d+$")
 PATHWAY_RE = re.compile(r"^(?:ko|map)\d{5}$")
+KEGG_REST_PATHWAY_KO = "https://rest.kegg.jp/list/pathway/ko"
+KEGG_REST_PATHWAY_MAP = "https://rest.kegg.jp/list/pathway"
+
+# Pathways deleted/merged by KEGG (https://www.genome.jp/kegg/docs/upd_map.html)
+# but still emitted by older eggNOG database builds.
+RETIRED_PATHWAYS = {
+    "ko00072": "Synthesis and degradation of ketone bodies (retired by KEGG, merged into ko00650)",
+    "ko00281": "Geraniol degradation (retired by KEGG, merged into ko00907)",
+    "ko00471": "D-Glutamine and D-glutamate metabolism (retired by KEGG, merged into ko00470)",
+    "ko01058": "Acridone alkaloid biosynthesis (retired by KEGG, merged into ko00996)",
+    "ko01130": "Biosynthesis of antibiotics (retired by KEGG, merged into ko01110)",
+}
+
+
+def load_pathway_names(path: str) -> dict:
+    """ko##### pathway id -> name.
+
+    Resolution order: explicit TSV file, then the KEGG REST API (short
+    timeout, best effort; ko list supplemented by the map list since a few
+    pathways only exist at map level). Retired IDs get historical names.
+    Returns {} when everything is unavailable.
+    """
+    mapping = {}
+
+    def absorb(text: str) -> None:
+        for line in text.splitlines():
+            parts = line.split("\t")
+            if len(parts) == 2 and parts[0].strip():
+                mapping[parts[0].strip().removeprefix("path:")] = parts[1].strip()
+
+    if path:
+        with open(path, encoding="utf-8-sig") as handle:
+            absorb(handle.read())
+        if not mapping:
+            print(f"[warn] pathway name file {path} is empty; trying KEGG REST",
+                  file=sys.stderr)
+    if not mapping:
+        try:
+            import urllib.request
+            with urllib.request.urlopen(KEGG_REST_PATHWAY_KO, timeout=10) as resp:
+                absorb(resp.read().decode("utf-8"))
+            map_names = {}
+            with urllib.request.urlopen(KEGG_REST_PATHWAY_MAP, timeout=10) as resp:
+                for line in resp.read().decode("utf-8").splitlines():
+                    parts = line.split("\t")
+                    if len(parts) == 2 and parts[0].strip():
+                        map_names[parts[0].strip().removeprefix("path:")] = parts[1].strip()
+            for pid, name in map_names.items():
+                mapping.setdefault(pid.replace("map", "ko", 1), name)
+        except Exception as exc:  # noqa: BLE001 - offline fallback keeps IDs as names
+            print(f"[warn] cannot fetch KEGG pathway list: {exc}", file=sys.stderr)
+    for pid, name in RETIRED_PATHWAYS.items():
+        mapping.setdefault(pid, name)
+    return mapping
 
 
 def split_values(value: str):
@@ -31,6 +86,8 @@ def main():
     parser.add_argument("--kegg-id-map", required=True)
     parser.add_argument("--kegg-term2gene", required=True)
     parser.add_argument("--kegg-term2name", required=True)
+    parser.add_argument("--kegg-pathway-names", default="",
+                        help="TSV of ko##### pathway id -> name (falls back to KEGG REST)")
     parser.add_argument("--kegg-config")
     args = parser.parse_args()
 
@@ -55,7 +112,8 @@ def main():
     go_rows = set()
     id_rows = set()
     pathway_rows = set()
-    pathway_names = {}
+    pathway_names = load_pathway_names(args.kegg_pathway_names)
+    observed_pathways = set()
     for row in rows:
         query = normalize_gene_id(row["query"])
         gos = sorted({go for go in split_values(row.get(go_column, "")) if GO_RE.fullmatch(go)})
@@ -66,7 +124,12 @@ def main():
                            if PATHWAY_RE.fullmatch(path) and path.startswith("ko")})
         for pathway in pathways:
             pathway_rows.add((pathway, query))
-            pathway_names.setdefault(pathway, pathway)
+            observed_pathways.add(pathway)
+    for pathway in observed_pathways:
+        pathway_names.setdefault(pathway, pathway)
+    unnamed = sorted(p for p, n in pathway_names.items() if p == n)
+    if unnamed:
+        print(f"[warn] no KEGG pathway name for: {', '.join(unnamed)}", file=sys.stderr)
 
     outputs = {
         "go": Path(args.go_assoc),
